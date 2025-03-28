@@ -1,0 +1,34 @@
+{
+  "extends": "@tsconfig/strictest/tsconfig.json",
+  "compilerOptions": {
+    "allowArbitraryExtensions": true,
+    "allowImportingTsExtensions": true,
+    "allowSyntheticDefaultImports": true,
+    "forceConsistentCasingInFileNames": true,
+    "importHelpers": true,
+    "inlineSourceMap": true,
+    "inlineSources": true,
+    "jsx": "react-jsx",
+    "lib": [
+      "DOM",
+      "ES2024"
+    ],
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "noEmit": true,
+    "skipLibCheck": false,
+    "target": "ES2024",
+    "types": [
+      "node",
+      "obsidian-typings",
+      "svelte"
+    ],
+    "verbatimModuleSyntax": true
+  },
+  "include": [
+    "./src/**/*.svelte",
+    "./src/**/*.ts",
+    "./src/**/*.tsx",
+    "./scripts/**/*.ts"
+  ]
+}

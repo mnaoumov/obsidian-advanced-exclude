@@ -1,0 +1,17 @@
+{
+  "version": "0.2",
+  "ignorePaths": [
+    "dist",
+    "node_modules",
+    "tsconfig.tsbuildinfo"
+  ],
+  "dictionaryDefinitions": [],
+  "dictionaries": [],
+  "words": [
+    "dblclick",
+    "tsbuildinfo"
+  ],
+  "ignoreWords": [],
+  "import": [],
+  "enabled": true
+}
