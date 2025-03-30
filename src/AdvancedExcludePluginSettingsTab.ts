@@ -34,7 +34,7 @@ export class AdvancedExcludePluginSettingsTab extends PluginSettingsTabBase<Adva
         f.appendText(' file manually.');
       }))
       .addTextArea((textArea) => {
-        textArea.setPlaceholder('Add patterns here...');
+        textArea.setPlaceholder('foo/bar/*\n!foo/bar/baz.md');
         textArea.inputEl.addClass('ignore-patterns-control');
         textArea.setDisabled(true);
         invokeAsyncSafely(async () => {
