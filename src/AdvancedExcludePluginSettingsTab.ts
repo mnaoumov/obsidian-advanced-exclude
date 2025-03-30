@@ -52,6 +52,21 @@ export class AdvancedExcludePluginSettingsTab extends PluginSettingsTabBase<Adva
       });
 
     new Setting(this.containerEl)
+      .setName(createFragment((f) => {
+        f.appendText('Include ');
+        appendCodeBlock(f, GIT_IGNORE_FILE);
+        f.appendText(' patterns.');
+      }))
+      .setDesc(createFragment((f) => {
+        f.appendText('Whether to include patterns from ');
+        appendCodeBlock(f, GIT_IGNORE_FILE);
+        f.appendText(' file.');
+      }))
+      .addToggle((toggle) => {
+        this.bind(toggle, 'shouldIncludeGitIgnorePatterns');
+      });
+
+    new Setting(this.containerEl)
       .setName('Ignore Excluded Files')
       .setDesc(createFragment((f) => {
         f.appendText('Whether to ignore files that are excluded by ');
@@ -70,21 +85,6 @@ export class AdvancedExcludePluginSettingsTab extends PluginSettingsTabBase<Adva
             .find((tabButton) => tabButton.textContent === manageButtonCaption)
             ?.click();
         });
-      });
-
-    new Setting(this.containerEl)
-      .setName(createFragment((f) => {
-        f.appendText('Include ');
-        appendCodeBlock(f, GIT_IGNORE_FILE);
-        f.appendText(' patterns.');
-      }))
-      .setDesc(createFragment((f) => {
-        f.appendText('Whether to include patterns from ');
-        appendCodeBlock(f, GIT_IGNORE_FILE);
-        f.appendText(' file.');
-      }))
-      .addToggle((toggle) => {
-        this.bind(toggle, 'shouldIncludeGitIgnorePatterns');
       });
   }
 

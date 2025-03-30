@@ -4,11 +4,12 @@ This is a plugin for [Obsidian](https://obsidian.md/) that enhances the `Exclude
 
 Obsidian has `Files and links > Excluded files` setting, but it is not as useful, because the excluded files are still present in the `Files` pane, appear in `Backlinks` pane, etc.
 
-This plugin improves the setting allowing Excluded files to be truly excluded.
+The plugin adds the following features:
 
-Additionally, it allows to have a separate configuration using [`gitignore`](https://git-scm.com/docs/gitignore) syntax.
-
-You can also edit the configuration file `.obsidianignore` manually.
+- Configure ignore patterns using [`gitignore`](https://git-scm.com/docs/gitignore) syntax.
+- `.obsidianignore` file for manual editing.
+- Support ignore patterns from `.gitignore` file.
+- Reuse existing `Files and links > Excluded files` setting in string/regexp format.
 
 ## Installation
 
