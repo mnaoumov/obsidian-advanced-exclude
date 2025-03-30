@@ -13,10 +13,9 @@ export const ROOT_PATH = '/';
 export const OBSIDIAN_IGNORE_FILE = '.obsidianignore';
 let cachedObsidianIgnoreFileMtime = 0;
 
-export async function getIgnorePatternsStr(plugin: AdvancedExcludePlugin): Promise<string> {
-  const app = plugin.app;
-  const doesIgnoreFileExist = await safeExists(app, OBSIDIAN_IGNORE_FILE);
-  return doesIgnoreFileExist ? await safeRead(app, OBSIDIAN_IGNORE_FILE) : '';
+export async function getIgnorePatternsStr(app: App): Promise<string> {
+  const doesIgnoreFileExist = await existsSafe(app, OBSIDIAN_IGNORE_FILE);
+  return doesIgnoreFileExist ? await readSafe(app, OBSIDIAN_IGNORE_FILE) : '';
 }
 
 export async function isIgnored(normalizedPath: string, plugin: AdvancedExcludePlugin): Promise<boolean> {
@@ -29,30 +28,43 @@ export async function isIgnored(normalizedPath: string, plugin: AdvancedExcludeP
   return ignoreTester.ignores(normalizedPath) || excludeRegExps.some((regExp) => regExp.test(normalizedPath));
 }
 
-export async function setIgnorePatternsStr(plugin: AdvancedExcludePlugin, ignorePatterns: string): Promise<void> {
-  const app = plugin.app;
-  await app.vault.adapter.write(OBSIDIAN_IGNORE_FILE, ignorePatterns);
-  await plugin.updateFileTree();
+export async function setIgnorePatternsStr(app: App, ignorePatterns: string): Promise<void> {
+  await writeSafe(app, OBSIDIAN_IGNORE_FILE, ignorePatterns);
 }
 
-async function safeExists(app: App, path: string): Promise<boolean> {
+async function existsSafe(app: App, path: string): Promise<boolean> {
   const adapter = app.vault.adapter;
   if (adapter instanceof FileSystemAdapter) {
     const fullPath = adapter.getFullPath(path);
-    return adapter.fs.existsSync(fullPath);
+    try {
+      await adapter.fsPromises.access(fullPath);
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   return await adapter.exists(path);
 }
 
-async function safeRead(app: App, path: string): Promise<string> {
+async function readSafe(app: App, path: string): Promise<string> {
   const adapter = app.vault.adapter;
   if (adapter instanceof FileSystemAdapter) {
     const fullPath = adapter.getFullPath(path);
-    return adapter.fs.readFileSync(fullPath, 'utf8');
+    return await adapter.fsPromises.readFile(fullPath, 'utf8');
   }
 
   return await adapter.read(path);
+}
+
+async function writeSafe(app: App, path: string, content: string): Promise<void> {
+  const adapter = app.vault.adapter;
+  if (adapter instanceof FileSystemAdapter) {
+    const fullPath = adapter.getFullPath(path);
+    await adapter.fsPromises.writeFile(fullPath, content);
+    return;
+  }
+  await adapter.write(path, content);
 }
 
 let cachedExcludeRegExps: null | RegExp[] = null;
@@ -88,19 +100,21 @@ export function clearCachedExcludeRegExps(): void {
   cachedExcludeRegExps = null;
 }
 
-async function getIgnoreTester(plugin: AdvancedExcludePlugin): Promise<ignore.Ignore> {
-  const stat = await statSafe(plugin.app, OBSIDIAN_IGNORE_FILE);
-  const currentObsidianIgnoreFileMtime = stat?.mtime ?? 0;
-  if (currentObsidianIgnoreFileMtime !== cachedObsidianIgnoreFileMtime) {
-    cachedIgnoreTester = null;
-    cachedObsidianIgnoreFileMtime = currentObsidianIgnoreFileMtime;
-  }
+export async function isObsidianIgnoreFileChanged(app: App): Promise<boolean> {
+  const stat = await statSafe(app, OBSIDIAN_IGNORE_FILE);
+  const obsidianIgnoreFileMtime = stat?.mtime ?? 0;
+  const isChanged = obsidianIgnoreFileMtime !== cachedObsidianIgnoreFileMtime;
+  cachedObsidianIgnoreFileMtime = obsidianIgnoreFileMtime;
+  cachedIgnoreTester = null;
+  return isChanged;
+}
 
+async function getIgnoreTester(plugin: AdvancedExcludePlugin): Promise<ignore.Ignore> {
   if (cachedIgnoreTester) {
     return cachedIgnoreTester;
   }
 
-  const ignorePatternsStr = await getIgnorePatternsStr(plugin);
+  const ignorePatternsStr = await getIgnorePatternsStr(plugin.app);
   // eslint-disable-next-line require-atomic-updates
   cachedIgnoreTester = ignore({
     ignoreCase: true

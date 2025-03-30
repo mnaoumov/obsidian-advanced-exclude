@@ -38,7 +38,7 @@ export class AdvancedExcludePluginSettingsTab extends PluginSettingsTabBase<Adva
         textArea.inputEl.addClass('ignore-patterns-control');
         textArea.setDisabled(true);
         invokeAsyncSafely(async () => {
-          const previousIgnorePatternsStr = await getIgnorePatternsStr(this.plugin);
+          const previousIgnorePatternsStr = await getIgnorePatternsStr(this.app);
 
           textArea.onChange((value) => {
             this.ignorePatternsStr = value;
@@ -74,7 +74,7 @@ export class AdvancedExcludePluginSettingsTab extends PluginSettingsTabBase<Adva
 
   public override hide(): void {
     if (this.isIgnorePatternsStrChanged) {
-      invokeAsyncSafely(() => setIgnorePatternsStr(this.plugin, this.ignorePatternsStr));
+      invokeAsyncSafely(() => setIgnorePatternsStr(this.app, this.ignorePatternsStr));
     }
   }
 }

@@ -1,8 +1,11 @@
+import type { DataAdapter } from 'obsidian';
+
 import {
   CapacitorAdapter,
   FileSystemAdapter,
   PluginSettingTab
 } from 'obsidian';
+import { invokeAsyncSafely } from 'obsidian-dev-utils/Async';
 import { around } from 'obsidian-dev-utils/obsidian/MonkeyAround';
 import { PluginBase } from 'obsidian-dev-utils/obsidian/Plugin/PluginBase';
 import { basename } from 'obsidian-dev-utils/Path';
@@ -12,13 +15,16 @@ import { AdvancedExcludePluginSettingsTab } from './AdvancedExcludePluginSetting
 import {
   clearCachedExcludeRegExps,
   isIgnored,
+  isObsidianIgnoreFileChanged,
+  OBSIDIAN_IGNORE_FILE,
   ROOT_PATH
 } from './IgnorePatterns.ts';
 
 type CapacitorAdapterReconcileFileCreationFn = CapacitorAdapter['reconcileFileCreation'];
-type CapacitorAdapterReconcileFolderCreationFn = CapacitorAdapter['reconcileFolderCreation'];
+type DataAdapterReconcileDeletionFn = DataAdapter['reconcileDeletion'];
+type DataAdapterReconcileFolderCreationFn = DataAdapter['reconcileFolderCreation'];
 type FileSystemAdapterReconcileFileCreationFn = FileSystemAdapter['reconcileFileCreation'];
-type FileSystemAdapterReconcileFolderCreationFn = FileSystemAdapter['reconcileFolderCreation'];
+
 type GenericReconcileFn = (normalizedPath: string, ...args: unknown[]) => Promise<void>;
 
 export class AdvancedExcludePlugin extends PluginBase<AdvancedExcludePluginSettings> {
@@ -47,16 +53,26 @@ export class AdvancedExcludePlugin extends PluginBase<AdvancedExcludePluginSetti
 
     if (this.app.vault.adapter instanceof CapacitorAdapter) {
       around(this.app.vault.adapter, {
+        reconcileDeletion: (next: DataAdapterReconcileDeletionFn): DataAdapterReconcileDeletionFn => {
+          return async (normalizedPath: string, normalizedNewPath: string, shouldSkipDeletionTimeout?: boolean): Promise<void> => {
+            return this.reconcileDeletion(next, normalizedPath, normalizedNewPath, shouldSkipDeletionTimeout);
+          };
+        },
         reconcileFileCreation: (next: CapacitorAdapterReconcileFileCreationFn): CapacitorAdapterReconcileFileCreationFn =>
           this.generateReconcileWrapper(next as GenericReconcileFn),
-        reconcileFolderCreation: (next: CapacitorAdapterReconcileFolderCreationFn): CapacitorAdapterReconcileFolderCreationFn =>
+        reconcileFolderCreation: (next: DataAdapterReconcileFolderCreationFn): DataAdapterReconcileFolderCreationFn =>
           this.generateReconcileWrapper(next as GenericReconcileFn)
       });
     } else if (this.app.vault.adapter instanceof FileSystemAdapter) {
       around(this.app.vault.adapter, {
+        reconcileDeletion: (next: DataAdapterReconcileDeletionFn): DataAdapterReconcileDeletionFn => {
+          return async (normalizedPath: string, normalizedNewPath: string, shouldSkipDeletionTimeout?: boolean): Promise<void> => {
+            return this.reconcileDeletion(next, normalizedPath, normalizedNewPath, shouldSkipDeletionTimeout);
+          };
+        },
         reconcileFileCreation: (next: FileSystemAdapterReconcileFileCreationFn): FileSystemAdapterReconcileFileCreationFn =>
           this.generateReconcileWrapper(next as GenericReconcileFn),
-        reconcileFolderCreation: (next: FileSystemAdapterReconcileFolderCreationFn): FileSystemAdapterReconcileFolderCreationFn =>
+        reconcileFolderCreation: (next: DataAdapterReconcileFolderCreationFn): DataAdapterReconcileFolderCreationFn =>
           this.generateReconcileWrapper(next as GenericReconcileFn)
       });
     }
@@ -73,6 +89,18 @@ export class AdvancedExcludePlugin extends PluginBase<AdvancedExcludePluginSetti
 
   private isDotFile(path: string): boolean {
     return basename(path).startsWith('.');
+  }
+
+  private async reconcileDeletion(
+    next: DataAdapterReconcileDeletionFn,
+    normalizedPath: string,
+    normalizedNewPath: string,
+    shouldSkipDeletionTimeout?: boolean
+  ): Promise<void> {
+    await next.call(this.app.vault.adapter, normalizedPath, normalizedNewPath, shouldSkipDeletionTimeout);
+    if (normalizedNewPath === OBSIDIAN_IGNORE_FILE && this.app.workspace.layoutReady && await isObsidianIgnoreFileChanged(this.app)) {
+      invokeAsyncSafely(() => this.updateFileTree());
+    }
   }
 
   private async reloadFolder(folderPath: string): Promise<void> {
