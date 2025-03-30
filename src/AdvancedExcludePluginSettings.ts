@@ -2,6 +2,7 @@ import { PluginSettingsBase } from 'obsidian-dev-utils/obsidian/Plugin/PluginSet
 
 export class AdvancedExcludePluginSettings extends PluginSettingsBase {
   public shouldIgnoreExcludedFiles = true;
+  public shouldIncludeGitIgnorePatterns = true;
 
   public constructor(data: unknown) {
     super();

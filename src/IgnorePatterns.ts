@@ -14,18 +14,32 @@ import type { AdvancedExcludePlugin } from './AdvancedExcludePlugin.ts';
 
 export const ROOT_PATH = '/';
 export const OBSIDIAN_IGNORE_FILE = '.obsidianignore';
+export const GIT_IGNORE_FILE = '.gitignore';
 
-let cachedObsidianIgnoreFileMtime = 0;
 let cachedExcludeRegExps: null | RegExp[] = null;
 let cachedIgnoreTester: ignore.Ignore | null = null;
+const cachedModificationTimes = new Map<string, number>();
 
 export function clearCachedExcludeRegExps(): void {
   cachedExcludeRegExps = null;
 }
 
-export async function getIgnorePatternsStr(app: App): Promise<string> {
-  const doesIgnoreFileExist = await existsSafe(app, OBSIDIAN_IGNORE_FILE);
-  return doesIgnoreFileExist ? await readSafe(app, OBSIDIAN_IGNORE_FILE) : '';
+export async function getIgnorePatternsStr(plugin: AdvancedExcludePlugin): Promise<string> {
+  return await readSafe(plugin.app, OBSIDIAN_IGNORE_FILE);
+}
+
+export async function isIgnoreConfigFileChanged(plugin: AdvancedExcludePlugin, path: string): Promise<boolean> {
+  const configFiles = getConfigFiles(plugin);
+  if (!configFiles.includes(path)) {
+    return false;
+  }
+
+  const stat = await statSafe(plugin.app, path);
+  const mtime = stat?.mtime ?? 0;
+  const isChanged = mtime !== (cachedModificationTimes.get(path) ?? 0);
+  cachedModificationTimes.set(path, mtime);
+  cachedIgnoreTester = null;
+  return isChanged;
 }
 
 export async function isIgnored(normalizedPath: string, plugin: AdvancedExcludePlugin): Promise<boolean> {
@@ -40,15 +54,6 @@ export async function isIgnored(normalizedPath: string, plugin: AdvancedExcludeP
   const ignoreTester = await getIgnoreTester(plugin);
   const excludeRegExps = getExcludeRegExps(plugin);
   return ignoreTester.ignores(normalizedPath) || excludeRegExps.some((regExp) => regExp.test(normalizedPath));
-}
-
-export async function isObsidianIgnoreFileChanged(app: App): Promise<boolean> {
-  const stat = await statSafe(app, OBSIDIAN_IGNORE_FILE);
-  const obsidianIgnoreFileMtime = stat?.mtime ?? 0;
-  const isChanged = obsidianIgnoreFileMtime !== cachedObsidianIgnoreFileMtime;
-  cachedObsidianIgnoreFileMtime = obsidianIgnoreFileMtime;
-  cachedIgnoreTester = null;
-  return isChanged;
 }
 
 export async function setIgnorePatternsStr(app: App, ignorePatterns: string): Promise<void> {
@@ -68,6 +73,29 @@ async function existsSafe(app: App, path: string): Promise<boolean> {
   }
 
   return await adapter.exists(path);
+}
+
+async function getAllIgnorePatternsStr(plugin: AdvancedExcludePlugin): Promise<string> {
+  const configFiles = getConfigFiles(plugin);
+
+  let patternsStr = '';
+
+  for (const configFile of configFiles) {
+    const content = await readSafe(plugin.app, configFile);
+    if (content) {
+      patternsStr += `${content}\n`;
+    }
+  }
+
+  return patternsStr;
+}
+
+function getConfigFiles(plugin: AdvancedExcludePlugin): string[] {
+  const configFiles = [OBSIDIAN_IGNORE_FILE];
+  if (plugin.settings.shouldIncludeGitIgnorePatterns) {
+    configFiles.push(GIT_IGNORE_FILE);
+  }
+  return configFiles;
 }
 
 function getExcludeRegExps(plugin: AdvancedExcludePlugin): RegExp[] {
@@ -100,7 +128,7 @@ async function getIgnoreTester(plugin: AdvancedExcludePlugin): Promise<ignore.Ig
     return cachedIgnoreTester;
   }
 
-  const ignorePatternsStr = await getIgnorePatternsStr(plugin.app);
+  const ignorePatternsStr = await getAllIgnorePatternsStr(plugin);
   // eslint-disable-next-line require-atomic-updates
   cachedIgnoreTester = ignore({
     ignoreCase: true
@@ -109,6 +137,10 @@ async function getIgnoreTester(plugin: AdvancedExcludePlugin): Promise<ignore.Ig
 }
 
 async function readSafe(app: App, path: string): Promise<string> {
+  if (!await existsSafe(app, path)) {
+    return '';
+  }
+
   const adapter = app.vault.adapter;
   const fullPath = adapter.getFullPath(path);
 

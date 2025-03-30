@@ -7,6 +7,7 @@ import type { AdvancedExcludePlugin } from './AdvancedExcludePlugin.ts';
 
 import {
   getIgnorePatternsStr,
+  GIT_IGNORE_FILE,
   OBSIDIAN_IGNORE_FILE,
   setIgnorePatternsStr
 } from './IgnorePatterns.ts';
@@ -19,7 +20,7 @@ export class AdvancedExcludePluginSettingsTab extends PluginSettingsTabBase<Adva
     this.containerEl.empty();
 
     new Setting(this.containerEl)
-      .setName('Ignore Patterns')
+      .setName('Ignore patterns')
       .setDesc(createFragment((f) => {
         f.appendText('Patterns to ignore files and folders.');
         f.createEl('br');
@@ -38,7 +39,7 @@ export class AdvancedExcludePluginSettingsTab extends PluginSettingsTabBase<Adva
         textArea.inputEl.addClass('ignore-patterns-control');
         textArea.setDisabled(true);
         invokeAsyncSafely(async () => {
-          const previousIgnorePatternsStr = await getIgnorePatternsStr(this.app);
+          const previousIgnorePatternsStr = await getIgnorePatternsStr(this.plugin);
 
           textArea.onChange((value) => {
             this.ignorePatternsStr = value;
@@ -69,6 +70,21 @@ export class AdvancedExcludePluginSettingsTab extends PluginSettingsTabBase<Adva
             .find((tabButton) => tabButton.textContent === manageButtonCaption)
             ?.click();
         });
+      });
+
+    new Setting(this.containerEl)
+      .setName(createFragment((f) => {
+        f.appendText('Include ');
+        appendCodeBlock(f, GIT_IGNORE_FILE);
+        f.appendText(' patterns.');
+      }))
+      .setDesc(createFragment((f) => {
+        f.appendText('Whether to include patterns from ');
+        appendCodeBlock(f, GIT_IGNORE_FILE);
+        f.appendText(' file.');
+      }))
+      .addToggle((toggle) => {
+        this.bind(toggle, 'shouldIncludeGitIgnorePatterns');
       });
   }
 

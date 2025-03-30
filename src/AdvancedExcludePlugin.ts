@@ -14,9 +14,8 @@ import { AdvancedExcludePluginSettings } from './AdvancedExcludePluginSettings.t
 import { AdvancedExcludePluginSettingsTab } from './AdvancedExcludePluginSettingsTab.ts';
 import {
   clearCachedExcludeRegExps,
+  isIgnoreConfigFileChanged,
   isIgnored,
-  isObsidianIgnoreFileChanged,
-  OBSIDIAN_IGNORE_FILE,
   ROOT_PATH
 } from './IgnorePatterns.ts';
 
@@ -102,7 +101,7 @@ export class AdvancedExcludePlugin extends PluginBase<AdvancedExcludePluginSetti
     shouldSkipDeletionTimeout?: boolean
   ): Promise<void> {
     await next.call(this.app.vault.adapter, normalizedPath, normalizedNewPath, shouldSkipDeletionTimeout);
-    if (normalizedNewPath === OBSIDIAN_IGNORE_FILE && this.app.workspace.layoutReady && await isObsidianIgnoreFileChanged(this.app)) {
+    if (this.app.workspace.layoutReady && await isIgnoreConfigFileChanged(this, normalizedPath)) {
       invokeAsyncSafely(() => this.updateFileTree());
     }
   }
