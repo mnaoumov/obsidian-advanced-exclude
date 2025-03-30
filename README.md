@@ -1,6 +1,6 @@
 # Advanced Exclude
 
-This is a plugin for [Obsidian](https://obsidian.md/) that enhances the `Excluded files` setting.
+This is a plugin for [Obsidian](https://obsidian.md/) that enhances the `Excluded files` setting bringing `gitignore` syntax.
 
 Obsidian has `Files and links > Excluded files` setting, but it is not as useful, because the excluded files are still present in the `Files` pane, appear in `Backlinks` pane, etc.
 
