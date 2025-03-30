@@ -11,6 +11,12 @@ The plugin adds the following features:
 - Support ignore patterns from `.gitignore` file.
 - Reuse existing `Files and links > Excluded files` setting in string/regexp format.
 
+> [!WARNING]
+>
+> The plugin makes Obsidian behave like the ignored files do not exist. This might affect features like [`Obsidian Sync`](https://help.obsidian.md/sync), [`Obsidian Publish`](https://help.obsidian.md/publish), etc.
+>
+> Ensure you configured the plugin correctly to avoid data loss.
+
 ## Installation
 
 The plugin is not available in [the official Community Plugins repository](https://obsidian.md/plugins) yet.
