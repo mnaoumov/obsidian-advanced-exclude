@@ -4,14 +4,24 @@ import type {
 } from 'obsidian';
 
 import ignore from 'ignore';
-import { FileSystemAdapter } from 'obsidian';
+import {
+  CapacitorAdapter,
+  FileSystemAdapter
+} from 'obsidian';
 import { escapeRegExp } from 'obsidian-dev-utils/RegExp';
 
 import type { AdvancedExcludePlugin } from './AdvancedExcludePlugin.ts';
 
 export const ROOT_PATH = '/';
 export const OBSIDIAN_IGNORE_FILE = '.obsidianignore';
+
 let cachedObsidianIgnoreFileMtime = 0;
+let cachedExcludeRegExps: null | RegExp[] = null;
+let cachedIgnoreTester: ignore.Ignore | null = null;
+
+export function clearCachedExcludeRegExps(): void {
+  cachedExcludeRegExps = null;
+}
 
 export async function getIgnorePatternsStr(app: App): Promise<string> {
   const doesIgnoreFileExist = await existsSafe(app, OBSIDIAN_IGNORE_FILE);
@@ -32,6 +42,15 @@ export async function isIgnored(normalizedPath: string, plugin: AdvancedExcludeP
   return ignoreTester.ignores(normalizedPath) || excludeRegExps.some((regExp) => regExp.test(normalizedPath));
 }
 
+export async function isObsidianIgnoreFileChanged(app: App): Promise<boolean> {
+  const stat = await statSafe(app, OBSIDIAN_IGNORE_FILE);
+  const obsidianIgnoreFileMtime = stat?.mtime ?? 0;
+  const isChanged = obsidianIgnoreFileMtime !== cachedObsidianIgnoreFileMtime;
+  cachedObsidianIgnoreFileMtime = obsidianIgnoreFileMtime;
+  cachedIgnoreTester = null;
+  return isChanged;
+}
+
 export async function setIgnorePatternsStr(app: App, ignorePatterns: string): Promise<void> {
   await writeSafe(app, OBSIDIAN_IGNORE_FILE, ignorePatterns);
 }
@@ -50,28 +69,6 @@ async function existsSafe(app: App, path: string): Promise<boolean> {
 
   return await adapter.exists(path);
 }
-
-async function readSafe(app: App, path: string): Promise<string> {
-  const adapter = app.vault.adapter;
-  if (adapter instanceof FileSystemAdapter) {
-    const fullPath = adapter.getFullPath(path);
-    return await adapter.fsPromises.readFile(fullPath, 'utf8');
-  }
-
-  return await adapter.read(path);
-}
-
-async function writeSafe(app: App, path: string, content: string): Promise<void> {
-  const adapter = app.vault.adapter;
-  if (adapter instanceof FileSystemAdapter) {
-    const fullPath = adapter.getFullPath(path);
-    await adapter.fsPromises.writeFile(fullPath, content);
-    return;
-  }
-  await adapter.write(path, content);
-}
-
-let cachedExcludeRegExps: null | RegExp[] = null;
 
 function getExcludeRegExps(plugin: AdvancedExcludePlugin): RegExp[] {
   if (!plugin.settings.shouldIgnoreExcludedFiles) {
@@ -98,21 +95,6 @@ function getExcludeRegExps(plugin: AdvancedExcludePlugin): RegExp[] {
   return excludeRegExps;
 }
 
-let cachedIgnoreTester: ignore.Ignore | null = null;
-
-export function clearCachedExcludeRegExps(): void {
-  cachedExcludeRegExps = null;
-}
-
-export async function isObsidianIgnoreFileChanged(app: App): Promise<boolean> {
-  const stat = await statSafe(app, OBSIDIAN_IGNORE_FILE);
-  const obsidianIgnoreFileMtime = stat?.mtime ?? 0;
-  const isChanged = obsidianIgnoreFileMtime !== cachedObsidianIgnoreFileMtime;
-  cachedObsidianIgnoreFileMtime = obsidianIgnoreFileMtime;
-  cachedIgnoreTester = null;
-  return isChanged;
-}
-
 async function getIgnoreTester(plugin: AdvancedExcludePlugin): Promise<ignore.Ignore> {
   if (cachedIgnoreTester) {
     return cachedIgnoreTester;
@@ -126,10 +108,24 @@ async function getIgnoreTester(plugin: AdvancedExcludePlugin): Promise<ignore.Ig
   return cachedIgnoreTester;
 }
 
+async function readSafe(app: App, path: string): Promise<string> {
+  const adapter = app.vault.adapter;
+  const fullPath = adapter.getFullPath(path);
+
+  if (adapter instanceof FileSystemAdapter) {
+    return await adapter.fsPromises.readFile(fullPath, 'utf8');
+  }
+  if (adapter instanceof CapacitorAdapter) {
+    return await adapter.fs.read(fullPath);
+  }
+
+  throw new Error('Unknown adapter');
+}
+
 async function statSafe(app: App, path: string): Promise<null | Stat> {
   const adapter = app.vault.adapter;
+  const fullPath = adapter.getFullPath(path);
   if (adapter instanceof FileSystemAdapter) {
-    const fullPath = adapter.getFullPath(path);
     const fsStats = await adapter.fsPromises.stat(fullPath);
     return {
       ctime: Math.round(fsStats.birthtimeMs),
@@ -138,6 +134,31 @@ async function statSafe(app: App, path: string): Promise<null | Stat> {
       type: fsStats.isFile() ? 'file' : 'directory'
     } as Stat;
   }
+  if (adapter instanceof CapacitorAdapter) {
+    const fsStats = await adapter.fs.stat(fullPath);
+    return {
+      ctime: fsStats.ctime ?? 0,
+      mtime: fsStats.mtime ?? 0,
+      size: fsStats.size ?? 0,
+      type: fsStats.type
+    } as Stat;
+  }
+  throw new Error('Unknown adapter');
+}
 
-  return await adapter.stat(path);
+async function writeSafe(app: App, path: string, content: string): Promise<void> {
+  const adapter = app.vault.adapter;
+  const fullPath = adapter.getFullPath(path);
+
+  if (adapter instanceof FileSystemAdapter) {
+    await adapter.fsPromises.writeFile(fullPath, content);
+    return;
+  }
+
+  if (adapter instanceof CapacitorAdapter) {
+    await adapter.fs.write(fullPath, content);
+    return;
+  }
+
+  throw new Error('Unknown adapter');
 }
