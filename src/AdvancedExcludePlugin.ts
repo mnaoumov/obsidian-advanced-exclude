@@ -6,7 +6,7 @@ import {
   PluginSettingTab
 } from 'obsidian';
 import { invokeAsyncSafely } from 'obsidian-dev-utils/Async';
-import { around } from 'obsidian-dev-utils/obsidian/MonkeyAround';
+import { registerPatch } from 'obsidian-dev-utils/obsidian/MonkeyAround';
 import { PluginBase } from 'obsidian-dev-utils/obsidian/Plugin/PluginBase';
 import { basename } from 'obsidian-dev-utils/Path';
 
@@ -41,7 +41,7 @@ export class AdvancedExcludePlugin extends PluginBase<AdvancedExcludePluginSetti
   }
 
   protected override async onLayoutReady(): Promise<void> {
-    // Await updateFileTree(this);
+    await this.updateFileTree();
   }
 
   protected override onloadComplete(): void {
@@ -52,7 +52,7 @@ export class AdvancedExcludePlugin extends PluginBase<AdvancedExcludePluginSetti
     }));
 
     if (this.app.vault.adapter instanceof CapacitorAdapter) {
-      around(this.app.vault.adapter, {
+      registerPatch(this, this.app.vault.adapter, {
         reconcileDeletion: (next: DataAdapterReconcileDeletionFn): DataAdapterReconcileDeletionFn => {
           return async (normalizedPath: string, normalizedNewPath: string, shouldSkipDeletionTimeout?: boolean): Promise<void> => {
             return this.reconcileDeletion(next, normalizedPath, normalizedNewPath, shouldSkipDeletionTimeout);
@@ -64,7 +64,7 @@ export class AdvancedExcludePlugin extends PluginBase<AdvancedExcludePluginSetti
           this.generateReconcileWrapper(next as GenericReconcileFn)
       });
     } else if (this.app.vault.adapter instanceof FileSystemAdapter) {
-      around(this.app.vault.adapter, {
+      registerPatch(this, this.app.vault.adapter, {
         reconcileDeletion: (next: DataAdapterReconcileDeletionFn): DataAdapterReconcileDeletionFn => {
           return async (normalizedPath: string, normalizedNewPath: string, shouldSkipDeletionTimeout?: boolean): Promise<void> => {
             return this.reconcileDeletion(next, normalizedPath, normalizedNewPath, shouldSkipDeletionTimeout);
@@ -76,6 +76,10 @@ export class AdvancedExcludePlugin extends PluginBase<AdvancedExcludePluginSetti
           this.generateReconcileWrapper(next as GenericReconcileFn)
       });
     }
+
+    this.register(() => {
+      invokeAsyncSafely(() => this.updateFileTree());
+    });
   }
 
   private generateReconcileWrapper(next: GenericReconcileFn): GenericReconcileFn {

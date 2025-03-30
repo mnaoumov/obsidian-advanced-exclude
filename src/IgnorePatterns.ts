@@ -19,6 +19,10 @@ export async function getIgnorePatternsStr(app: App): Promise<string> {
 }
 
 export async function isIgnored(normalizedPath: string, plugin: AdvancedExcludePlugin): Promise<boolean> {
+  if (!plugin._loaded) {
+    return false;
+  }
+
   if (normalizedPath === ROOT_PATH) {
     return false;
   }
