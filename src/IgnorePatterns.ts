@@ -82,7 +82,7 @@ function getExcludeRegExps(plugin: AdvancedExcludePlugin): RegExp[] {
     return cachedExcludeRegExps;
   }
 
-  const filters = plugin.app.vault.getConfig('userIgnoreFilters') as string[];
+  const filters = (plugin.app.vault.getConfig('userIgnoreFilters') ?? []) as string[];
   const excludeRegExps = filters.map((filter) => {
     if (filter.length > 1 && filter.startsWith('/') && filter.endsWith('/')) {
       try {
