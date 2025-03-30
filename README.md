@@ -2,6 +2,14 @@
 
 This is a plugin for [Obsidian](https://obsidian.md/) that enhances the `Excluded files` setting.
 
+Obsidian has `Files and links > Excluded files` setting, but it is not as useful, because the excluded files are still present in the `Files` pane, appear in `Backlinks` pane, etc.
+
+This plugin improves the setting allowing Excluded files to be truly excluded.
+
+Additionally, it allows to have a separate configuration using [`gitignore`](https://git-scm.com/docs/gitignore) syntax.
+
+You can also edit the configuration file `.obsidianignore` manually.
+
 ## Installation
 
 The plugin is not available in [the official Community Plugins repository](https://obsidian.md/plugins) yet.
@@ -13,9 +21,9 @@ To install the latest beta release of this plugin (regardless if it is available
 1. Make sure to have the [BRAT plugin](https://obsidian.md/plugins?id=obsidian42-brat) installed and enabled.
 2. Paste the following link in your browser and press `Enter`:
 
-    ```
-    obsidian://brat?plugin=https://github.com/mnaoumov/obsidian-advanced-exclude
-    ```
+   ```
+   obsidian://brat?plugin=https://github.com/mnaoumov/obsidian-advanced-exclude
+   ```
 
 3. An Obsidian pop-up window should appear. In the window, click the `Add plugin` button once and wait a few seconds for the plugin to install.
 
