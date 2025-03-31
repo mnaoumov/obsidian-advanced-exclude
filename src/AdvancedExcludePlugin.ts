@@ -103,7 +103,9 @@ export class AdvancedExcludePlugin extends PluginBase<AdvancedExcludePluginSetti
 
   private async reloadFolder(folderPath: string): Promise<void> {
     this.consoleDebug(`Reloading folder: ${folderPath}`);
-    this.updateProgressEl.max++;
+    if (folderPath !== ROOT_PATH) {
+      this.updateProgressEl.max++;
+    }
     const folder = this.app.vault.getFolderByPath(folderPath);
     if (!folder) {
       this.updateProgressEl.value++;
