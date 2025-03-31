@@ -27,10 +27,6 @@ type FileSystemAdapterReconcileFileCreationFn = FileSystemAdapter['reconcileFile
 type GenericReconcileFn = (normalizedPath: string, ...args: unknown[]) => Promise<void>;
 
 export class AdvancedExcludePlugin extends PluginBase<AdvancedExcludePluginSettings> {
-  public async updateFileTree(): Promise<void> {
-    await this.reloadFolder(ROOT_PATH);
-  }
-
   protected override createPluginSettings(data: unknown): AdvancedExcludePluginSettings {
     return new AdvancedExcludePluginSettings(data);
   }
@@ -40,10 +36,6 @@ export class AdvancedExcludePlugin extends PluginBase<AdvancedExcludePluginSetti
   }
 
   protected override async onLayoutReady(): Promise<void> {
-    await this.updateFileTree();
-  }
-
-  protected override onloadComplete(): void {
     this.registerEvent(this.app.vault.on('config-changed', (configKey: string) => {
       if (configKey === 'userIgnoreFilters') {
         clearCachedExcludeRegExps();
@@ -79,6 +71,8 @@ export class AdvancedExcludePlugin extends PluginBase<AdvancedExcludePluginSetti
     this.register(() => {
       invokeAsyncSafely(() => this.updateFileTree());
     });
+
+    await this.updateFileTree();
   }
 
   private generateReconcileWrapper(next: GenericReconcileFn): GenericReconcileFn {
@@ -148,5 +142,9 @@ export class AdvancedExcludePlugin extends PluginBase<AdvancedExcludePluginSetti
         await this.reloadFolder(childFolderPath);
       }
     }
+  }
+
+  private async updateFileTree(): Promise<void> {
+    await this.reloadFolder(ROOT_PATH);
   }
 }
