@@ -27,6 +27,7 @@ type FileSystemAdapterReconcileFileCreationFn = FileSystemAdapter['reconcileFile
 type GenericReconcileFn = (normalizedPath: string, ...args: unknown[]) => Promise<void>;
 
 export class AdvancedExcludePlugin extends PluginBase<AdvancedExcludePluginSettings> {
+  private updateProgressEl!: HTMLProgressElement;
   protected override createPluginSettings(data: unknown): AdvancedExcludePluginSettings {
     return new AdvancedExcludePluginSettings(data);
   }
@@ -101,8 +102,10 @@ export class AdvancedExcludePlugin extends PluginBase<AdvancedExcludePluginSetti
   }
 
   private async reloadFolder(folderPath: string): Promise<void> {
+    this.updateProgressEl.max++;
     const folder = this.app.vault.getFolderByPath(folderPath);
     if (!folder) {
+      this.updateProgressEl.value++;
       return;
     }
 
@@ -112,12 +115,14 @@ export class AdvancedExcludePlugin extends PluginBase<AdvancedExcludePluginSetti
     }
 
     const listedFiles = await adapter.list(folderPath);
+    this.updateProgressEl.max += listedFiles.files.length + listedFiles.folders.length;
 
     const includedPaths = new Set<string>();
 
     const orphanPaths = new Set<string>(folder.children.map((child) => child.path));
 
     for (const childPath of listedFiles.files.concat(listedFiles.folders)) {
+      this.updateProgressEl.value++;
       if (this.isDotFile(childPath)) {
         continue;
       }
@@ -133,7 +138,9 @@ export class AdvancedExcludePlugin extends PluginBase<AdvancedExcludePluginSetti
       }
     }
 
+    this.updateProgressEl.max += orphanPaths.size;
     for (const orphanPath of orphanPaths) {
+      this.updateProgressEl.value++;
       await adapter.reconcileDeletion(orphanPath, orphanPath);
     }
 
@@ -142,9 +149,17 @@ export class AdvancedExcludePlugin extends PluginBase<AdvancedExcludePluginSetti
         await this.reloadFolder(childFolderPath);
       }
     }
+
+    this.updateProgressEl.value++;
   }
 
   private async updateFileTree(): Promise<void> {
+    const fragment = createFragment((f) => {
+      f.appendText('Advanced Exclude: Updating file tree...');
+      this.updateProgressEl = f.createEl('progress');
+    });
+    const notice = new Notice(fragment, 0);
     await this.reloadFolder(ROOT_PATH);
+    notice.hide();
   }
 }
