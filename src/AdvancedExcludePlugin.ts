@@ -5,7 +5,11 @@ import {
   FileSystemAdapter,
   PluginSettingTab
 } from 'obsidian';
-import { invokeAsyncSafely } from 'obsidian-dev-utils/Async';
+import {
+  ignoreError,
+  invokeAsyncSafely,
+  throwOnAbort
+} from 'obsidian-dev-utils/Async';
 import { registerPatch } from 'obsidian-dev-utils/obsidian/MonkeyAround';
 import { PluginBase } from 'obsidian-dev-utils/obsidian/Plugin/PluginBase';
 import { basename } from 'obsidian-dev-utils/Path';
@@ -27,7 +31,9 @@ type FileSystemAdapterReconcileFileCreationFn = FileSystemAdapter['reconcileFile
 type GenericReconcileFn = (normalizedPath: string, ...args: unknown[]) => Promise<void>;
 
 export class AdvancedExcludePlugin extends PluginBase<AdvancedExcludePluginSettings> {
+  private updateFileTreeAbortController: AbortController | null = null;
   private updateProgressEl!: HTMLProgressElement;
+
   protected override createPluginSettings(data: unknown): AdvancedExcludePluginSettings {
     return new AdvancedExcludePluginSettings(data);
   }
@@ -101,7 +107,10 @@ export class AdvancedExcludePlugin extends PluginBase<AdvancedExcludePluginSetti
     }
   }
 
-  private async reloadFolder(folderPath: string): Promise<void> {
+  private async reloadFolder(folderPath: string, abortSignal: AbortSignal): Promise<void> {
+    if (abortSignal.aborted) {
+      return;
+    }
     this.consoleDebug(`Reloading folder: ${folderPath}`);
     if (folderPath !== ROOT_PATH) {
       this.updateProgressEl.max++;
@@ -126,6 +135,10 @@ export class AdvancedExcludePlugin extends PluginBase<AdvancedExcludePluginSetti
 
     for (const childPath of listedFiles.files.concat(listedFiles.folders)) {
       try {
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+        if (abortSignal.aborted) {
+          return;
+        }
         this.consoleDebug(`Reloading file: ${childPath}`);
         if (this.isDotFile(childPath)) {
           continue;
@@ -153,6 +166,10 @@ export class AdvancedExcludePlugin extends PluginBase<AdvancedExcludePluginSetti
 
     this.updateProgressEl.max += orphanPaths.size;
     for (const orphanPath of orphanPaths) {
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+      if (abortSignal.aborted) {
+        return;
+      }
       this.consoleDebug(`Cleaning orphan file: ${orphanPath}`);
       this.updateProgressEl.value++;
       try {
@@ -163,9 +180,13 @@ export class AdvancedExcludePlugin extends PluginBase<AdvancedExcludePluginSetti
     }
 
     for (const childFolderPath of listedFiles.folders) {
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+      if (abortSignal.aborted) {
+        return;
+      }
       if (includedPaths.has(childFolderPath)) {
         try {
-          await this.reloadFolder(childFolderPath);
+          await this.reloadFolder(childFolderPath, abortSignal);
         } catch (e) {
           console.error(`Failed reloading folder ${childFolderPath}`, e);
         }
@@ -176,15 +197,27 @@ export class AdvancedExcludePlugin extends PluginBase<AdvancedExcludePluginSetti
   }
 
   private async updateFileTree(): Promise<void> {
+    const NOTIFICATION_MIN_DURATION_IN_MS = 2000;
+
+    if (this.updateFileTreeAbortController) {
+      this.updateFileTreeAbortController.abort();
+    }
+
+    this.updateFileTreeAbortController = new AbortController();
+    const abortSignal = this.updateFileTreeAbortController.signal;
     const fragment = createFragment((f) => {
       f.appendText('Advanced Exclude: Updating file tree...');
       this.updateProgressEl = f.createEl('progress');
     });
     const notice = new Notice(fragment, 0);
     try {
-      await this.reloadFolder(ROOT_PATH);
+      await Promise.race([
+        Promise.all([this.reloadFolder(ROOT_PATH, abortSignal), sleep(NOTIFICATION_MIN_DURATION_IN_MS)]),
+        ignoreError(throwOnAbort(abortSignal))
+      ]);
     } finally {
       notice.hide();
+      this.updateFileTreeAbortController = null;
     }
   }
 }
