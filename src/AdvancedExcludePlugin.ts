@@ -102,6 +102,7 @@ export class AdvancedExcludePlugin extends PluginBase<AdvancedExcludePluginSetti
   }
 
   private async reloadFolder(folderPath: string): Promise<void> {
+    this.consoleDebug(`Reloading folder: ${folderPath}`);
     this.updateProgressEl.max++;
     const folder = this.app.vault.getFolderByPath(folderPath);
     if (!folder) {
@@ -122,31 +123,46 @@ export class AdvancedExcludePlugin extends PluginBase<AdvancedExcludePluginSetti
     const orphanPaths = new Set<string>(folder.children.map((child) => child.path));
 
     for (const childPath of listedFiles.files.concat(listedFiles.folders)) {
-      this.updateProgressEl.value++;
-      if (this.isDotFile(childPath)) {
-        continue;
-      }
+      try {
+        this.consoleDebug(`Reloading file: ${childPath}`);
+        if (this.isDotFile(childPath)) {
+          continue;
+        }
 
-      orphanPaths.delete(childPath);
+        orphanPaths.delete(childPath);
 
-      const isChildPathIgnored = await isIgnored(childPath, this);
-      if (isChildPathIgnored) {
-        await adapter.reconcileDeletion(childPath, childPath);
-      } else {
-        await adapter.reconcileFile(childPath, childPath);
-        includedPaths.add(childPath);
+        const isChildPathIgnored = await isIgnored(childPath, this);
+        if (isChildPathIgnored) {
+          await adapter.reconcileDeletion(childPath, childPath);
+        } else {
+          await adapter.reconcileFile(childPath, childPath);
+          includedPaths.add(childPath);
+        }
+      } catch (e) {
+        console.error(`Failed reloading file: ${childPath}`, e);
+      } finally {
+        this.updateProgressEl.value++;
       }
     }
 
     this.updateProgressEl.max += orphanPaths.size;
     for (const orphanPath of orphanPaths) {
+      this.consoleDebug(`Cleaning orphan file: ${orphanPath}`);
       this.updateProgressEl.value++;
-      await adapter.reconcileDeletion(orphanPath, orphanPath);
+      try {
+        await adapter.reconcileDeletion(orphanPath, orphanPath);
+      } catch (e) {
+        console.error(`Failed cleaning orphan file ${orphanPath}`, e);
+      }
     }
 
     for (const childFolderPath of listedFiles.folders) {
       if (includedPaths.has(childFolderPath)) {
-        await this.reloadFolder(childFolderPath);
+        try {
+          await this.reloadFolder(childFolderPath);
+        } catch (e) {
+          console.error(`Failed reloading folder ${childFolderPath}`, e);
+        }
       }
     }
 
@@ -159,7 +175,10 @@ export class AdvancedExcludePlugin extends PluginBase<AdvancedExcludePluginSetti
       this.updateProgressEl = f.createEl('progress');
     });
     const notice = new Notice(fragment, 0);
-    await this.reloadFolder(ROOT_PATH);
-    notice.hide();
+    try {
+      await this.reloadFolder(ROOT_PATH);
+    } finally {
+      notice.hide();
+    }
   }
 }
