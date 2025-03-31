@@ -135,7 +135,11 @@ export class AdvancedExcludePlugin extends PluginBase<AdvancedExcludePluginSetti
         if (isChildPathIgnored) {
           await adapter.reconcileDeletion(childPath, childPath);
         } else {
-          await adapter.reconcileFile(childPath, childPath);
+          if (adapter instanceof FileSystemAdapter) {
+            await adapter.reconcileFileInternal(childPath, childPath);
+          } else {
+            await adapter.reconcileFile(childPath, childPath);
+          }
           includedPaths.add(childPath);
         }
       } catch (e) {
