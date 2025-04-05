@@ -10,7 +10,7 @@ import {
 } from 'obsidian';
 import { escapeRegExp } from 'obsidian-dev-utils/RegExp';
 
-import type { AdvancedExcludePlugin } from './AdvancedExcludePlugin.ts';
+import type { Plugin } from './Plugin.ts';
 
 export const ROOT_PATH = '/';
 export const OBSIDIAN_IGNORE_FILE = '.obsidianignore';
@@ -24,11 +24,11 @@ export function clearCachedExcludeRegExps(): void {
   cachedExcludeRegExps = null;
 }
 
-export async function getIgnorePatternsStr(plugin: AdvancedExcludePlugin): Promise<string> {
+export async function getIgnorePatternsStr(plugin: Plugin): Promise<string> {
   return await readSafe(plugin.app, OBSIDIAN_IGNORE_FILE);
 }
 
-export async function isIgnoreConfigFileChanged(plugin: AdvancedExcludePlugin, path: string): Promise<boolean> {
+export async function isIgnoreConfigFileChanged(plugin: Plugin, path: string): Promise<boolean> {
   const configFiles = getConfigFiles(plugin);
   if (!configFiles.includes(path)) {
     return false;
@@ -42,7 +42,7 @@ export async function isIgnoreConfigFileChanged(plugin: AdvancedExcludePlugin, p
   return isChanged;
 }
 
-export async function isIgnored(normalizedPath: string, plugin: AdvancedExcludePlugin): Promise<boolean> {
+export async function isIgnored(normalizedPath: string, plugin: Plugin): Promise<boolean> {
   if (!plugin._loaded) {
     return false;
   }
@@ -75,7 +75,7 @@ async function existsSafe(app: App, path: string): Promise<boolean> {
   return await adapter.exists(path);
 }
 
-async function getAllIgnorePatternsStr(plugin: AdvancedExcludePlugin): Promise<string> {
+async function getAllIgnorePatternsStr(plugin: Plugin): Promise<string> {
   const configFiles = getConfigFiles(plugin);
 
   let patternsStr = '';
@@ -90,7 +90,7 @@ async function getAllIgnorePatternsStr(plugin: AdvancedExcludePlugin): Promise<s
   return patternsStr;
 }
 
-function getConfigFiles(plugin: AdvancedExcludePlugin): string[] {
+function getConfigFiles(plugin: Plugin): string[] {
   const configFiles = [OBSIDIAN_IGNORE_FILE];
   if (plugin.settings.shouldIncludeGitIgnorePatterns) {
     configFiles.push(GIT_IGNORE_FILE);
@@ -98,7 +98,7 @@ function getConfigFiles(plugin: AdvancedExcludePlugin): string[] {
   return configFiles;
 }
 
-function getExcludeRegExps(plugin: AdvancedExcludePlugin): RegExp[] {
+function getExcludeRegExps(plugin: Plugin): RegExp[] {
   if (!plugin.settings.shouldIgnoreExcludedFiles) {
     return [];
   }
@@ -123,7 +123,7 @@ function getExcludeRegExps(plugin: AdvancedExcludePlugin): RegExp[] {
   return excludeRegExps;
 }
 
-async function getIgnoreTester(plugin: AdvancedExcludePlugin): Promise<ignore.Ignore> {
+async function getIgnoreTester(plugin: Plugin): Promise<ignore.Ignore> {
   if (cachedIgnoreTester) {
     return cachedIgnoreTester;
   }

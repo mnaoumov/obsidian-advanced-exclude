@@ -1,4 +1,5 @@
 import type { DataAdapter } from 'obsidian';
+import type { PluginSettingsManagerBase } from 'obsidian-dev-utils/obsidian/Plugin/PluginSettingsManagerBase';
 
 import {
   CapacitorAdapter,
@@ -14,14 +15,15 @@ import { registerPatch } from 'obsidian-dev-utils/obsidian/MonkeyAround';
 import { PluginBase } from 'obsidian-dev-utils/obsidian/Plugin/PluginBase';
 import { basename } from 'obsidian-dev-utils/Path';
 
-import { AdvancedExcludePluginSettings } from './AdvancedExcludePluginSettings.ts';
-import { AdvancedExcludePluginSettingsTab } from './AdvancedExcludePluginSettingsTab.ts';
 import {
   clearCachedExcludeRegExps,
   isIgnoreConfigFileChanged,
   isIgnored,
   ROOT_PATH
 } from './IgnorePatterns.ts';
+import { PluginSettings } from './PluginSettings.ts';
+import { PluginSettingsManager } from './PluginSettingsManager.ts';
+import { PluginSettingsTab } from './PluginSettingsTab.ts';
 
 type CapacitorAdapterReconcileFileCreationFn = CapacitorAdapter['reconcileFileCreation'];
 type DataAdapterReconcileDeletionFn = DataAdapter['reconcileDeletion'];
@@ -30,16 +32,16 @@ type FileSystemAdapterReconcileFileCreationFn = FileSystemAdapter['reconcileFile
 
 type GenericReconcileFn = (normalizedPath: string, ...args: unknown[]) => Promise<void>;
 
-export class AdvancedExcludePlugin extends PluginBase<AdvancedExcludePluginSettings> {
+export class Plugin extends PluginBase<PluginSettings> {
   private updateFileTreeAbortController: AbortController | null = null;
   private updateProgressEl!: HTMLProgressElement;
 
-  protected override createPluginSettings(data: unknown): AdvancedExcludePluginSettings {
-    return new AdvancedExcludePluginSettings(data);
+  protected override createPluginSettingsTab(): null | PluginSettingTab {
+    return new PluginSettingsTab(this);
   }
 
-  protected override createPluginSettingsTab(): null | PluginSettingTab {
-    return new AdvancedExcludePluginSettingsTab(this);
+  protected override createSettingsManager(): PluginSettingsManagerBase<PluginSettings> {
+    return new PluginSettingsManager(this);
   }
 
   protected override async onLayoutReady(): Promise<void> {

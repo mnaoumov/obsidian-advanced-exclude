@@ -3,7 +3,7 @@ import { invokeAsyncSafely } from 'obsidian-dev-utils/Async';
 import { appendCodeBlock } from 'obsidian-dev-utils/HTMLElement';
 import { PluginSettingsTabBase } from 'obsidian-dev-utils/obsidian/Plugin/PluginSettingsTabBase';
 
-import type { AdvancedExcludePlugin } from './AdvancedExcludePlugin.ts';
+import type { Plugin } from './Plugin.ts';
 
 import {
   getIgnorePatternsStr,
@@ -12,7 +12,7 @@ import {
   setIgnorePatternsStr
 } from './IgnorePatterns.ts';
 
-export class AdvancedExcludePluginSettingsTab extends PluginSettingsTabBase<AdvancedExcludePlugin> {
+export class PluginSettingsTab extends PluginSettingsTabBase<Plugin> {
   private ignorePatternsStr = '';
   private isIgnorePatternsStrChanged = false;
 
@@ -89,6 +89,7 @@ export class AdvancedExcludePluginSettingsTab extends PluginSettingsTabBase<Adva
   }
 
   public override hide(): void {
+    super.hide();
     if (this.isIgnorePatternsStrChanged) {
       invokeAsyncSafely(() => setIgnorePatternsStr(this.app, this.ignorePatternsStr));
     }
