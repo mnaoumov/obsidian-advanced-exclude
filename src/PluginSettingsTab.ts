@@ -3,7 +3,7 @@ import { invokeAsyncSafely } from 'obsidian-dev-utils/Async';
 import { appendCodeBlock } from 'obsidian-dev-utils/HTMLElement';
 import { PluginSettingsTabBase } from 'obsidian-dev-utils/obsidian/Plugin/PluginSettingsTabBase';
 
-import type { Plugin } from './Plugin.ts';
+import type { PluginTypes } from './PluginTypes.ts';
 
 import {
   getIgnorePatternsStr,
@@ -12,7 +12,7 @@ import {
   setIgnorePatternsStr
 } from './IgnorePatterns.ts';
 
-export class PluginSettingsTab extends PluginSettingsTabBase<Plugin> {
+export class PluginSettingsTab extends PluginSettingsTabBase<PluginTypes> {
   private ignorePatternsStr = '';
   private isIgnorePatternsStrChanged = false;
 

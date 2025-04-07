@@ -1,10 +1,8 @@
 import type { DataAdapter } from 'obsidian';
-import type { PluginSettingsManagerBase } from 'obsidian-dev-utils/obsidian/Plugin/PluginSettingsManagerBase';
 
 import {
   CapacitorAdapter,
-  FileSystemAdapter,
-  PluginSettingTab
+  FileSystemAdapter
 } from 'obsidian';
 import {
   ignoreError,
@@ -15,13 +13,14 @@ import { registerPatch } from 'obsidian-dev-utils/obsidian/MonkeyAround';
 import { PluginBase } from 'obsidian-dev-utils/obsidian/Plugin/PluginBase';
 import { basename } from 'obsidian-dev-utils/Path';
 
+import type { PluginTypes } from './PluginTypes.ts';
+
 import {
   clearCachedExcludeRegExps,
   isIgnoreConfigFileChanged,
   isIgnored,
   ROOT_PATH
 } from './IgnorePatterns.ts';
-import { PluginSettings } from './PluginSettings.ts';
 import { PluginSettingsManager } from './PluginSettingsManager.ts';
 import { PluginSettingsTab } from './PluginSettingsTab.ts';
 
@@ -32,15 +31,15 @@ type FileSystemAdapterReconcileFileCreationFn = FileSystemAdapter['reconcileFile
 
 type GenericReconcileFn = (normalizedPath: string, ...args: unknown[]) => Promise<void>;
 
-export class Plugin extends PluginBase<PluginSettings> {
+export class Plugin extends PluginBase<PluginTypes> {
   private updateFileTreeAbortController: AbortController | null = null;
   private updateProgressEl!: HTMLProgressElement;
 
-  protected override createPluginSettingsTab(): null | PluginSettingTab {
+  protected override createPluginSettingsTab(): null | PluginSettingsTab {
     return new PluginSettingsTab(this);
   }
 
-  protected override createSettingsManager(): PluginSettingsManagerBase<PluginSettings> {
+  protected override createSettingsManager(): PluginSettingsManager {
     return new PluginSettingsManager(this);
   }
 
