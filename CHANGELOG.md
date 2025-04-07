@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## 1.2.1
+
+- New template
+
 ## 1.2.0
 
 - Show single progress bar
