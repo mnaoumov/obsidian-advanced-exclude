@@ -26,7 +26,7 @@
     "ignore": "^7.0.3",
     "jiti": "^2.4.2",
     "obsidian": "^1.8.7",
-    "obsidian-dev-utils": "^24.0.1",
+    "obsidian-dev-utils": "^24.1.0",
     "obsidian-typings": "^2.41.4"
   },
   "overrides": {

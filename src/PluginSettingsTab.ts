@@ -17,6 +17,7 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginTypes> {
   private isIgnorePatternsStrChanged = false;
 
   public override display(): void {
+    super.display();
     this.containerEl.empty();
 
     new Setting(this.containerEl)
