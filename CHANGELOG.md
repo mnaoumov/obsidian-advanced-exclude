@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## 1.2.5
+
+- Stop loop on plugin unload
+- https://github.com/mnaoumov/obsidian-dev-utils/releases/tag/25.1.0
+
 ## 1.2.4
 
 - https://github.com/mnaoumov/obsidian-dev-utils/releases/tag/24.1.1
