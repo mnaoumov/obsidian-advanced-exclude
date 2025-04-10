@@ -205,7 +205,7 @@ export class Plugin extends PluginBase<PluginTypes> {
     }
 
     this.updateFileTreeAbortController = new AbortController();
-    const abortSignal = this.updateFileTreeAbortController.signal;
+    const abortSignal = AbortSignal.any([this.updateFileTreeAbortController.signal, this.abortSignal]);
     const fragment = createFragment((f) => {
       f.appendText('Advanced Exclude: Updating file tree...');
       this.updateProgressEl = f.createEl('progress');
