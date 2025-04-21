@@ -39,7 +39,7 @@ To show them, run the following command in the `DevTools Console`:
 window.DEBUG.enable('advanced-exclude');
 ```
 
-For more details, refer to the [documentation](https://github.com/mnaoumov/obsidian-dev-utils?tab=readme-ov-file#debugging).
+For more details, refer to the [documentation](https://github.com/mnaoumov/obsidian-dev-utils/blob/main/docs/debugging.md).
 
 ## Support
 
