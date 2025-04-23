@@ -21,6 +21,8 @@ The plugin adds the following features:
 
 The plugin is not available in [the official Community Plugins repository](https://obsidian.md/plugins) yet.
 
+The Obsidian team [decided](https://github.com/obsidianmd/obsidian-releases/pull/5856#issuecomment-2824346972) to not accept this plugin to the repository.
+
 ### Beta versions
 
 To install the latest beta release of this plugin (regardless if it is available in [the official Community Plugins repository](https://obsidian.md/plugins) or not), follow these steps:
