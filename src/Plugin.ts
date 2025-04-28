@@ -2,7 +2,8 @@ import type { DataAdapter } from 'obsidian';
 
 import {
   CapacitorAdapter,
-  FileSystemAdapter
+  FileSystemAdapter,
+  Notice
 } from 'obsidian';
 import {
   ignoreError,
@@ -35,12 +36,12 @@ export class Plugin extends PluginBase<PluginTypes> {
   private updateFileTreeAbortController: AbortController | null = null;
   private updateProgressEl!: HTMLProgressElement;
 
-  protected override createPluginSettingsTab(): null | PluginSettingsTab {
-    return new PluginSettingsTab(this);
-  }
-
   protected override createSettingsManager(): PluginSettingsManager {
     return new PluginSettingsManager(this);
+  }
+
+  protected override createSettingsTab(): null | PluginSettingsTab {
+    return new PluginSettingsTab(this);
   }
 
   protected override async onLayoutReady(): Promise<void> {
