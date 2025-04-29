@@ -11,6 +11,7 @@ import {
   OBSIDIAN_IGNORE_FILE,
   setIgnorePatternsStr
 } from './IgnorePatterns.ts';
+import { ExcludeMode } from './PluginSettings.ts';
 
 export class PluginSettingsTab extends PluginSettingsTabBase<PluginTypes> {
   private ignorePatternsStr = '';
@@ -86,6 +87,23 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginTypes> {
             .find((tabButton) => tabButton.textContent === manageButtonCaption)
             ?.click();
         });
+      });
+
+    new Setting(this.containerEl)
+      .setName('Exclude mode')
+      .setDesc(createFragment((f) => {
+        f.appendText('How to exclude files and folders.');
+        f.createEl('br');
+        appendCodeBlock(f, 'Full');
+        f.appendText(' - Exclude files and folders from the entire Obsidian app, including the Files Pane, Backlinks, Graph, etc.');
+        f.createEl('br');
+        appendCodeBlock(f, 'Files Pane');
+        f.appendText(' - Exclude files and folders from the Files Pane only.');
+      }))
+      .addDropdown((dropdown) => {
+        dropdown.addOption(ExcludeMode.Full, 'Full');
+        dropdown.addOption(ExcludeMode.FilesPane, 'Files Pane');
+        this.bind(dropdown, 'excludeMode');
       });
   }
 

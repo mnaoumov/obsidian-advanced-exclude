@@ -1,4 +1,7 @@
 import type { DataAdapter } from 'obsidian';
+import type { ExtractPluginSettingsWrapper } from 'obsidian-dev-utils/obsidian/Plugin/PluginTypesBase';
+import type { FileExplorerView } from 'obsidian-typings';
+import type { ReadonlyObjectDeep } from 'type-fest/source/readonly-deep.js';
 
 import {
   CapacitorAdapter,
@@ -22,6 +25,7 @@ import {
   isIgnored,
   ROOT_PATH
 } from './IgnorePatterns.ts';
+import { ExcludeMode } from './PluginSettings.ts';
 import { PluginSettingsManager } from './PluginSettingsManager.ts';
 import { PluginSettingsTab } from './PluginSettingsTab.ts';
 
@@ -84,13 +88,70 @@ export class Plugin extends PluginBase<PluginTypes> {
     await this.updateFileTree();
   }
 
+  protected override async onSaveSettings(
+    newSettings: ReadonlyObjectDeep<ExtractPluginSettingsWrapper<PluginTypes>>,
+    oldSettings: ReadonlyObjectDeep<ExtractPluginSettingsWrapper<PluginTypes>>,
+    _context: unknown
+  ): Promise<void> {
+    if (newSettings.settings.excludeMode !== oldSettings.settings.excludeMode) {
+      await this.updateFileTree();
+    }
+  }
+
+  private addToFilesPane(normalizedPath: string): void {
+    const fileExplorerView = this.getFileExplorerView();
+    if (!fileExplorerView) {
+      return;
+    }
+
+    if (fileExplorerView.fileItems[normalizedPath]) {
+      return;
+    }
+
+    const file = this.app.vault.getAbstractFileByPath(normalizedPath);
+    if (!file) {
+      return;
+    }
+
+    fileExplorerView.onCreate(file);
+  }
+
+  private deleteFromFilesPane(normalizedPath: string): void {
+    const fileExplorerView = this.getFileExplorerView();
+    if (!fileExplorerView) {
+      return;
+    }
+
+    if (!fileExplorerView.fileItems[normalizedPath]) {
+      return;
+    }
+
+    const file = this.app.vault.getAbstractFileByPath(normalizedPath);
+    if (!file) {
+      return;
+    }
+
+    fileExplorerView.onDelete(file);
+  }
+
   private generateReconcileWrapper(next: GenericReconcileFn): GenericReconcileFn {
     return async (normalizedPath: string, ...args: unknown[]) => {
+      let shouldRemoveFromFilesPane = false;
       if (await isIgnored(normalizedPath, this)) {
-        return;
+        if (this.settings.excludeMode === ExcludeMode.Full) {
+          return;
+        }
+        shouldRemoveFromFilesPane = true;
       }
       await next.call(this.app.vault.adapter, normalizedPath, ...args);
+      if (shouldRemoveFromFilesPane) {
+        this.deleteFromFilesPane(normalizedPath);
+      }
     };
+  }
+
+  private getFileExplorerView(): FileExplorerView | undefined {
+    return this.app.workspace.getLeavesOfType('file-explorer')[0]?.view as FileExplorerView | undefined;
   }
 
   private isDotFile(path: string): boolean {
@@ -149,7 +210,7 @@ export class Plugin extends PluginBase<PluginTypes> {
         orphanPaths.delete(childPath);
 
         const isChildPathIgnored = await isIgnored(childPath, this);
-        if (isChildPathIgnored) {
+        if (isChildPathIgnored && this.settings.excludeMode === ExcludeMode.Full) {
           await adapter.reconcileDeletion(childPath, childPath);
         } else {
           if (adapter instanceof FileSystemAdapter) {
@@ -158,6 +219,11 @@ export class Plugin extends PluginBase<PluginTypes> {
             await adapter.reconcileFile(childPath, childPath);
           }
           includedPaths.add(childPath);
+          if (isChildPathIgnored) {
+            this.deleteFromFilesPane(childPath);
+          } else if (this.settings.excludeMode === ExcludeMode.FilesPane) {
+            this.addToFilesPane(childPath);
+          }
         }
       } catch (e) {
         console.error(`Failed reloading file: ${childPath}`, e);
