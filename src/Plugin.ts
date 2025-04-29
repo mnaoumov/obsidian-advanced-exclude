@@ -170,6 +170,35 @@ export class Plugin extends PluginBase<PluginTypes> {
     }
   }
 
+  private async reloadChildPath(childPath: string, orphanPaths: Set<string>, includedPaths: Set<string>): Promise<void> {
+    this.consoleDebug(`Reloading file: ${childPath}`);
+    if (this.isDotFile(childPath)) {
+      return;
+    }
+
+    orphanPaths.delete(childPath);
+
+    const adapter = this.app.vault.adapter;
+
+    const isChildPathIgnored = await isIgnored(childPath, this);
+    if (isChildPathIgnored && this.settings.excludeMode === ExcludeMode.Full) {
+      await adapter.reconcileDeletion(childPath, childPath);
+      return;
+    }
+
+    if (adapter instanceof FileSystemAdapter) {
+      await adapter.reconcileFileInternal(childPath, childPath);
+    } else {
+      await adapter.reconcileFile(childPath, childPath);
+    }
+    includedPaths.add(childPath);
+    if (isChildPathIgnored) {
+      this.deleteFromFilesPane(childPath);
+    } else if (this.settings.excludeMode === ExcludeMode.FilesPane) {
+      this.addToFilesPane(childPath);
+    }
+  }
+
   private async reloadFolder(folderPath: string, abortSignal: AbortSignal): Promise<void> {
     if (abortSignal.aborted) {
       return;
@@ -202,29 +231,8 @@ export class Plugin extends PluginBase<PluginTypes> {
         if (abortSignal.aborted) {
           return;
         }
-        this.consoleDebug(`Reloading file: ${childPath}`);
-        if (this.isDotFile(childPath)) {
-          continue;
-        }
 
-        orphanPaths.delete(childPath);
-
-        const isChildPathIgnored = await isIgnored(childPath, this);
-        if (isChildPathIgnored && this.settings.excludeMode === ExcludeMode.Full) {
-          await adapter.reconcileDeletion(childPath, childPath);
-        } else {
-          if (adapter instanceof FileSystemAdapter) {
-            await adapter.reconcileFileInternal(childPath, childPath);
-          } else {
-            await adapter.reconcileFile(childPath, childPath);
-          }
-          includedPaths.add(childPath);
-          if (isChildPathIgnored) {
-            this.deleteFromFilesPane(childPath);
-          } else if (this.settings.excludeMode === ExcludeMode.FilesPane) {
-            this.addToFilesPane(childPath);
-          }
-        }
+        await this.reloadChildPath(childPath, orphanPaths, includedPaths);
       } catch (e) {
         console.error(`Failed reloading file: ${childPath}`, e);
       } finally {
