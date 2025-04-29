@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## 1.3.0
+
+- Add ExcludeMode
+- Update libs
+
 ## 1.2.5
 
 - Stop loop on plugin unload
