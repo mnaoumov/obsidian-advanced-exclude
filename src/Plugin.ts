@@ -28,6 +28,7 @@ import {
 import { ExcludeMode } from './PluginSettings.ts';
 import { PluginSettingsManager } from './PluginSettingsManager.ts';
 import { PluginSettingsTab } from './PluginSettingsTab.ts';
+import { ensureMetadataCacheReady } from 'obsidian-dev-utils/obsidian/MetadataCache';
 
 type CapacitorAdapterReconcileFileCreationFn = CapacitorAdapter['reconcileFileCreation'];
 type DataAdapterReconcileDeletionFn = DataAdapter['reconcileDeletion'];
@@ -49,6 +50,8 @@ export class Plugin extends PluginBase<PluginTypes> {
   }
 
   protected override async onLayoutReady(): Promise<void> {
+    await ensureMetadataCacheReady(this.app);
+
     this.registerEvent(this.app.vault.on('config-changed', (configKey: string) => {
       if (configKey === 'userIgnoreFilters') {
         clearCachedExcludeRegExps();
