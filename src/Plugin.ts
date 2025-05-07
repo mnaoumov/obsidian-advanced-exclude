@@ -66,9 +66,9 @@ export class Plugin extends PluginBase<PluginTypes> {
           };
         },
         reconcileFileCreation: (next: CapacitorAdapterReconcileFileCreationFn): CapacitorAdapterReconcileFileCreationFn =>
-          this.generateReconcileWrapper(next as GenericReconcileFn),
+          this.generateReconcileWrapper(next as GenericReconcileFn, false),
         reconcileFolderCreation: (next: DataAdapterReconcileFolderCreationFn): DataAdapterReconcileFolderCreationFn =>
-          this.generateReconcileWrapper(next as GenericReconcileFn)
+          this.generateReconcileWrapper(next as GenericReconcileFn, true)
       });
     } else if (this.app.vault.adapter instanceof FileSystemAdapter) {
       registerPatch(this, this.app.vault.adapter, {
@@ -78,9 +78,9 @@ export class Plugin extends PluginBase<PluginTypes> {
           };
         },
         reconcileFileCreation: (next: FileSystemAdapterReconcileFileCreationFn): FileSystemAdapterReconcileFileCreationFn =>
-          this.generateReconcileWrapper(next as GenericReconcileFn),
+          this.generateReconcileWrapper(next as GenericReconcileFn, false),
         reconcileFolderCreation: (next: DataAdapterReconcileFolderCreationFn): DataAdapterReconcileFolderCreationFn =>
-          this.generateReconcileWrapper(next as GenericReconcileFn)
+          this.generateReconcileWrapper(next as GenericReconcileFn, true)
       });
     }
 
@@ -137,10 +137,10 @@ export class Plugin extends PluginBase<PluginTypes> {
     fileExplorerView.onDelete(file);
   }
 
-  private generateReconcileWrapper(next: GenericReconcileFn): GenericReconcileFn {
+  private generateReconcileWrapper(next: GenericReconcileFn, isFolder: boolean): GenericReconcileFn {
     return async (normalizedPath: string, ...args: unknown[]) => {
       let shouldRemoveFromFilesPane = false;
-      if (await isIgnored(normalizedPath, this)) {
+      if (await isIgnored(normalizedPath, this, isFolder)) {
         if (this.settings.excludeMode === ExcludeMode.Full) {
           return;
         }
@@ -173,7 +173,7 @@ export class Plugin extends PluginBase<PluginTypes> {
     }
   }
 
-  private async reloadChildPath(childPath: string, orphanPaths: Set<string>, includedPaths: Set<string>): Promise<void> {
+  private async reloadChildPath(childPath: string, orphanPaths: Set<string>, includedPaths: Set<string>, isFolder: boolean): Promise<void> {
     this.consoleDebug(`Reloading file: ${childPath}`);
     if (this.isDotFile(childPath)) {
       return;
@@ -183,7 +183,7 @@ export class Plugin extends PluginBase<PluginTypes> {
 
     const adapter = this.app.vault.adapter;
 
-    const isChildPathIgnored = await isIgnored(childPath, this);
+    const isChildPathIgnored = await isIgnored(childPath, this, isFolder);
     if (isChildPathIgnored && this.settings.excludeMode === ExcludeMode.Full) {
       await adapter.reconcileDeletion(childPath, childPath);
       return;
@@ -228,16 +228,19 @@ export class Plugin extends PluginBase<PluginTypes> {
 
     const orphanPaths = new Set<string>(folder.children.map((child) => child.path));
 
-    for (const childPath of listedFiles.files.concat(listedFiles.folders)) {
+    const childEntries = listedFiles.files.map((file) => ({ childPath: file, isFolder: false }))
+      .concat(listedFiles.folders.map((folder) => ({ childPath: folder, isFolder: true })));
+
+    for (const childEntry of childEntries) {
       try {
         // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
         if (abortSignal.aborted) {
           return;
         }
 
-        await this.reloadChildPath(childPath, orphanPaths, includedPaths);
+        await this.reloadChildPath(childEntry.childPath, orphanPaths, includedPaths, childEntry.isFolder);
       } catch (e) {
-        console.error(`Failed reloading file: ${childPath}`, e);
+        console.error(`Failed reloading file: ${childEntry.childPath}`, e);
       } finally {
         this.updateProgressEl.value++;
       }

@@ -42,7 +42,7 @@ export async function isIgnoreConfigFileChanged(plugin: Plugin, path: string): P
   return isChanged;
 }
 
-export async function isIgnored(normalizedPath: string, plugin: Plugin): Promise<boolean> {
+export async function isIgnored(normalizedPath: string, plugin: Plugin, isFolder: boolean): Promise<boolean> {
   if (!plugin._loaded) {
     return false;
   }
@@ -53,7 +53,9 @@ export async function isIgnored(normalizedPath: string, plugin: Plugin): Promise
 
   const ignoreTester = await getIgnoreTester(plugin);
   const excludeRegExps = getExcludeRegExps(plugin);
-  return ignoreTester.ignores(normalizedPath) || excludeRegExps.some((regExp) => regExp.test(normalizedPath));
+
+  const pathsToCheck = isFolder ? [normalizedPath, `${normalizedPath}/`] : [normalizedPath];
+  return pathsToCheck.some((path) => ignoreTester.ignores(path) || excludeRegExps.some((regExp) => regExp.test(path)));
 }
 
 export async function setIgnorePatternsStr(app: App, ignorePatterns: string): Promise<void> {
