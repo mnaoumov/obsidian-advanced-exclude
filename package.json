@@ -22,12 +22,12 @@
   },
   "devDependencies": {
     "@tsconfig/strictest": "^2.0.5",
-    "@types/node": "^22.15.3",
+    "@types/node": "^22.15.13",
     "ignore": "^7.0.4",
     "jiti": "^2.4.2",
     "obsidian": "^1.8.7",
     "obsidian-dev-utils": "^26.22.0",
-    "obsidian-typings": "^3.4.0"
+    "obsidian-typings": "^3.7.0"
   },
   "overrides": {
     "boolean": "npm:dry-uninstall"
