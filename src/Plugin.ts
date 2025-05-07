@@ -49,15 +49,8 @@ export class Plugin extends PluginBase<PluginTypes> {
     return new PluginSettingsTab(this);
   }
 
-  protected override async onLayoutReady(): Promise<void> {
-    await ensureMetadataCacheReady(this.app);
-
-    this.registerEvent(this.app.vault.on('config-changed', (configKey: string) => {
-      if (configKey === 'userIgnoreFilters') {
-        clearCachedExcludeRegExps();
-      }
-    }));
-
+  protected override async onloadImpl(): Promise<void> {
+    await super.onloadImpl();
     if (this.app.vault.adapter instanceof CapacitorAdapter) {
       registerPatch(this, this.app.vault.adapter, {
         reconcileDeletion: (next: DataAdapterReconcileDeletionFn): DataAdapterReconcileDeletionFn => {
@@ -83,6 +76,17 @@ export class Plugin extends PluginBase<PluginTypes> {
           this.generateReconcileWrapper(next as GenericReconcileFn, true)
       });
     }
+  }
+
+  protected override async onLayoutReady(): Promise<void> {
+    await super.onLayoutReady();
+    await ensureMetadataCacheReady(this.app);
+
+    this.registerEvent(this.app.vault.on('config-changed', (configKey: string) => {
+      if (configKey === 'userIgnoreFilters') {
+        clearCachedExcludeRegExps();
+      }
+    }));
 
     this.register(() => {
       invokeAsyncSafely(() => this.updateFileTree());
