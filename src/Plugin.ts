@@ -13,6 +13,7 @@ import {
   invokeAsyncSafely,
   throwOnAbort
 } from 'obsidian-dev-utils/Async';
+import { ensureMetadataCacheReady } from 'obsidian-dev-utils/obsidian/MetadataCache';
 import { registerPatch } from 'obsidian-dev-utils/obsidian/MonkeyAround';
 import { PluginBase } from 'obsidian-dev-utils/obsidian/Plugin/PluginBase';
 import { basename } from 'obsidian-dev-utils/Path';
@@ -28,7 +29,6 @@ import {
 import { ExcludeMode } from './PluginSettings.ts';
 import { PluginSettingsManager } from './PluginSettingsManager.ts';
 import { PluginSettingsTab } from './PluginSettingsTab.ts';
-import { ensureMetadataCacheReady } from 'obsidian-dev-utils/obsidian/MetadataCache';
 
 type CapacitorAdapterReconcileFileCreationFn = CapacitorAdapter['reconcileFileCreation'];
 type DataAdapterReconcileDeletionFn = DataAdapter['reconcileDeletion'];
@@ -232,8 +232,8 @@ export class Plugin extends PluginBase<PluginTypes> {
 
     const orphanPaths = new Set<string>(folder.children.map((child) => child.path));
 
-    const childEntries = listedFiles.files.map((file) => ({ childPath: file, isFolder: false }))
-      .concat(listedFiles.folders.map((folder) => ({ childPath: folder, isFolder: true })));
+    const childEntries = listedFiles.files.map((childFilePath) => ({ childPath: childFilePath, isFolder: false }))
+      .concat(listedFiles.folders.map((childFolderPath) => ({ childPath: childFolderPath, isFolder: true })));
 
     for (const childEntry of childEntries) {
       try {
