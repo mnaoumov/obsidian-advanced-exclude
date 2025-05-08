@@ -10,8 +10,9 @@ import {
 
 export async function existsSafe(app: App, path: string): Promise<boolean> {
   const adapter = app.vault.adapter;
+  const fullPath = adapter.getFullPath(path);
+
   if (adapter instanceof FileSystemAdapter) {
-    const fullPath = adapter.getFullPath(path);
     try {
       await adapter.fsPromises.access(fullPath);
       return true;
@@ -19,8 +20,16 @@ export async function existsSafe(app: App, path: string): Promise<boolean> {
       return false;
     }
   }
+  if (adapter instanceof CapacitorAdapter) {
+    try {
+      await adapter.fs.stat(fullPath)
+      return true;
+    } catch {
+      return false;
+    }
+  }
 
-  return await adapter.exists(path);
+  throw new Error('Unknown adapter');
 }
 
 export async function readSafe(app: App, path: string): Promise<string> {
