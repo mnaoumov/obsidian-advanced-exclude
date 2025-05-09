@@ -51,7 +51,7 @@ export async function readSafe(app: App, path: string): Promise<string> {
 }
 
 export async function statSafe(app: App, path: string): Promise<null | Stat> {
-  if (!await existsSafe(app, path)){
+  if (!await existsSafe(app, path)) {
     return null;
   }
 
