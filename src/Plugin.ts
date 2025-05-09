@@ -1,4 +1,7 @@
-import type { DataAdapter } from 'obsidian';
+import type {
+  DataAdapter,
+  Vault
+} from 'obsidian';
 import type { ExtractPluginSettingsWrapper } from 'obsidian-dev-utils/obsidian/Plugin/PluginTypesBase';
 import type { FileExplorerView } from 'obsidian-typings';
 import type { ReadonlyObjectDeep } from 'type-fest/source/readonly-deep.js';
@@ -32,15 +35,16 @@ type CapacitorAdapterReconcileFileCreationFn = CapacitorAdapter['reconcileFileCr
 type DataAdapterReconcileDeletionFn = DataAdapter['reconcileDeletion'];
 type DataAdapterReconcileFolderCreationFn = DataAdapter['reconcileFolderCreation'];
 type FileSystemAdapterReconcileFileCreationFn = FileSystemAdapter['reconcileFileCreation'];
-
 type GenericReconcileFn = (normalizedPath: string, ...args: unknown[]) => Promise<void>;
+type VaultLoadFn = Vault['load'];
 
 export class Plugin extends PluginBase<PluginTypes> {
   private ignorePatternsComponent!: IgnorePatternsComponent;
-
   private shouldUpdateFileTree = false;
   private updateFileTreeAbortController: AbortController | null = null;
   private updateProgressEl!: HTMLProgressElement;
+  private vaultLoadCalled = false;
+
   public override async onLoadSettings(loadedSettings: ReadonlyObjectDeep<ExtractPluginSettingsWrapper<PluginTypes>>, isInitialLoad: boolean): Promise<void> {
     await super.onLoadSettings(loadedSettings, isInitialLoad);
     if (isInitialLoad) {
@@ -107,12 +111,21 @@ export class Plugin extends PluginBase<PluginTypes> {
       invokeAsyncSafely(() => this.updateFileTree());
     });
 
-    await this.updateFileTree();
+    if (!this.vaultLoadCalled) {
+      await this.updateFileTree();
+    }
   }
 
   protected override async onloadImpl(): Promise<void> {
     await super.onloadImpl();
     this.ignorePatternsComponent = new IgnorePatternsComponent(this);
+
+    registerPatch(this, this.app.vault, {
+      load: (next: VaultLoadFn): VaultLoadFn => {
+        return () => this.vaultLoad(next);
+      }
+    });
+
     this.addChild(this.ignorePatternsComponent);
     if (this.app.vault.adapter instanceof CapacitorAdapter) {
       registerPatch(this, this.app.vault.adapter, {
@@ -328,5 +341,10 @@ export class Plugin extends PluginBase<PluginTypes> {
     }
 
     this.updateProgressEl.value++;
+  }
+
+  private async vaultLoad(next: VaultLoadFn): Promise<void> {
+    this.vaultLoadCalled = true;
+    await next.call(this.app.vault);
   }
 }
