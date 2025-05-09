@@ -51,6 +51,10 @@ export async function readSafe(app: App, path: string): Promise<string> {
 }
 
 export async function statSafe(app: App, path: string): Promise<null | Stat> {
+  if (!await existsSafe(app, path)){
+    return null;
+  }
+
   const adapter = app.vault.adapter;
   const fullPath = adapter.getFullPath(path);
   if (adapter instanceof FileSystemAdapter) {
