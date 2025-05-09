@@ -1,5 +1,8 @@
 import ignore from 'ignore';
-import { Component } from 'obsidian';
+import {
+  Component,
+  debounce
+} from 'obsidian';
 import { invokeAsyncSafelyAfterDelay } from 'obsidian-dev-utils/Async';
 import { deepEqual } from 'obsidian-dev-utils/Object';
 import { escapeRegExp } from 'obsidian-dev-utils/RegExp';
@@ -15,9 +18,10 @@ import {
 export const ROOT_PATH = '/';
 export const OBSIDIAN_IGNORE_FILE = '.obsidianignore';
 export const GIT_IGNORE_FILE = '.gitignore';
-export const DB_VERSION = 1;
-export const MTIME_STORE_NAME = 'mtime';
-export const FILES_STORE_NAME = 'files';
+const DB_VERSION = 1;
+const MTIME_STORE_NAME = 'mtime';
+const FILES_STORE_NAME = 'files';
+const PROCESS_STORE_ACTIONS_DEBOUNCE_INTERVAL_IN_MILLISECONDS = 5000;
 
 interface DbFileEntry {
   isIgnored: boolean;
@@ -38,6 +42,10 @@ export class IgnorePatternsComponent extends Component {
   private db!: IDBDatabase;
   private fileIgnoreMap = new Map<string, boolean>();
   private onloadPromise: Promise<void> = Promise.resolve();
+  private pendingStoreActions: ((store: IDBObjectStore) => void)[] = [];
+  private processStoreActionsDebounced = debounce(() => {
+    this.processStoreActions();
+  }, PROCESS_STORE_ACTIONS_DEBOUNCE_INTERVAL_IN_MILLISECONDS);
 
   public constructor(private plugin: Plugin) {
     super();
@@ -54,7 +62,8 @@ export class IgnorePatternsComponent extends Component {
   public async handleDeletedOrDotFile(normalizedPath: string): Promise<void> {
     if (this.fileIgnoreMap.has(normalizedPath)) {
       this.fileIgnoreMap.delete(normalizedPath);
-      this.getFileStore().delete(normalizedPath);
+
+      this.addStoreAction((store) => store.delete(normalizedPath));
     }
 
     let shouldRefresh = false;
@@ -94,10 +103,13 @@ export class IgnorePatternsComponent extends Component {
     const pathsToCheck = isFolder ? [normalizedPath, `${normalizedPath}/`] : [normalizedPath];
     isIgnoredResult = pathsToCheck.some((path) => ignoreTester.ignores(path) || excludeRegExps.some((regExp) => regExp.test(path)));
     this.fileIgnoreMap.set(normalizedPath, isIgnoredResult);
-    this.getFileStore().put({
-      isIgnored: isIgnoredResult,
-      path: normalizedPath
-    });
+    this.addStoreAction((store) =>
+      store.put({
+        isIgnored: isIgnoredResult,
+        path: normalizedPath
+      })
+    );
+
     return isIgnoredResult;
   }
 
@@ -155,6 +167,11 @@ export class IgnorePatternsComponent extends Component {
     await writeSafe(this.plugin.app, OBSIDIAN_IGNORE_FILE, obsidianIgnoreContent);
     await this.plugin.settingsManager.setProperty('obsidianIgnoreContent', obsidianIgnoreContent);
     this.cachedObsidianIgnoreContent = obsidianIgnoreContent;
+  }
+
+  private addStoreAction(storeAction: (store: IDBObjectStore) => void): void {
+    this.pendingStoreActions.push(storeAction);
+    this.processStoreActionsDebounced();
   }
 
   private async getCurrentMtimeEntry(): Promise<DbMtimeEntry> {
@@ -257,6 +274,18 @@ export class IgnorePatternsComponent extends Component {
   private async onloadAsync(): Promise<void> {
     await this.loadDb();
     await this.reload();
+  }
+
+  private processStoreActions(): void {
+    const pendingStoreActions = this.pendingStoreActions;
+    this.pendingStoreActions = [];
+
+    const transaction = this.db.transaction(FILES_STORE_NAME, 'readwrite');
+    const store = transaction.objectStore(FILES_STORE_NAME);
+    for (const action of pendingStoreActions) {
+      action(store);
+    }
+    transaction.commit();
   }
 
   private async resetDb(): Promise<void> {
