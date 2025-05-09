@@ -21,11 +21,9 @@ import { basename } from 'obsidian-dev-utils/Path';
 import type { PluginTypes } from './PluginTypes.ts';
 
 import {
-  clearCachedExcludeRegExps,
-  isIgnoreConfigFileChanged,
-  isIgnored,
+  IgnorePatternsComponent,
   ROOT_PATH
-} from './IgnorePatterns.ts';
+} from './IgnorePatternsComponent.ts';
 import { ExcludeMode } from './PluginSettings.ts';
 import { PluginSettingsManager } from './PluginSettingsManager.ts';
 import { PluginSettingsTab } from './PluginSettingsTab.ts';
@@ -38,8 +36,43 @@ type FileSystemAdapterReconcileFileCreationFn = FileSystemAdapter['reconcileFile
 type GenericReconcileFn = (normalizedPath: string, ...args: unknown[]) => Promise<void>;
 
 export class Plugin extends PluginBase<PluginTypes> {
+  private ignorePatternsComponent!: IgnorePatternsComponent;
+
   private updateFileTreeAbortController: AbortController | null = null;
   private updateProgressEl!: HTMLProgressElement;
+  public override async onLoadSettings(loadedSettings: ReadonlyObjectDeep<ExtractPluginSettingsWrapper<PluginTypes>>, isInitialLoad: boolean): Promise<void> {
+    await super.onLoadSettings(loadedSettings, isInitialLoad);
+    if (isInitialLoad) {
+      return;
+    }
+
+    await this.ignorePatternsComponent.readObsidianIgnore();
+  }
+
+  public async updateFileTree(): Promise<void> {
+    const NOTIFICATION_MIN_DURATION_IN_MS = 2000;
+
+    if (this.updateFileTreeAbortController) {
+      this.updateFileTreeAbortController.abort();
+    }
+
+    this.updateFileTreeAbortController = new AbortController();
+    const abortSignal = this.updateFileTreeAbortController.signal;
+    const fragment = createFragment((f) => {
+      f.appendText('Advanced Exclude: Updating file tree...');
+      this.updateProgressEl = f.createEl('progress');
+    });
+    const notice = new Notice(fragment, 0);
+    try {
+      await Promise.race([
+        Promise.all([this.reloadFolder(ROOT_PATH, abortSignal), sleep(NOTIFICATION_MIN_DURATION_IN_MS)]),
+        ignoreError(throwOnAbort(abortSignal))
+      ]);
+    } finally {
+      notice.hide();
+      this.updateFileTreeAbortController = null;
+    }
+  }
 
   protected override createSettingsManager(): PluginSettingsManager {
     return new PluginSettingsManager(this);
@@ -49,8 +82,27 @@ export class Plugin extends PluginBase<PluginTypes> {
     return new PluginSettingsTab(this);
   }
 
+  protected override async onLayoutReady(): Promise<void> {
+    await super.onLayoutReady();
+    await ensureMetadataCacheReady(this.app);
+
+    this.registerEvent(this.app.vault.on('config-changed', (configKey: string) => {
+      if (configKey === 'userIgnoreFilters') {
+        this.ignorePatternsComponent.clearCachedExcludeRegExps();
+      }
+    }));
+
+    this.register(() => {
+      invokeAsyncSafely(() => this.updateFileTree());
+    });
+
+    await this.updateFileTree();
+  }
+
   protected override async onloadImpl(): Promise<void> {
     await super.onloadImpl();
+    this.ignorePatternsComponent = new IgnorePatternsComponent(this);
+    this.addChild(this.ignorePatternsComponent);
     if (this.app.vault.adapter instanceof CapacitorAdapter) {
       registerPatch(this, this.app.vault.adapter, {
         reconcileDeletion: (next: DataAdapterReconcileDeletionFn): DataAdapterReconcileDeletionFn => {
@@ -78,29 +130,14 @@ export class Plugin extends PluginBase<PluginTypes> {
     }
   }
 
-  protected override async onLayoutReady(): Promise<void> {
-    await super.onLayoutReady();
-    await ensureMetadataCacheReady(this.app);
-
-    this.registerEvent(this.app.vault.on('config-changed', (configKey: string) => {
-      if (configKey === 'userIgnoreFilters') {
-        clearCachedExcludeRegExps();
-      }
-    }));
-
-    this.register(() => {
-      invokeAsyncSafely(() => this.updateFileTree());
-    });
-
-    await this.updateFileTree();
-  }
-
   protected override async onSaveSettings(
     newSettings: ReadonlyObjectDeep<ExtractPluginSettingsWrapper<PluginTypes>>,
     oldSettings: ReadonlyObjectDeep<ExtractPluginSettingsWrapper<PluginTypes>>,
-    _context: unknown
+    context: unknown
   ): Promise<void> {
-    if (newSettings.settings.excludeMode !== oldSettings.settings.excludeMode) {
+    await super.onSaveSettings(newSettings, oldSettings, context);
+    await this.ignorePatternsComponent.reload(newSettings.settings.obsidianIgnoreContent);
+    if (!this.settingsTab.isOpen) {
       await this.updateFileTree();
     }
   }
@@ -144,7 +181,7 @@ export class Plugin extends PluginBase<PluginTypes> {
   private generateReconcileWrapper(next: GenericReconcileFn, isFolder: boolean): GenericReconcileFn {
     return async (normalizedPath: string, ...args: unknown[]) => {
       let shouldRemoveFromFilesPane = false;
-      if (await isIgnored(normalizedPath, this, isFolder)) {
+      if (await this.ignorePatternsComponent.isIgnored(normalizedPath, isFolder)) {
         if (this.settings.excludeMode === ExcludeMode.Full) {
           return;
         }
@@ -172,9 +209,11 @@ export class Plugin extends PluginBase<PluginTypes> {
     shouldSkipDeletionTimeout?: boolean
   ): Promise<void> {
     await next.call(this.app.vault.adapter, normalizedPath, normalizedNewPath, shouldSkipDeletionTimeout);
-    if (this.app.workspace.layoutReady && await isIgnoreConfigFileChanged(this, normalizedPath)) {
-      invokeAsyncSafely(() => this.updateFileTree());
+    if (!this.app.workspace.layoutReady) {
+      return;
     }
+
+    await this.ignorePatternsComponent.checkForConfigChanges(normalizedPath);
   }
 
   private async reloadChildPath(childPath: string, orphanPaths: Set<string>, includedPaths: Set<string>, isFolder: boolean): Promise<void> {
@@ -187,7 +226,7 @@ export class Plugin extends PluginBase<PluginTypes> {
 
     const adapter = this.app.vault.adapter;
 
-    const isChildPathIgnored = await isIgnored(childPath, this, isFolder);
+    const isChildPathIgnored = await this.ignorePatternsComponent.isIgnored(childPath, isFolder);
     if (isChildPathIgnored && this.settings.excludeMode === ExcludeMode.Full) {
       await adapter.reconcileDeletion(childPath, childPath);
       return;
@@ -280,30 +319,5 @@ export class Plugin extends PluginBase<PluginTypes> {
     }
 
     this.updateProgressEl.value++;
-  }
-
-  private async updateFileTree(): Promise<void> {
-    const NOTIFICATION_MIN_DURATION_IN_MS = 2000;
-
-    if (this.updateFileTreeAbortController) {
-      this.updateFileTreeAbortController.abort();
-    }
-
-    this.updateFileTreeAbortController = new AbortController();
-    const abortSignal = AbortSignal.any([this.updateFileTreeAbortController.signal, this.abortSignal]);
-    const fragment = createFragment((f) => {
-      f.appendText('Advanced Exclude: Updating file tree...');
-      this.updateProgressEl = f.createEl('progress');
-    });
-    const notice = new Notice(fragment, 0);
-    try {
-      await Promise.race([
-        Promise.all([this.reloadFolder(ROOT_PATH, abortSignal), sleep(NOTIFICATION_MIN_DURATION_IN_MS)]),
-        ignoreError(throwOnAbort(abortSignal))
-      ]);
-    } finally {
-      notice.hide();
-      this.updateFileTreeAbortController = null;
-    }
   }
 }

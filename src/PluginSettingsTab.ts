@@ -1,22 +1,16 @@
 import { Setting } from 'obsidian';
-import { invokeAsyncSafely } from 'obsidian-dev-utils/Async';
 import { appendCodeBlock } from 'obsidian-dev-utils/HTMLElement';
 import { PluginSettingsTabBase } from 'obsidian-dev-utils/obsidian/Plugin/PluginSettingsTabBase';
 
 import type { PluginTypes } from './PluginTypes.ts';
 
 import {
-  getIgnorePatternsStr,
   GIT_IGNORE_FILE,
-  OBSIDIAN_IGNORE_FILE,
-  setIgnorePatternsStr
-} from './IgnorePatterns.ts';
+  OBSIDIAN_IGNORE_FILE
+} from './IgnorePatternsComponent.ts';
 import { ExcludeMode } from './PluginSettings.ts';
 
 export class PluginSettingsTab extends PluginSettingsTabBase<PluginTypes> {
-  private ignorePatternsStr = '';
-  private isIgnorePatternsStrChanged = false;
-
   public override display(): void {
     super.display();
     this.containerEl.empty();
@@ -39,18 +33,7 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginTypes> {
       .addTextArea((textArea) => {
         textArea.setPlaceholder('foo/bar/*\n!foo/bar/baz.md');
         textArea.inputEl.addClass('ignore-patterns-control');
-        textArea.setDisabled(true);
-        invokeAsyncSafely(async () => {
-          const previousIgnorePatternsStr = await getIgnorePatternsStr(this.plugin);
-
-          textArea.onChange((value) => {
-            this.ignorePatternsStr = value;
-            this.isIgnorePatternsStrChanged = value !== previousIgnorePatternsStr;
-          });
-
-          textArea.setValue(previousIgnorePatternsStr);
-          textArea.setDisabled(false);
-        });
+        this.bind(textArea, 'obsidianIgnoreContent');
       });
 
     new Setting(this.containerEl)
@@ -105,12 +88,5 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginTypes> {
         dropdown.addOption(ExcludeMode.FilesPane, 'Files Pane');
         this.bind(dropdown, 'excludeMode');
       });
-  }
-
-  public override hide(): void {
-    super.hide();
-    if (this.isIgnorePatternsStrChanged) {
-      invokeAsyncSafely(() => setIgnorePatternsStr(this.app, this.ignorePatternsStr));
-    }
   }
 }

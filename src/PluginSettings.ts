@@ -5,6 +5,7 @@ export enum ExcludeMode {
 
 export class PluginSettings {
   public excludeMode: ExcludeMode = ExcludeMode.Full;
+  public obsidianIgnoreContent = '';
   public shouldIgnoreExcludedFiles = false;
   public shouldIncludeGitIgnorePatterns = true;
 }

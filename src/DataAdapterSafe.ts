@@ -22,7 +22,7 @@ export async function existsSafe(app: App, path: string): Promise<boolean> {
   }
   if (adapter instanceof CapacitorAdapter) {
     try {
-      await adapter.fs.stat(fullPath)
+      await adapter.fs.stat(fullPath);
       return true;
     } catch {
       return false;
