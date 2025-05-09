@@ -92,6 +92,6 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginTypes> {
 
   public override async hideAsync(): Promise<void> {
     await super.hideAsync();
-    await this.plugin.updateFileTreeIfHadChanges();
+    await this.plugin.processConfigChanges();
   }
 }

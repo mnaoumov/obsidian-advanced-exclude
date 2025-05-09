@@ -39,8 +39,8 @@ type GenericReconcileFn = (normalizedPath: string, ...args: unknown[]) => Promis
 type VaultLoadFn = Vault['load'];
 
 export class Plugin extends PluginBase<PluginTypes> {
+  private hadConfigChanges = false;
   private ignorePatternsComponent!: IgnorePatternsComponent;
-  private shouldUpdateFileTree = false;
   private updateFileTreeAbortController: AbortController | null = null;
   private updateProgressEl!: HTMLProgressElement;
   private vaultLoadCalled = false;
@@ -52,6 +52,15 @@ export class Plugin extends PluginBase<PluginTypes> {
     }
 
     await this.ignorePatternsComponent.readObsidianIgnore();
+  }
+
+  public async processConfigChanges(): Promise<void> {
+    if (!this.hadConfigChanges) {
+      return;
+    }
+
+    this.hadConfigChanges = false;
+    await this.ignorePatternsComponent.processConfigChanges();
   }
 
   public async updateFileTree(): Promise<void> {
@@ -77,16 +86,6 @@ export class Plugin extends PluginBase<PluginTypes> {
       notice.hide();
       this.updateFileTreeAbortController = null;
     }
-  }
-
-  public async updateFileTreeIfHadChanges(): Promise<void> {
-    if (!this.shouldUpdateFileTree) {
-      return;
-    }
-
-    this.shouldUpdateFileTree = false;
-
-    await this.updateFileTree();
   }
 
   protected override createSettingsManager(): PluginSettingsManager {
@@ -161,7 +160,7 @@ export class Plugin extends PluginBase<PluginTypes> {
   ): Promise<void> {
     await super.onSaveSettings(newSettings, oldSettings, context);
     await this.ignorePatternsComponent.reload(newSettings.settings.obsidianIgnoreContent);
-    this.shouldUpdateFileTree = true;
+    this.hadConfigChanges = true;
   }
 
   private addToFilesPane(normalizedPath: string): void {
@@ -235,7 +234,7 @@ export class Plugin extends PluginBase<PluginTypes> {
       return;
     }
 
-    await this.ignorePatternsComponent.checkForConfigChanges(normalizedPath);
+    await this.ignorePatternsComponent.handleDeletedOrDotFile(normalizedPath);
   }
 
   private async reloadChildPath(childPath: string, orphanPaths: Set<string>, includedPaths: Set<string>, isFolder: boolean): Promise<void> {
