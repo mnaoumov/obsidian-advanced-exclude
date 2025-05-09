@@ -231,7 +231,7 @@ export class IgnorePatternsComponent extends Component {
     const db = await getResult(request);
 
     this.db = db;
-    const transaction = db.transaction([FILES_STORE_NAME], 'readonly');
+    const transaction = db.transaction([MTIME_STORE_NAME], 'readonly');
     const mtimeStore = transaction.objectStore(MTIME_STORE_NAME);
 
     const DEFAULT_MTIME_ENTRY: DbMtimeEntry = {
