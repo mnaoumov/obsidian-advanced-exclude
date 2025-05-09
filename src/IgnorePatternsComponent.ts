@@ -1,5 +1,6 @@
 import ignore from 'ignore';
 import { Component } from 'obsidian';
+import { invokeAsyncSafelyAfterDelay } from 'obsidian-dev-utils/Async';
 import { escapeRegExp } from 'obsidian-dev-utils/RegExp';
 
 import type { Plugin } from './Plugin.ts';
@@ -35,7 +36,8 @@ export class IgnorePatternsComponent extends Component {
     }
 
     if (shouldRefresh) {
-      await this.plugin.updateFileTree();
+      this.cachedIgnoreTester = null;
+      invokeAsyncSafelyAfterDelay(() => this.plugin.updateFileTree());
     }
   }
 
