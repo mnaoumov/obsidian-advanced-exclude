@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## 2.0.0
+
+- Cache in database
+- Prevent double load
+- Add support for dir/ patterns
+- Wait for metadata ready
+- Update libs
+
 ## 1.3.0
 
 - Add ExcludeMode
