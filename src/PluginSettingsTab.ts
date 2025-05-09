@@ -89,4 +89,9 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginTypes> {
         this.bind(dropdown, 'excludeMode');
       });
   }
+
+  public override async hideAsync(): Promise<void> {
+    await super.hideAsync();
+    await this.plugin.updateFileTreeIfHadChanges();
+  }
 }

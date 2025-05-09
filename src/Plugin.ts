@@ -38,6 +38,7 @@ type GenericReconcileFn = (normalizedPath: string, ...args: unknown[]) => Promis
 export class Plugin extends PluginBase<PluginTypes> {
   private ignorePatternsComponent!: IgnorePatternsComponent;
 
+  private shouldUpdateFileTree = false;
   private updateFileTreeAbortController: AbortController | null = null;
   private updateProgressEl!: HTMLProgressElement;
   public override async onLoadSettings(loadedSettings: ReadonlyObjectDeep<ExtractPluginSettingsWrapper<PluginTypes>>, isInitialLoad: boolean): Promise<void> {
@@ -72,6 +73,16 @@ export class Plugin extends PluginBase<PluginTypes> {
       notice.hide();
       this.updateFileTreeAbortController = null;
     }
+  }
+
+  public async updateFileTreeIfHadChanges(): Promise<void> {
+    if (!this.shouldUpdateFileTree) {
+      return;
+    }
+
+    this.shouldUpdateFileTree = false;
+
+    await this.updateFileTree();
   }
 
   protected override createSettingsManager(): PluginSettingsManager {
@@ -137,9 +148,7 @@ export class Plugin extends PluginBase<PluginTypes> {
   ): Promise<void> {
     await super.onSaveSettings(newSettings, oldSettings, context);
     await this.ignorePatternsComponent.reload(newSettings.settings.obsidianIgnoreContent);
-    if (!this.settingsTab.isOpen) {
-      await this.updateFileTree();
-    }
+    this.shouldUpdateFileTree = true;
   }
 
   private addToFilesPane(normalizedPath: string): void {
