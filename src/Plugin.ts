@@ -1,5 +1,6 @@
 import type {
   DataAdapter,
+  TAbstractFile,
   Vault
 } from 'obsidian';
 import type { ExtractPluginSettingsWrapper } from 'obsidian-dev-utils/obsidian/Plugin/PluginTypesBase';
@@ -16,6 +17,8 @@ import {
   invokeAsyncSafely,
   throwOnAbort
 } from 'obsidian-dev-utils/Async';
+import { getPrototypeOf } from 'obsidian-dev-utils/Object';
+import { isFolder as isFolderFn } from 'obsidian-dev-utils/obsidian/FileSystem';
 import { ensureMetadataCacheReady } from 'obsidian-dev-utils/obsidian/MetadataCache';
 import { registerPatch } from 'obsidian-dev-utils/obsidian/MonkeyAround';
 import { PluginBase } from 'obsidian-dev-utils/obsidian/Plugin/PluginBase';
@@ -36,6 +39,7 @@ type DataAdapterReconcileDeletionFn = DataAdapter['reconcileDeletion'];
 type DataAdapterReconcileFolderCreationFn = DataAdapter['reconcileFolderCreation'];
 type FileSystemAdapterReconcileFileCreationFn = FileSystemAdapter['reconcileFileCreation'];
 type GenericReconcileFn = (normalizedPath: string, ...args: unknown[]) => Promise<void>;
+type OnCreateFn = FileExplorerView['onCreate'];
 type VaultLoadFn = Vault['load'];
 
 export class Plugin extends PluginBase<PluginTypes> {
@@ -112,6 +116,18 @@ export class Plugin extends PluginBase<PluginTypes> {
 
     if (!this.vaultLoadCalled) {
       await this.updateFileTree();
+    }
+
+    const that = this;
+    const view = this.getFileExplorerView();
+    if (view) {
+      registerPatch(this, getPrototypeOf(view), {
+        onCreate: (next: OnCreateFn): OnCreateFn => {
+          return function onCreatePatched(this: FileExplorerView, file: TAbstractFile): void {
+            that.onCreate(next, this, file);
+          };
+        }
+      });
     }
   }
 
@@ -221,6 +237,21 @@ export class Plugin extends PluginBase<PluginTypes> {
 
   private isDotFile(path: string): boolean {
     return basename(path).startsWith('.');
+  }
+
+  private onCreate(next: OnCreateFn, view: FileExplorerView, file: TAbstractFile): void {
+    if (this.settings.excludeMode !== ExcludeMode.FilesPane) {
+      next.call(view, file);
+      return;
+    }
+
+    invokeAsyncSafely(async () => {
+      const isIgnored = await this.ignorePatternsComponent.isIgnored(file.path, isFolderFn(file));
+      if (isIgnored) {
+        return;
+      }
+      next.call(view, file);
+    });
   }
 
   private async reconcileDeletion(
