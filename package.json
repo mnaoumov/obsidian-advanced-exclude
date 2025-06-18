@@ -1,6 +1,6 @@
 {
   "name": "advanced-exclude",
-  "version": "2.0.3",
+  "version": "2.0.4",
   "description": "Enhances the Excluded files setting bringing gitignore syntax.",
   "keywords": [],
   "license": "MIT",
