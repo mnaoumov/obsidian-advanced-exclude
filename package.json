@@ -22,14 +22,16 @@
   },
   "devDependencies": {
     "@tsconfig/strictest": "^2.0.5",
-    "@types/node": "^22.15.29",
+    "@types/node": "^24.2.1",
     "ignore": "^7.0.5",
-    "jiti": "^2.4.2",
+    "jiti": "^2.5.1",
     "obsidian": "^1.8.7",
-    "obsidian-dev-utils": "^27.0.0",
-    "obsidian-typings": "^3.9.5"
+    "obsidian-dev-utils": "^31.0.0",
+    "obsidian-typings": "^3.16.0"
   },
   "overrides": {
-    "boolean": "npm:dry-uninstall"
+    "@antfu/utils": "9.2.0",
+    "boolean": "npm:dry-uninstall",
+    "dompurify": "3.0.1"
   }
 }
