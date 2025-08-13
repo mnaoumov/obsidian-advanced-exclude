@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## 2.0.5
+
+- Update libs
+
 ## 2.0.4
 
 - Ensure excluded items don't reappear on view reload
