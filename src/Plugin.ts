@@ -17,7 +17,7 @@ import {
   invokeAsyncSafely,
   throwOnAbort
 } from 'obsidian-dev-utils/Async';
-import { getPrototypeOf } from 'obsidian-dev-utils/Object';
+import { getPrototypeOf } from 'obsidian-dev-utils/ObjectUtils';
 import { isFolder as isFolderFn } from 'obsidian-dev-utils/obsidian/FileSystem';
 import { ensureMetadataCacheReady } from 'obsidian-dev-utils/obsidian/MetadataCache';
 import { registerPatch } from 'obsidian-dev-utils/obsidian/MonkeyAround';

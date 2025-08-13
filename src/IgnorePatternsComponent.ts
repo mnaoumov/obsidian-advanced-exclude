@@ -4,7 +4,7 @@ import {
   debounce
 } from 'obsidian';
 import { invokeAsyncSafelyAfterDelay } from 'obsidian-dev-utils/Async';
-import { deepEqual } from 'obsidian-dev-utils/Object';
+import { deepEqual } from 'obsidian-dev-utils/ObjectUtils';
 import { escapeRegExp } from 'obsidian-dev-utils/RegExp';
 
 import type { Plugin } from './Plugin.ts';
