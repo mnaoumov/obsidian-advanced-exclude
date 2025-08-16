@@ -3,7 +3,6 @@ import type {
   TAbstractFile,
   Vault
 } from 'obsidian';
-import { sleep } from 'obsidian-dev-utils/Async';
 import type { ExtractPluginSettingsWrapper } from 'obsidian-dev-utils/obsidian/Plugin/PluginTypesBase';
 import type { FileExplorerView } from 'obsidian-typings';
 import type { ReadonlyObjectDeep } from 'type-fest/source/readonly-deep.js';
@@ -13,7 +12,10 @@ import {
   FileSystemAdapter,
   Notice
 } from 'obsidian';
-import { invokeAsyncSafely } from 'obsidian-dev-utils/Async';
+import {
+  invokeAsyncSafely,
+  sleep
+} from 'obsidian-dev-utils/Async';
 import { getPrototypeOf } from 'obsidian-dev-utils/ObjectUtils';
 import { isFolder as isFolderFn } from 'obsidian-dev-utils/obsidian/FileSystem';
 import { ensureMetadataCacheReady } from 'obsidian-dev-utils/obsidian/MetadataCache';
