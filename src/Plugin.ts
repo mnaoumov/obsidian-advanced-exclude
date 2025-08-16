@@ -83,7 +83,7 @@ export class Plugin extends PluginBase<PluginTypes> {
     const notice = new Notice(fragment, 0);
     try {
       await Promise.race([
-        Promise.all([this.reloadFolder(ROOT_PATH, abortSignal), sleep(NOTIFICATION_MIN_DURATION_IN_MS, abortSignal)]),
+        Promise.all([this.reloadFolder(ROOT_PATH, abortSignal), sleep(NOTIFICATION_MIN_DURATION_IN_MS, abortSignal)])
       ]);
     } finally {
       notice.hide();
