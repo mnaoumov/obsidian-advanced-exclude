@@ -6,6 +6,6 @@
   "id": "advanced-exclude",
   "isDesktopOnly": false,
   "name": "Advanced Exclude",
-  "version": "2.0.7",
-  "minAppVersion": "1.9.10"
+  "version": "2.0.8",
+  "minAppVersion": "1.9.12"
 }
