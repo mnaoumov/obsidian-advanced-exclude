@@ -40,14 +40,14 @@ export class IgnorePatternsComponent extends Component {
   private cachedIgnoreTester: ignore.Ignore | null = null;
   private cachedObsidianIgnoreContent = '';
   private db!: IDBDatabase;
-  private fileIgnoreMap = new Map<string, boolean>();
+  private readonly fileIgnoreMap = new Map<string, boolean>();
   private onloadPromise: Promise<void> = Promise.resolve();
   private pendingStoreActions: ((store: IDBObjectStore) => void)[] = [];
-  private processStoreActionsDebounced = debounce(() => {
+  private readonly processStoreActionsDebounced = debounce(() => {
     this.processStoreActions();
   }, PROCESS_STORE_ACTIONS_DEBOUNCE_INTERVAL_IN_MILLISECONDS);
 
-  public constructor(private plugin: Plugin) {
+  public constructor(private readonly plugin: Plugin) {
     super();
   }
 
