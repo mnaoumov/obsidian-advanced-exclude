@@ -5,7 +5,7 @@ import type {
 } from 'obsidian';
 import type { ExtractPluginSettingsWrapper } from 'obsidian-dev-utils/obsidian/Plugin/PluginTypesBase';
 import type { FileExplorerView } from 'obsidian-typings';
-import type { ReadonlyObjectDeep } from 'type-fest/source/readonly-deep.js';
+import type { ReadonlyDeep } from 'type-fest';
 
 import {
   CapacitorAdapter,
@@ -42,19 +42,26 @@ type OnCreateFn = FileExplorerView['onCreate'];
 type VaultLoadFn = Vault['load'];
 
 export class Plugin extends PluginBase<PluginTypes> {
+  private _updateProgressEl?: HTMLProgressElement;
   private hadConfigChanges = false;
-  private ignorePatternsComponent!: IgnorePatternsComponent;
+  private ignorePatternsComponent?: IgnorePatternsComponent;
   private updateFileTreeAbortController: AbortController | null = null;
-  private updateProgressEl!: HTMLProgressElement;
   private vaultLoadCalled = false;
 
-  public override async onLoadSettings(loadedSettings: ReadonlyObjectDeep<ExtractPluginSettingsWrapper<PluginTypes>>, isInitialLoad: boolean): Promise<void> {
+  private get updateProgressEl(): HTMLProgressElement {
+    if (!this._updateProgressEl) {
+      throw new Error('updateProgressEl is not set');
+    }
+    return this._updateProgressEl;
+  }
+
+  public override async onLoadSettings(loadedSettings: ReadonlyDeep<ExtractPluginSettingsWrapper<PluginTypes>>, isInitialLoad: boolean): Promise<void> {
     await super.onLoadSettings(loadedSettings, isInitialLoad);
     if (isInitialLoad) {
       return;
     }
 
-    await this.ignorePatternsComponent.readObsidianIgnore();
+    await this.ignorePatternsComponent?.readObsidianIgnore();
   }
 
   public async processConfigChanges(): Promise<void> {
@@ -63,7 +70,7 @@ export class Plugin extends PluginBase<PluginTypes> {
     }
 
     this.hadConfigChanges = false;
-    await this.ignorePatternsComponent.processConfigChanges();
+    await this.ignorePatternsComponent?.processConfigChanges();
   }
 
   public async updateFileTree(): Promise<void> {
@@ -77,7 +84,7 @@ export class Plugin extends PluginBase<PluginTypes> {
     const abortSignal = this.updateFileTreeAbortController.signal;
     const fragment = createFragment((f) => {
       f.appendText('Advanced Exclude: Updating file tree...');
-      this.updateProgressEl = f.createEl('progress');
+      this._updateProgressEl = f.createEl('progress');
     });
     const notice = new Notice(fragment, 0);
     try {
@@ -104,7 +111,7 @@ export class Plugin extends PluginBase<PluginTypes> {
 
     this.registerEvent(this.app.vault.on('config-changed', (configKey: string) => {
       if (configKey === 'userIgnoreFilters') {
-        this.ignorePatternsComponent.clearCachedExcludeRegExps();
+        this.ignorePatternsComponent?.clearCachedExcludeRegExps();
       }
     }));
 
@@ -168,12 +175,12 @@ export class Plugin extends PluginBase<PluginTypes> {
   }
 
   protected override async onSaveSettings(
-    newSettings: ReadonlyObjectDeep<ExtractPluginSettingsWrapper<PluginTypes>>,
-    oldSettings: ReadonlyObjectDeep<ExtractPluginSettingsWrapper<PluginTypes>>,
+    newSettings: ReadonlyDeep<ExtractPluginSettingsWrapper<PluginTypes>>,
+    oldSettings: ReadonlyDeep<ExtractPluginSettingsWrapper<PluginTypes>>,
     context: unknown
   ): Promise<void> {
     await super.onSaveSettings(newSettings, oldSettings, context);
-    await this.ignorePatternsComponent.reload(newSettings.settings.obsidianIgnoreContent);
+    await this.ignorePatternsComponent?.reload(newSettings.settings.obsidianIgnoreContent);
     this.hadConfigChanges = true;
   }
 
@@ -216,7 +223,7 @@ export class Plugin extends PluginBase<PluginTypes> {
   private generateReconcileWrapper(next: GenericReconcileFn, isFolder: boolean): GenericReconcileFn {
     return async (normalizedPath: string, ...args: unknown[]) => {
       let shouldRemoveFromFilesPane = false;
-      if (await this.ignorePatternsComponent.isIgnored(normalizedPath, isFolder)) {
+      if (await this.ignorePatternsComponent?.isIgnored(normalizedPath, isFolder)) {
         if (this.settings.excludeMode === ExcludeMode.Full) {
           return;
         }
@@ -244,7 +251,7 @@ export class Plugin extends PluginBase<PluginTypes> {
     }
 
     invokeAsyncSafely(async () => {
-      const isIgnored = await this.ignorePatternsComponent.isIgnored(file.path, isFolderFn(file));
+      const isIgnored = await this.ignorePatternsComponent?.isIgnored(file.path, isFolderFn(file));
       if (isIgnored) {
         return;
       }
@@ -263,7 +270,7 @@ export class Plugin extends PluginBase<PluginTypes> {
       return;
     }
 
-    await this.ignorePatternsComponent.handleDeletedOrDotFile(normalizedPath);
+    await this.ignorePatternsComponent?.handleDeletedOrDotFile(normalizedPath);
   }
 
   private async reloadChildPath(childPath: string, orphanPaths: Set<string>, includedPaths: Set<string>, isFolder: boolean): Promise<void> {
@@ -276,7 +283,7 @@ export class Plugin extends PluginBase<PluginTypes> {
 
     const adapter = this.app.vault.adapter;
 
-    const isChildPathIgnored = await this.ignorePatternsComponent.isIgnored(childPath, isFolder);
+    const isChildPathIgnored = await this.ignorePatternsComponent?.isIgnored(childPath, isFolder);
     if (isChildPathIgnored && this.settings.excludeMode === ExcludeMode.Full) {
       await adapter.reconcileDeletion(childPath, childPath);
       return;
@@ -326,7 +333,7 @@ export class Plugin extends PluginBase<PluginTypes> {
 
     for (const childEntry of childEntries) {
       try {
-        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- Can change in await calls.
         if (abortSignal.aborted) {
           return;
         }
@@ -341,7 +348,7 @@ export class Plugin extends PluginBase<PluginTypes> {
 
     this.updateProgressEl.max += orphanPaths.size;
     for (const orphanPath of orphanPaths) {
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- Can change in await calls.
       if (abortSignal.aborted) {
         return;
       }
@@ -355,7 +362,7 @@ export class Plugin extends PluginBase<PluginTypes> {
     }
 
     for (const childFolderPath of listedFiles.folders) {
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- Can change in await calls.
       if (abortSignal.aborted) {
         return;
       }

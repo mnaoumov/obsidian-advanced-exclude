@@ -35,17 +35,26 @@ interface DbMtimeEntry {
 }
 
 export class IgnorePatternsComponent extends Component {
+  private _db?: IDBDatabase;
   private cachedExcludeRegExps: null | RegExp[] = null;
   private cachedGitIgnoreContent = '';
   private cachedIgnoreTester: ignore.Ignore | null = null;
   private cachedObsidianIgnoreContent = '';
-  private db!: IDBDatabase;
+
   private readonly fileIgnoreMap = new Map<string, boolean>();
+
   private onloadPromise: Promise<void> = Promise.resolve();
   private pendingStoreActions: ((store: IDBObjectStore) => void)[] = [];
   private readonly processStoreActionsDebounced = debounce(() => {
     this.processStoreActions();
   }, PROCESS_STORE_ACTIONS_DEBOUNCE_INTERVAL_IN_MILLISECONDS);
+
+  private get db(): IDBDatabase {
+    if (!this._db) {
+      throw new Error('db is not set');
+    }
+    return this._db;
+  }
 
   public constructor(private readonly plugin: Plugin) {
     super();
@@ -247,7 +256,7 @@ export class IgnorePatternsComponent extends Component {
 
     const db = await getResult(request);
 
-    this.db = db;
+    this._db = db;
     const transaction = db.transaction([MTIME_STORE_NAME], 'readonly');
     const mtimeStore = transaction.objectStore(MTIME_STORE_NAME);
 
