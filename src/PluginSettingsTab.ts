@@ -52,7 +52,7 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginTypes> {
       });
 
     new Setting(this.containerEl)
-      .setName('Ignore Excluded Files')
+      .setName('Ignore excluded files')
       .setDesc(createFragment((f) => {
         f.appendText('Whether to ignore files that are excluded by ');
         appendCodeBlock(f, 'File links > Excluded files');
@@ -85,7 +85,7 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginTypes> {
       }))
       .addDropdown((dropdown) => {
         dropdown.addOption(ExcludeMode.Full, 'Full');
-        dropdown.addOption(ExcludeMode.FilesPane, 'Files Pane');
+        dropdown.addOption(ExcludeMode.FilesPane, 'Files pane');
         this.bind(dropdown, 'excludeMode');
       });
   }
