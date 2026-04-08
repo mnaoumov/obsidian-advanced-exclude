@@ -1,10 +1,12 @@
 import type {
-  DataAdapter,
   TAbstractFile,
   Vault
 } from 'obsidian';
-import type { ExtractPluginSettingsWrapper } from 'obsidian-dev-utils/obsidian/Plugin/PluginTypesBase';
-import type { FileExplorerView } from 'obsidian-typings';
+import type { ExtractPluginSettingsWrapper } from 'obsidian-dev-utils/obsidian/plugin/plugin-types-base';
+import type {
+  DataAdapterEx,
+  FileExplorerView
+} from 'obsidian-typings';
 import type { ReadonlyDeep } from 'type-fest';
 
 import {
@@ -15,13 +17,14 @@ import {
 import {
   invokeAsyncSafely,
   sleep
-} from 'obsidian-dev-utils/Async';
-import { getPrototypeOf } from 'obsidian-dev-utils/ObjectUtils';
-import { isFolder as isFolderFn } from 'obsidian-dev-utils/obsidian/FileSystem';
-import { ensureMetadataCacheReady } from 'obsidian-dev-utils/obsidian/MetadataCache';
-import { registerPatch } from 'obsidian-dev-utils/obsidian/MonkeyAround';
-import { PluginBase } from 'obsidian-dev-utils/obsidian/Plugin/PluginBase';
-import { basename } from 'obsidian-dev-utils/Path';
+} from 'obsidian-dev-utils/async';
+import { getPrototypeOf } from 'obsidian-dev-utils/object-utils';
+import { isFolder as isFolderFn } from 'obsidian-dev-utils/obsidian/file-system';
+import { ensureMetadataCacheReady } from 'obsidian-dev-utils/obsidian/metadata-cache';
+import { registerPatch } from 'obsidian-dev-utils/obsidian/monkey-around';
+import { PluginBase } from 'obsidian-dev-utils/obsidian/plugin/plugin-base';
+import { basename } from 'obsidian-dev-utils/path';
+import { getDataAdapterEx } from 'obsidian-typings/implementations';
 
 import type { PluginTypes } from './PluginTypes.ts';
 
@@ -34,8 +37,8 @@ import { PluginSettingsManager } from './PluginSettingsManager.ts';
 import { PluginSettingsTab } from './PluginSettingsTab.ts';
 
 type CapacitorAdapterReconcileFileCreationFn = CapacitorAdapter['reconcileFileCreation'];
-type DataAdapterReconcileDeletionFn = DataAdapter['reconcileDeletion'];
-type DataAdapterReconcileFolderCreationFn = DataAdapter['reconcileFolderCreation'];
+type DataAdapterReconcileDeletionFn = DataAdapterEx['reconcileDeletion'];
+type DataAdapterReconcileFolderCreationFn = DataAdapterEx['reconcileFolderCreation'];
 type FileSystemAdapterReconcileFileCreationFn = FileSystemAdapter['reconcileFileCreation'];
 type GenericReconcileFn = (normalizedPath: string, ...args: unknown[]) => Promise<void>;
 type OnCreateFn = FileExplorerView['onCreate'];
@@ -281,7 +284,7 @@ export class Plugin extends PluginBase<PluginTypes> {
 
     orphanPaths.delete(childPath);
 
-    const adapter = this.app.vault.adapter;
+    const adapter = getDataAdapterEx(this.app);
 
     const isChildPathIgnored = await this.ignorePatternsComponent?.isIgnored(childPath, isFolder);
     if (isChildPathIgnored && this.settings.excludeMode === ExcludeMode.Full) {
@@ -316,7 +319,7 @@ export class Plugin extends PluginBase<PluginTypes> {
       return;
     }
 
-    const adapter = this.app.vault.adapter;
+    const adapter = getDataAdapterEx(this.app);
     if (folderPath === ROOT_PATH) {
       await adapter.reconcileFolderCreation(folderPath, folderPath);
     }

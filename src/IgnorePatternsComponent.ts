@@ -3,9 +3,9 @@ import {
   Component,
   debounce
 } from 'obsidian';
-import { invokeAsyncSafelyAfterDelay } from 'obsidian-dev-utils/Async';
-import { deepEqual } from 'obsidian-dev-utils/ObjectUtils';
-import { escapeRegExp } from 'obsidian-dev-utils/RegExp';
+import { invokeAsyncSafelyAfterDelay } from 'obsidian-dev-utils/async';
+import { deepEqual } from 'obsidian-dev-utils/object-utils';
+import { escapeRegExp } from 'obsidian-dev-utils/reg-exp';
 
 import type { Plugin } from './Plugin.ts';
 
