@@ -7,9 +7,10 @@ import {
   CapacitorAdapter,
   FileSystemAdapter
 } from 'obsidian';
+import { getDataAdapterEx } from 'obsidian-typings/implementations';
 
 export async function existsSafe(app: App, path: string): Promise<boolean> {
-  const adapter = app.vault.adapter;
+  const adapter = getDataAdapterEx(app);
   const fullPath = adapter.getFullPath(path);
 
   if (adapter instanceof FileSystemAdapter) {
@@ -37,7 +38,7 @@ export async function readSafe(app: App, path: string): Promise<string> {
     return '';
   }
 
-  const adapter = app.vault.adapter;
+  const adapter = getDataAdapterEx(app);
   const fullPath = adapter.getFullPath(path);
 
   if (adapter instanceof FileSystemAdapter) {
@@ -55,7 +56,7 @@ export async function statSafe(app: App, path: string): Promise<null | Stat> {
     return null;
   }
 
-  const adapter = app.vault.adapter;
+  const adapter = getDataAdapterEx(app);
   const fullPath = adapter.getFullPath(path);
   if (adapter instanceof FileSystemAdapter) {
     const fsStats = await adapter.fsPromises.stat(fullPath);
@@ -79,7 +80,7 @@ export async function statSafe(app: App, path: string): Promise<null | Stat> {
 }
 
 export async function writeSafe(app: App, path: string, content: string): Promise<void> {
-  const adapter = app.vault.adapter;
+  const adapter = getDataAdapterEx(app);
   const fullPath = adapter.getFullPath(path);
 
   if (adapter instanceof FileSystemAdapter) {
