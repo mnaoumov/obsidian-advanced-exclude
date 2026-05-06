@@ -2,13 +2,13 @@ import { Setting } from 'obsidian';
 import { appendCodeBlock } from 'obsidian-dev-utils/html-element';
 import { PluginSettingsTabBase } from 'obsidian-dev-utils/obsidian/plugin/plugin-settings-tab-base';
 
-import type { PluginTypes } from './PluginTypes.ts';
+import type { PluginTypes } from './plugin-types.ts';
 
 import {
   GIT_IGNORE_FILE,
   OBSIDIAN_IGNORE_FILE
-} from './IgnorePatternsComponent.ts';
-import { ExcludeMode } from './PluginSettings.ts';
+} from './ignore-patterns-component.ts';
+import { ExcludeMode } from './plugin-settings.ts';
 
 export class PluginSettingsTab extends PluginSettingsTabBase<PluginTypes> {
   public override display(): void {

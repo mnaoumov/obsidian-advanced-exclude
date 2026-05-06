@@ -26,15 +26,15 @@ import { PluginBase } from 'obsidian-dev-utils/obsidian/plugin/plugin-base';
 import { basename } from 'obsidian-dev-utils/path';
 import { getDataAdapterEx } from 'obsidian-typings/implementations';
 
-import type { PluginTypes } from './PluginTypes.ts';
+import type { PluginTypes } from './plugin-types.ts';
 
 import {
   IgnorePatternsComponent,
   ROOT_PATH
-} from './IgnorePatternsComponent.ts';
-import { ExcludeMode } from './PluginSettings.ts';
-import { PluginSettingsManager } from './PluginSettingsManager.ts';
-import { PluginSettingsTab } from './PluginSettingsTab.ts';
+} from './ignore-patterns-component.ts';
+import { ExcludeMode } from './plugin-settings.ts';
+import { PluginSettingsManager } from './plugin-settings-manager.ts';
+import { PluginSettingsTab } from './plugin-settings-tab.ts';
 
 type CapacitorAdapterReconcileFileCreationFn = CapacitorAdapter['reconcileFileCreation'];
 type DataAdapterReconcileDeletionFn = DataAdapterEx['reconcileDeletion'];
