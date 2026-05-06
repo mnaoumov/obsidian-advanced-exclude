@@ -13,7 +13,7 @@ import {
   readSafe,
   statSafe,
   writeSafe
-} from './DataAdapterSafe.ts';
+} from './data-adapter-safe.ts';
 
 export const ROOT_PATH = '/';
 export const OBSIDIAN_IGNORE_FILE = '.obsidianignore';
