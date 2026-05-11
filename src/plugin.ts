@@ -1,388 +1,71 @@
 import type {
-  TAbstractFile,
-  Vault
+  App,
+  PluginManifest
 } from 'obsidian';
-import type { ExtractPluginSettingsWrapper } from 'obsidian-dev-utils/obsidian/plugin/plugin-types-base';
-import type {
-  DataAdapterEx,
-  FileExplorerView
-} from 'obsidian-typings';
-import type { ReadonlyDeep } from 'type-fest';
 
-import {
-  CapacitorAdapter,
-  FileSystemAdapter,
-  Notice
-} from 'obsidian';
-import {
-  invokeAsyncSafely,
-  sleep
-} from 'obsidian-dev-utils/async';
-import { getPrototypeOf } from 'obsidian-dev-utils/object-utils';
-import { isFolder as isFolderFn } from 'obsidian-dev-utils/obsidian/file-system';
-import { ensureMetadataCacheReady } from 'obsidian-dev-utils/obsidian/metadata-cache';
-import { registerPatch } from 'obsidian-dev-utils/obsidian/monkey-around';
-import { PluginBase } from 'obsidian-dev-utils/obsidian/plugin/plugin-base';
-import { basename } from 'obsidian-dev-utils/path';
-import { getDataAdapterEx } from 'obsidian-typings/implementations';
+import { PluginDataHandler } from 'obsidian-dev-utils/obsidian/data-handler';
+import { PluginSettingsTabComponent } from 'obsidian-dev-utils/obsidian/plugin/components/plugin-settings-tab-component';
+import { PluginBase } from 'obsidian-dev-utils/obsidian/plugin/plugin';
 
-import type { PluginTypes } from './plugin-types.ts';
-
-import {
-  IgnorePatternsComponent,
-  ROOT_PATH
-} from './ignore-patterns-component.ts';
-import { ExcludeMode } from './plugin-settings.ts';
-import { PluginSettingsManager } from './plugin-settings-manager.ts';
+import { FileTreeComponent } from './file-tree-component.ts';
+import { IgnorePatternsComponent } from './ignore-patterns-component.ts';
+import { AdapterPatch } from './patches/adapter-patch.ts';
+import { FileExplorerViewOnCreatePatch } from './patches/file-explorer-view-on-create-patch.ts';
+import { VaultLoadPatch } from './patches/vault-load-patch.ts';
+import { PluginSettingsComponent } from './plugin-settings-component.ts';
 import { PluginSettingsTab } from './plugin-settings-tab.ts';
 
-type CapacitorAdapterReconcileFileCreationFn = CapacitorAdapter['reconcileFileCreation'];
-type DataAdapterReconcileDeletionFn = DataAdapterEx['reconcileDeletion'];
-type DataAdapterReconcileFolderCreationFn = DataAdapterEx['reconcileFolderCreation'];
-type FileSystemAdapterReconcileFileCreationFn = FileSystemAdapter['reconcileFileCreation'];
-type GenericReconcileFn = (normalizedPath: string, ...args: unknown[]) => Promise<void>;
-type OnCreateFn = FileExplorerView['onCreate'];
-type VaultLoadFn = Vault['load'];
+export class Plugin extends PluginBase {
+  public constructor(app: App, manifest: PluginManifest) {
+    super(app, manifest);
 
-export class Plugin extends PluginBase<PluginTypes> {
-  private _updateProgressEl?: HTMLProgressElement;
-  private hadConfigChanges = false;
-  private ignorePatternsComponent?: IgnorePatternsComponent;
-  private updateFileTreeAbortController: AbortController | null = null;
-  private vaultLoadCalled = false;
+    const pluginSettingsComponent = this.addChild(new PluginSettingsComponent(new PluginDataHandler(this)));
+    const vaultLoadPatch = this.addChild(new VaultLoadPatch(app));
 
-  private get updateProgressEl(): HTMLProgressElement {
-    if (!this._updateProgressEl) {
-      throw new Error('updateProgressEl is not set');
-    }
-    return this._updateProgressEl;
-  }
+    const ignorePatternsComponent: IgnorePatternsComponent = this.addChild(
+      new IgnorePatternsComponent({
+        app,
+        onUpdateFileTree: (): Promise<void> => fileTreeComponent.update(),
+        pluginSettingsComponent,
+        vaultLoadPatch
+      })
+    );
 
-  public override async onLoadSettings(loadedSettings: ReadonlyDeep<ExtractPluginSettingsWrapper<PluginTypes>>, isInitialLoad: boolean): Promise<void> {
-    await super.onLoadSettings(loadedSettings, isInitialLoad);
-    if (isInitialLoad) {
-      return;
-    }
+    const fileTreeComponent = this.addChild(
+      new FileTreeComponent({
+        app,
+        consoleDebugComponent: this.consoleDebugComponent,
+        ignorePatternsComponent,
+        pluginSettingsComponent,
+        vaultLoadPatch
+      })
+    );
+    this.addChild(
+      new PluginSettingsTabComponent({
+        plugin: this,
+        pluginSettingsTab: new PluginSettingsTab({
+          ignorePatternsComponent,
+          plugin: this,
+          pluginSettingsComponent
+        })
+      })
+    );
 
-    await this.ignorePatternsComponent?.readObsidianIgnore();
-  }
+    this.addChild(
+      new FileExplorerViewOnCreatePatch({
+        app,
+        ignorePatternsComponent,
+        pluginSettingsComponent
+      })
+    );
 
-  public async processConfigChanges(): Promise<void> {
-    if (!this.hadConfigChanges) {
-      return;
-    }
-
-    this.hadConfigChanges = false;
-    await this.ignorePatternsComponent?.processConfigChanges();
-  }
-
-  public async updateFileTree(): Promise<void> {
-    const NOTIFICATION_MIN_DURATION_IN_MS = 2000;
-
-    if (this.updateFileTreeAbortController) {
-      this.updateFileTreeAbortController.abort();
-    }
-
-    this.updateFileTreeAbortController = new AbortController();
-    const abortSignal = this.updateFileTreeAbortController.signal;
-    const fragment = createFragment((f) => {
-      f.appendText('Advanced Exclude: Updating file tree...');
-      this._updateProgressEl = f.createEl('progress');
-    });
-    const notice = new Notice(fragment, 0);
-    try {
-      await Promise.race([
-        Promise.all([this.reloadFolder(ROOT_PATH, abortSignal), sleep(NOTIFICATION_MIN_DURATION_IN_MS, abortSignal)])
-      ]);
-    } finally {
-      notice.hide();
-      this.updateFileTreeAbortController = null;
-    }
-  }
-
-  protected override createSettingsManager(): PluginSettingsManager {
-    return new PluginSettingsManager(this);
-  }
-
-  protected override createSettingsTab(): null | PluginSettingsTab {
-    return new PluginSettingsTab(this);
-  }
-
-  protected override async onLayoutReady(): Promise<void> {
-    await super.onLayoutReady();
-    await ensureMetadataCacheReady(this.app);
-
-    this.registerEvent(this.app.vault.on('config-changed', (configKey: string) => {
-      if (configKey === 'userIgnoreFilters') {
-        this.ignorePatternsComponent?.clearCachedExcludeRegExps();
-      }
-    }));
-
-    this.register(() => {
-      invokeAsyncSafely(() => this.updateFileTree());
-    });
-
-    if (!this.vaultLoadCalled) {
-      await this.updateFileTree();
-    }
-
-    const that = this;
-    const view = this.getFileExplorerView();
-    if (view) {
-      registerPatch(this, getPrototypeOf(view), {
-        onCreate: (next: OnCreateFn): OnCreateFn => {
-          return function onCreatePatched(this: FileExplorerView, file: TAbstractFile): void {
-            that.onCreate(next, this, file);
-          };
-        }
-      });
-    }
-  }
-
-  protected override async onloadImpl(): Promise<void> {
-    await super.onloadImpl();
-    this.ignorePatternsComponent = new IgnorePatternsComponent(this);
-
-    registerPatch(this, this.app.vault, {
-      load: (next: VaultLoadFn): VaultLoadFn => {
-        return () => this.vaultLoad(next);
-      }
-    });
-
-    this.addChild(this.ignorePatternsComponent);
-    if (this.app.vault.adapter instanceof CapacitorAdapter) {
-      registerPatch(this, this.app.vault.adapter, {
-        reconcileDeletion: (next: DataAdapterReconcileDeletionFn): DataAdapterReconcileDeletionFn => {
-          return async (normalizedPath: string, normalizedNewPath: string, shouldSkipDeletionTimeout?: boolean): Promise<void> => {
-            return this.reconcileDeletion(next, normalizedPath, normalizedNewPath, shouldSkipDeletionTimeout);
-          };
-        },
-        reconcileFileCreation: (next: CapacitorAdapterReconcileFileCreationFn): CapacitorAdapterReconcileFileCreationFn =>
-          this.generateReconcileWrapper(next as GenericReconcileFn, false),
-        reconcileFolderCreation: (next: DataAdapterReconcileFolderCreationFn): DataAdapterReconcileFolderCreationFn =>
-          this.generateReconcileWrapper(next as GenericReconcileFn, true)
-      });
-    } else if (this.app.vault.adapter instanceof FileSystemAdapter) {
-      registerPatch(this, this.app.vault.adapter, {
-        reconcileDeletion: (next: DataAdapterReconcileDeletionFn): DataAdapterReconcileDeletionFn => {
-          return async (normalizedPath: string, normalizedNewPath: string, shouldSkipDeletionTimeout?: boolean): Promise<void> => {
-            return this.reconcileDeletion(next, normalizedPath, normalizedNewPath, shouldSkipDeletionTimeout);
-          };
-        },
-        reconcileFileCreation: (next: FileSystemAdapterReconcileFileCreationFn): FileSystemAdapterReconcileFileCreationFn =>
-          this.generateReconcileWrapper(next as GenericReconcileFn, false),
-        reconcileFolderCreation: (next: DataAdapterReconcileFolderCreationFn): DataAdapterReconcileFolderCreationFn =>
-          this.generateReconcileWrapper(next as GenericReconcileFn, true)
-      });
-    }
-  }
-
-  protected override async onSaveSettings(
-    newSettings: ReadonlyDeep<ExtractPluginSettingsWrapper<PluginTypes>>,
-    oldSettings: ReadonlyDeep<ExtractPluginSettingsWrapper<PluginTypes>>,
-    context: unknown
-  ): Promise<void> {
-    await super.onSaveSettings(newSettings, oldSettings, context);
-    await this.ignorePatternsComponent?.reload(newSettings.settings.obsidianIgnoreContent);
-    this.hadConfigChanges = true;
-  }
-
-  private addToFilesPane(normalizedPath: string): void {
-    const fileExplorerView = this.getFileExplorerView();
-    if (!fileExplorerView) {
-      return;
-    }
-
-    if (fileExplorerView.fileItems[normalizedPath]) {
-      return;
-    }
-
-    const file = this.app.vault.getAbstractFileByPath(normalizedPath);
-    if (!file) {
-      return;
-    }
-
-    fileExplorerView.onCreate(file);
-  }
-
-  private deleteFromFilesPane(normalizedPath: string): void {
-    const fileExplorerView = this.getFileExplorerView();
-    if (!fileExplorerView) {
-      return;
-    }
-
-    if (!fileExplorerView.fileItems[normalizedPath]) {
-      return;
-    }
-
-    const file = this.app.vault.getAbstractFileByPath(normalizedPath);
-    if (!file) {
-      return;
-    }
-
-    fileExplorerView.onDelete(file);
-  }
-
-  private generateReconcileWrapper(next: GenericReconcileFn, isFolder: boolean): GenericReconcileFn {
-    return async (normalizedPath: string, ...args: unknown[]) => {
-      let shouldRemoveFromFilesPane = false;
-      if (await this.ignorePatternsComponent?.isIgnored(normalizedPath, isFolder)) {
-        if (this.settings.excludeMode === ExcludeMode.Full) {
-          return;
-        }
-        shouldRemoveFromFilesPane = true;
-      }
-      await next.call(this.app.vault.adapter, normalizedPath, ...args);
-      if (shouldRemoveFromFilesPane) {
-        this.deleteFromFilesPane(normalizedPath);
-      }
-    };
-  }
-
-  private getFileExplorerView(): FileExplorerView | undefined {
-    return this.app.workspace.getLeavesOfType('file-explorer')[0]?.view as FileExplorerView | undefined;
-  }
-
-  private isDotFile(path: string): boolean {
-    return basename(path).startsWith('.');
-  }
-
-  private onCreate(next: OnCreateFn, view: FileExplorerView, file: TAbstractFile): void {
-    if (this.settings.excludeMode !== ExcludeMode.FilesPane) {
-      next.call(view, file);
-      return;
-    }
-
-    invokeAsyncSafely(async () => {
-      const isIgnored = await this.ignorePatternsComponent?.isIgnored(file.path, isFolderFn(file));
-      if (isIgnored) {
-        return;
-      }
-      next.call(view, file);
-    });
-  }
-
-  private async reconcileDeletion(
-    next: DataAdapterReconcileDeletionFn,
-    normalizedPath: string,
-    normalizedNewPath: string,
-    shouldSkipDeletionTimeout?: boolean
-  ): Promise<void> {
-    await next.call(this.app.vault.adapter, normalizedPath, normalizedNewPath, shouldSkipDeletionTimeout);
-    if (!this.app.workspace.layoutReady) {
-      return;
-    }
-
-    await this.ignorePatternsComponent?.handleDeletedOrDotFile(normalizedPath);
-  }
-
-  private async reloadChildPath(childPath: string, orphanPaths: Set<string>, includedPaths: Set<string>, isFolder: boolean): Promise<void> {
-    this.consoleDebug(`Reloading file: ${childPath}`);
-    if (this.isDotFile(childPath)) {
-      return;
-    }
-
-    orphanPaths.delete(childPath);
-
-    const adapter = getDataAdapterEx(this.app);
-
-    const isChildPathIgnored = await this.ignorePatternsComponent?.isIgnored(childPath, isFolder);
-    if (isChildPathIgnored && this.settings.excludeMode === ExcludeMode.Full) {
-      await adapter.reconcileDeletion(childPath, childPath);
-      return;
-    }
-
-    if (adapter instanceof FileSystemAdapter) {
-      await adapter.reconcileFileInternal(childPath, childPath);
-    } else {
-      await adapter.reconcileFile(childPath, childPath);
-    }
-    includedPaths.add(childPath);
-    if (isChildPathIgnored) {
-      this.deleteFromFilesPane(childPath);
-    } else if (this.settings.excludeMode === ExcludeMode.FilesPane) {
-      this.addToFilesPane(childPath);
-    }
-  }
-
-  private async reloadFolder(folderPath: string, abortSignal: AbortSignal): Promise<void> {
-    if (abortSignal.aborted) {
-      return;
-    }
-    this.consoleDebug(`Reloading folder: ${folderPath}`);
-    if (folderPath !== ROOT_PATH) {
-      this.updateProgressEl.max++;
-    }
-    const folder = this.app.vault.getFolderByPath(folderPath);
-    if (!folder) {
-      this.updateProgressEl.value++;
-      return;
-    }
-
-    const adapter = getDataAdapterEx(this.app);
-    if (folderPath === ROOT_PATH) {
-      await adapter.reconcileFolderCreation(folderPath, folderPath);
-    }
-
-    const listedFiles = await adapter.list(folderPath);
-    this.updateProgressEl.max += listedFiles.files.length + listedFiles.folders.length;
-
-    const includedPaths = new Set<string>();
-
-    const orphanPaths = new Set<string>(folder.children.map((child) => child.path));
-
-    const childEntries = listedFiles.files.map((childFilePath) => ({ childPath: childFilePath, isFolder: false }))
-      .concat(listedFiles.folders.map((childFolderPath) => ({ childPath: childFolderPath, isFolder: true })));
-
-    for (const childEntry of childEntries) {
-      try {
-        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- Can change in await calls.
-        if (abortSignal.aborted) {
-          return;
-        }
-
-        await this.reloadChildPath(childEntry.childPath, orphanPaths, includedPaths, childEntry.isFolder);
-      } catch (e) {
-        console.error(`Failed reloading file: ${childEntry.childPath}`, e);
-      } finally {
-        this.updateProgressEl.value++;
-      }
-    }
-
-    this.updateProgressEl.max += orphanPaths.size;
-    for (const orphanPath of orphanPaths) {
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- Can change in await calls.
-      if (abortSignal.aborted) {
-        return;
-      }
-      this.consoleDebug(`Cleaning orphan file: ${orphanPath}`);
-      this.updateProgressEl.value++;
-      try {
-        await adapter.reconcileDeletion(orphanPath, orphanPath);
-      } catch (e) {
-        console.error(`Failed cleaning orphan file ${orphanPath}`, e);
-      }
-    }
-
-    for (const childFolderPath of listedFiles.folders) {
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- Can change in await calls.
-      if (abortSignal.aborted) {
-        return;
-      }
-      if (includedPaths.has(childFolderPath)) {
-        try {
-          await this.reloadFolder(childFolderPath, abortSignal);
-        } catch (e) {
-          console.error(`Failed reloading folder ${childFolderPath}`, e);
-        }
-      }
-    }
-
-    this.updateProgressEl.value++;
-  }
-
-  private async vaultLoad(next: VaultLoadFn): Promise<void> {
-    this.vaultLoadCalled = true;
-    await next.call(this.app.vault);
+    this.addChild(
+      new AdapterPatch({
+        app,
+        fileTreeComponent,
+        ignorePatternsComponent,
+        pluginSettingsComponent
+      })
+    );
   }
 }

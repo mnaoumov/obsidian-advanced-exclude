@@ -48,6 +48,7 @@
     "dompurify": "3.0.1",
     "eslint": "latest",
     "type-fest": "latest",
-    "typescript": "latest"
+    "typescript": "latest",
+    "@eslint/config-helpers": "latest"
   }
 }
