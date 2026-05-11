@@ -1,23 +1,33 @@
+import type { LayoutReadyComponent } from 'obsidian-dev-utils/obsidian/plugin/components/layout-ready-component';
+import type { ReadonlyPluginSettingsState } from 'obsidian-dev-utils/obsidian/plugin/components/plugin-settings-component';
+
 import ignore from 'ignore';
 import {
-  Component,
+  App,
   debounce
 } from 'obsidian';
 import { invokeAsyncSafelyAfterDelay } from 'obsidian-dev-utils/async';
 import { deepEqual } from 'obsidian-dev-utils/object-utils';
+import { AsyncComponentBase } from 'obsidian-dev-utils/obsidian/components/async-component';
+import { registerAsyncEvent } from 'obsidian-dev-utils/obsidian/components/async-events-component';
+import { ensureMetadataCacheReady } from 'obsidian-dev-utils/obsidian/metadata-cache';
 import { escapeRegExp } from 'obsidian-dev-utils/reg-exp';
 
-import type { Plugin } from './Plugin.ts';
+import type { VaultLoadPatch } from './patches/vault-load-patch.ts';
+import type { PluginSettingsComponent } from './plugin-settings-component.ts';
+import type { PluginSettings } from './plugin-settings.ts';
 
+import {
+  GIT_IGNORE_FILE,
+  OBSIDIAN_IGNORE_FILE,
+  ROOT_PATH
+} from './constants.ts';
 import {
   readSafe,
   statSafe,
   writeSafe
 } from './data-adapter-safe.ts';
 
-export const ROOT_PATH = '/';
-export const OBSIDIAN_IGNORE_FILE = '.obsidianignore';
-export const GIT_IGNORE_FILE = '.gitignore';
 const DB_VERSION = 1;
 const MTIME_STORE_NAME = 'mtime';
 const FILES_STORE_NAME = 'files';
@@ -34,20 +44,30 @@ interface DbMtimeEntry {
   userIgnoreFiltersStr: string;
 }
 
-export class IgnorePatternsComponent extends Component {
+interface IgnorePatternsComponentConstructorParams {
+  readonly app: App;
+  readonly onUpdateFileTree: () => Promise<void>;
+  readonly pluginSettingsComponent: PluginSettingsComponent;
+  readonly vaultLoadPatch: VaultLoadPatch;
+}
+
+export class IgnorePatternsComponent extends AsyncComponentBase implements LayoutReadyComponent {
   private _db?: IDBDatabase;
+  private readonly app: App;
   private cachedExcludeRegExps: null | RegExp[] = null;
   private cachedGitIgnoreContent = '';
   private cachedIgnoreTester: ignore.Ignore | null = null;
   private cachedObsidianIgnoreContent = '';
-
   private readonly fileIgnoreMap = new Map<string, boolean>();
-
-  private onloadPromise: Promise<void> = Promise.resolve();
+  private hadConfigChanges = false;
+  private readonly onUpdateFileTree: () => Promise<void>;
   private pendingStoreActions: ((store: IDBObjectStore) => void)[] = [];
+  private readonly pluginSettingsComponent: PluginSettingsComponent;
   private readonly processStoreActionsDebounced = debounce(() => {
     this.processStoreActions();
   }, PROCESS_STORE_ACTIONS_DEBOUNCE_INTERVAL_IN_MILLISECONDS);
+
+  private readonly vaultLoadPatch: VaultLoadPatch;
 
   private get db(): IDBDatabase {
     if (!this._db) {
@@ -56,13 +76,17 @@ export class IgnorePatternsComponent extends Component {
     return this._db;
   }
 
-  public constructor(private readonly plugin: Plugin) {
+  public constructor(params: IgnorePatternsComponentConstructorParams) {
     super();
+    this.app = params.app;
+    this.onUpdateFileTree = params.onUpdateFileTree;
+    this.pluginSettingsComponent = params.pluginSettingsComponent;
+    this.vaultLoadPatch = params.vaultLoadPatch;
   }
 
   public clearCachedExcludeRegExps(): void {
     this.cachedExcludeRegExps = null;
-    if (this.plugin.settings.shouldIgnoreExcludedFiles) {
+    if (this.pluginSettingsComponent.settings.shouldIgnoreExcludedFiles) {
       this.fileIgnoreMap.clear();
       invokeAsyncSafelyAfterDelay(() => this.processConfigChanges());
     }
@@ -90,16 +114,10 @@ export class IgnorePatternsComponent extends Component {
     }
   }
 
-  public async isIgnored(normalizedPath: string, isFolder: boolean): Promise<boolean> {
-    if (!this.plugin._loaded) {
-      return false;
-    }
-
+  public isIgnored(normalizedPath: string, isFolder: boolean): boolean {
     if (normalizedPath === ROOT_PATH) {
       return false;
     }
-
-    await this.onloadPromise;
 
     let isIgnoredResult = this.fileIgnoreMap.get(normalizedPath);
     if (isIgnoredResult !== undefined) {
@@ -122,50 +140,49 @@ export class IgnorePatternsComponent extends Component {
     return isIgnoredResult;
   }
 
-  public override onload(): void {
-    super.onload();
-    this.onloadPromise = this.onloadAsync();
+  public async onLayoutReady(): Promise<void> {
+    await ensureMetadataCacheReady(this.app);
+
+    this.registerEvent(this.app.vault.on('config-changed', (configKey: string) => {
+      if (configKey === 'userIgnoreFilters') {
+        this.clearCachedExcludeRegExps();
+      }
+    }));
+
+    if (!this.vaultLoadPatch.vaultLoadCalled) {
+      await this.onUpdateFileTree();
+    }
+  }
+
+  public override async onload(): Promise<void> {
+    await super.onload();
+    await this.loadDb();
+    await this.reload();
+    registerAsyncEvent(
+      this,
+      this.pluginSettingsComponent.on('loadSettings', async (_loadedState, isInitialLoad) => {
+        if (!isInitialLoad) {
+          await this.readObsidianIgnore();
+        }
+      })
+    );
+
+    registerAsyncEvent(
+      this,
+      this.pluginSettingsComponent.on('saveSettings', async (newState: ReadonlyPluginSettingsState<PluginSettings>) => {
+        await this.reload(newState.effectiveValues.obsidianIgnoreContent);
+        this.hadConfigChanges = true;
+      })
+    );
   }
 
   public async processConfigChanges(): Promise<void> {
+    if (!this.hadConfigChanges) {
+      return;
+    }
+    this.hadConfigChanges = false;
     await this.resetDb();
-    await this.plugin.updateFileTree();
-  }
-
-  public async readGitIgnore(): Promise<boolean> {
-    if (!this.plugin.settings.shouldIncludeGitIgnorePatterns) {
-      this.cachedGitIgnoreContent = '';
-      return false;
-    }
-
-    const gitIgnoreContent = await readSafe(this.plugin.app, GIT_IGNORE_FILE);
-    if (gitIgnoreContent === this.cachedGitIgnoreContent) {
-      return false;
-    }
-
-    this.cachedGitIgnoreContent = gitIgnoreContent;
-    return true;
-  }
-
-  public async readObsidianIgnore(): Promise<boolean> {
-    const obsidianIgnoreContent = await readSafe(this.plugin.app, OBSIDIAN_IGNORE_FILE);
-    if (obsidianIgnoreContent === this.cachedObsidianIgnoreContent) {
-      return false;
-    }
-
-    await this.plugin.settingsManager.setProperty('obsidianIgnoreContent', obsidianIgnoreContent);
-    this.cachedObsidianIgnoreContent = obsidianIgnoreContent;
-    return true;
-  }
-
-  public async reload(obsidianIgnoreContent?: string): Promise<void> {
-    this.cachedIgnoreTester = null;
-    if (obsidianIgnoreContent === undefined) {
-      await this.readObsidianIgnore();
-    } else {
-      await this.writeObsidianIgnore(obsidianIgnoreContent);
-    }
-    await this.readGitIgnore();
+    await this.onUpdateFileTree();
   }
 
   public async writeObsidianIgnore(obsidianIgnoreContent: string): Promise<void> {
@@ -173,8 +190,8 @@ export class IgnorePatternsComponent extends Component {
       return;
     }
 
-    await writeSafe(this.plugin.app, OBSIDIAN_IGNORE_FILE, obsidianIgnoreContent);
-    await this.plugin.settingsManager.setProperty('obsidianIgnoreContent', obsidianIgnoreContent);
+    await writeSafe(this.app, OBSIDIAN_IGNORE_FILE, obsidianIgnoreContent);
+    await this.pluginSettingsComponent.setProperty('obsidianIgnoreContent', obsidianIgnoreContent);
     this.cachedObsidianIgnoreContent = obsidianIgnoreContent;
   }
 
@@ -185,14 +202,14 @@ export class IgnorePatternsComponent extends Component {
 
   private async getCurrentMtimeEntry(): Promise<DbMtimeEntry> {
     return {
-      gitIgnoreMtime: this.plugin.settings.shouldIncludeGitIgnorePatterns ? (await statSafe(this.plugin.app, GIT_IGNORE_FILE))?.mtime ?? 0 : 0,
-      obsidianIgnoreMtime: (await statSafe(this.plugin.app, OBSIDIAN_IGNORE_FILE))?.mtime ?? 0,
+      gitIgnoreMtime: this.pluginSettingsComponent.settings.shouldIncludeGitIgnorePatterns ? (await statSafe(this.app, GIT_IGNORE_FILE))?.mtime ?? 0 : 0,
+      obsidianIgnoreMtime: (await statSafe(this.app, OBSIDIAN_IGNORE_FILE))?.mtime ?? 0,
       userIgnoreFiltersStr: this.getUserIgnoreFilters().join('\n')
     };
   }
 
   private getExcludeRegExps(): RegExp[] {
-    if (!this.plugin.settings.shouldIgnoreExcludedFiles) {
+    if (!this.pluginSettingsComponent.settings.shouldIgnoreExcludedFiles) {
       return [];
     }
 
@@ -234,15 +251,15 @@ export class IgnorePatternsComponent extends Component {
   }
 
   private getUserIgnoreFilters(): string[] {
-    if (!this.plugin.settings.shouldIgnoreExcludedFiles) {
+    if (!this.pluginSettingsComponent.settings.shouldIgnoreExcludedFiles) {
       return [];
     }
 
-    return (this.plugin.app.vault.getConfig('userIgnoreFilters') ?? []) as string[];
+    return (this.app.vault.getConfig('userIgnoreFilters') ?? []) as string[];
   }
 
   private async loadDb(): Promise<void> {
-    const request = window.indexedDB.open(`${this.plugin.app.appId}/advanced-exclude`, DB_VERSION);
+    const request = window.indexedDB.open(`${this.app.appId}/advanced-exclude`, DB_VERSION);
     request.addEventListener('upgradeneeded', (event) => {
       if (event.newVersion !== 1) {
         return;
@@ -280,11 +297,6 @@ export class IgnorePatternsComponent extends Component {
     }
   }
 
-  private async onloadAsync(): Promise<void> {
-    await this.loadDb();
-    await this.reload();
-  }
-
   private processStoreActions(): void {
     const pendingStoreActions = this.pendingStoreActions;
     this.pendingStoreActions = [];
@@ -295,6 +307,42 @@ export class IgnorePatternsComponent extends Component {
       action(store);
     }
     transaction.commit();
+  }
+
+  private async readGitIgnore(): Promise<boolean> {
+    if (!this.pluginSettingsComponent.settings.shouldIncludeGitIgnorePatterns) {
+      this.cachedGitIgnoreContent = '';
+      return false;
+    }
+
+    const gitIgnoreContent = await readSafe(this.app, GIT_IGNORE_FILE);
+    if (gitIgnoreContent === this.cachedGitIgnoreContent) {
+      return false;
+    }
+
+    this.cachedGitIgnoreContent = gitIgnoreContent;
+    return true;
+  }
+
+  private async readObsidianIgnore(): Promise<boolean> {
+    const obsidianIgnoreContent = await readSafe(this.app, OBSIDIAN_IGNORE_FILE);
+    if (obsidianIgnoreContent === this.cachedObsidianIgnoreContent) {
+      return false;
+    }
+
+    await this.pluginSettingsComponent.setProperty('obsidianIgnoreContent', obsidianIgnoreContent);
+    this.cachedObsidianIgnoreContent = obsidianIgnoreContent;
+    return true;
+  }
+
+  private async reload(obsidianIgnoreContent?: string): Promise<void> {
+    this.cachedIgnoreTester = null;
+    if (obsidianIgnoreContent === undefined) {
+      await this.readObsidianIgnore();
+    } else {
+      await this.writeObsidianIgnore(obsidianIgnoreContent);
+    }
+    await this.readGitIgnore();
   }
 
   private async resetDb(): Promise<void> {
@@ -314,12 +362,13 @@ async function getResult<T>(request: IDBRequest<T>): Promise<T> {
     return request.result;
   }
 
-  return await new Promise((resolve, reject) => {
+  return await new Promise<T>((resolve, reject) => {
     request.addEventListener('success', () => {
       resolve(request.result);
     });
     request.addEventListener('error', () => {
-      reject(request.error as Error);
+      const error: Error = request.error ?? new Error('Unknown error');
+      reject(error);
     });
   });
 }

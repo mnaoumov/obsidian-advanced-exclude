@@ -1,16 +1,32 @@
+import type { PluginSettingsTabBaseConstructorParams } from 'obsidian-dev-utils/obsidian/plugin/plugin-settings-tab';
+
 import { Setting } from 'obsidian';
 import { appendCodeBlock } from 'obsidian-dev-utils/html-element';
-import { PluginSettingsTabBase } from 'obsidian-dev-utils/obsidian/plugin/plugin-settings-tab-base';
+import { PluginSettingsTabBase } from 'obsidian-dev-utils/obsidian/plugin/plugin-settings-tab';
 
-import type { PluginTypes } from './plugin-types.ts';
+import type { IgnorePatternsComponent } from './ignore-patterns-component.ts';
 
 import {
   GIT_IGNORE_FILE,
   OBSIDIAN_IGNORE_FILE
-} from './ignore-patterns-component.ts';
-import { ExcludeMode } from './plugin-settings.ts';
+} from './constants.ts';
+import {
+  ExcludeMode,
+  PluginSettings
+} from './plugin-settings.ts';
 
-export class PluginSettingsTab extends PluginSettingsTabBase<PluginTypes> {
+interface PluginSettingsTabConstructorParams extends PluginSettingsTabBaseConstructorParams<PluginSettings> {
+  readonly ignorePatternsComponent: IgnorePatternsComponent;
+}
+
+export class PluginSettingsTab extends PluginSettingsTabBase<PluginSettings> {
+  private readonly ignorePatternsComponent: IgnorePatternsComponent;
+
+  public constructor(params: PluginSettingsTabConstructorParams) {
+    super(params);
+    this.ignorePatternsComponent = params.ignorePatternsComponent;
+  }
+
   public override display(): void {
     super.display();
     this.containerEl.empty();
@@ -92,6 +108,6 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginTypes> {
 
   public override async hideAsync(): Promise<void> {
     await super.hideAsync();
-    await this.plugin.processConfigChanges();
+    await this.ignorePatternsComponent.processConfigChanges();
   }
 }
