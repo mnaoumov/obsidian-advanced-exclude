@@ -32,6 +32,7 @@
     "./commitlint.config.ts",
     "./eslint.config.mts",
     "./src/**/*.ts",
-    "./scripts/**/*.ts"
+    "./scripts/**/*.ts",
+    "./vitest.config.ts"
   ]
 }
