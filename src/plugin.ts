@@ -3,7 +3,12 @@ import type {
   PluginManifest
 } from 'obsidian';
 
+import { AppActiveFileProvider } from 'obsidian-dev-utils/obsidian/active-file-provider';
+import { CommandHandlerComponent } from 'obsidian-dev-utils/obsidian/command-handlers/command-handler-component';
+import { OpenSettingsCommandHandler } from 'obsidian-dev-utils/obsidian/command-handlers/open-settings-command-handler';
+import { PluginCommandRegistrar } from 'obsidian-dev-utils/obsidian/command-registrar';
 import { PluginDataHandler } from 'obsidian-dev-utils/obsidian/data-handler';
+import { AppMenuEventRegistrar } from 'obsidian-dev-utils/obsidian/menu-event-registrar';
 import { PluginSettingsTabComponent } from 'obsidian-dev-utils/obsidian/plugin/components/plugin-settings-tab-component';
 import { PluginBase } from 'obsidian-dev-utils/obsidian/plugin/plugin';
 
@@ -40,14 +45,17 @@ export class Plugin extends PluginBase {
         vaultLoadPatch
       })
     );
+
+    const pluginSettingsTab = new PluginSettingsTab({
+      ignorePatternsComponent,
+      plugin: this,
+      pluginSettingsComponent
+    });
+
     this.addChild(
       new PluginSettingsTabComponent({
         plugin: this,
-        pluginSettingsTab: new PluginSettingsTab({
-          ignorePatternsComponent,
-          plugin: this,
-          pluginSettingsComponent
-        })
+        pluginSettingsTab
       })
     );
 
@@ -65,6 +73,18 @@ export class Plugin extends PluginBase {
         fileTreeComponent,
         ignorePatternsComponent,
         pluginSettingsComponent
+      })
+    );
+
+    this.addChild(
+      new CommandHandlerComponent({
+        activeFileProvider: new AppActiveFileProvider(app),
+        commandHandlers: [
+          new OpenSettingsCommandHandler(pluginSettingsTab)
+        ],
+        commandRegistrar: new PluginCommandRegistrar(this),
+        menuEventRegistrar: new AppMenuEventRegistrar(app, this),
+        pluginName: this.manifest.name
       })
     );
   }
