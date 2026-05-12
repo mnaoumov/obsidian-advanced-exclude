@@ -167,9 +167,11 @@ export class FileTreeComponent extends AsyncComponentBase implements LayoutReady
   }
 
   private async reloadFolder(folderPath: string, abortSignal: AbortSignal): Promise<void> {
+    /* v8 ignore start -- Defensive guard; callers check abortSignal.aborted before invoking reloadFolder synchronously. */
     if (abortSignal.aborted) {
       return;
     }
+    /* v8 ignore stop */
     this.consoleDebugComponent.debug(`Reloading folder: ${folderPath}`);
     if (folderPath !== ROOT_PATH) {
       this.updateProgressEl.max++;

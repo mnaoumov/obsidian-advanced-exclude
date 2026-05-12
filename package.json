@@ -45,6 +45,7 @@
     "husky": "latest",
     "ignore": "latest",
     "jiti": "latest",
+    "jsdom": "latest",
     "nano-staged": "latest",
     "obsidian": "latest",
     "obsidian-dev-utils": "latest",

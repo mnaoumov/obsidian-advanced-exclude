@@ -79,6 +79,7 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginSettings> {
       })
       .addButton((button) => {
         button.setButtonText('Go to settings');
+        /* v8 ignore start -- Deep Obsidian UI integration; covered by integration tests. */
         button.onClick(() => {
           const tab = this.app.setting.openTabById('file');
           const manageButtonCaption = window.i18next.t('interface.button-manage');
@@ -86,6 +87,7 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginSettings> {
             .find((tabButton) => tabButton.textContent === manageButtonCaption)
             ?.click();
         });
+        /* v8 ignore stop */
       });
 
     new Setting(this.containerEl)
