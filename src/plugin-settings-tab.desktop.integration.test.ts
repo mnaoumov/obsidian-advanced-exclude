@@ -1,4 +1,5 @@
 import { evalInObsidian } from 'obsidian-integration-testing';
+import { getTempVault } from 'obsidian-integration-testing/vitest-global-setup';
 import {
   describe,
   expect,
@@ -38,7 +39,8 @@ describe('PluginSettingsTab', () => {
           activeTabId: activeTab?.id,
           error: null
         };
-      }
+      },
+      vaultPath: getTempVault().path
     });
 
     expect(result.error).toBeNull();
