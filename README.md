@@ -3,6 +3,7 @@
 [![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-ffdd00?logo=buy-me-a-coffee&logoColor=black)](https://www.buymeacoffee.com/mnaoumov)
 [![GitHub release](https://img.shields.io/github/v/release/mnaoumov/obsidian-advanced-exclude)](https://github.com/mnaoumov/obsidian-advanced-exclude/releases)
 [![GitHub downloads](https://img.shields.io/github/downloads/mnaoumov/obsidian-advanced-exclude/total)](https://github.com/mnaoumov/obsidian-advanced-exclude/releases)
+[![Coverage: 100%](https://img.shields.io/badge/coverage-100%25-brightgreen)](https://github.com/mnaoumov/obsidian-advanced-exclude)
 
 This is a plugin for [Obsidian](https://obsidian.md/) that enhances the `Excluded files` setting bringing `gitignore` syntax.
 
@@ -23,15 +24,13 @@ The plugin adds the following features:
 
 ## Installation
 
-The plugin is not available in [the official Community Plugins repository](https://obsidian.md/plugins) yet.
-
-The Obsidian team [decided](https://github.com/obsidianmd/obsidian-releases/pull/5856#issuecomment-2824346972) to not accept this plugin to the repository.
+The plugin is not available in [the official Community Plugins repository](https://community.obsidian.md) yet.
 
 ### Beta versions
 
-To install the latest beta release of this plugin (regardless if it is available in [the official Community Plugins repository](https://obsidian.md/plugins) or not), follow these steps:
+To install the latest beta release of this plugin (regardless if it is available in [the official Community Plugins repository](https://community.obsidian.md) or not), follow these steps:
 
-1. Ensure you have the [BRAT plugin](https://obsidian.md/plugins?id=obsidian42-brat) installed and enabled.
+1. Ensure you have the [BRAT plugin](https://community.obsidian.md/plugins/obsidian42-brat) installed and enabled.
 2. Click [Install via BRAT](https://intradeus.github.io/http-protocol-redirector?r=obsidian://brat?plugin=https://github.com/mnaoumov/obsidian-advanced-exclude).
 3. An Obsidian pop-up window should appear. In the window, click the `Add plugin` button once and wait a few seconds for the plugin to install.
 
