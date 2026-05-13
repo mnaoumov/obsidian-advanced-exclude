@@ -24,7 +24,7 @@ The plugin adds the following features:
 
 ## Installation
 
-The plugin is not available in [the official Community Plugins repository](https://community.obsidian.md) yet.
+The plugin is available in [the official Community Plugins repository](https://community.obsidian.md/plugins/advanced-exclude).
 
 ### Beta versions
 
