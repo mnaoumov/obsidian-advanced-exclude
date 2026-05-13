@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## 2.1.0
+
+- test: add integration tests
+- feat: add command handler with open-settings command
+- test: add unit tests
+- test: add smoke
+- chore: update template
+
 ## 2.0.23
 
 - chore: update template
