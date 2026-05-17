@@ -1,12 +1,12 @@
 import type { App as AppOriginal } from 'obsidian';
-import type { DataAdapterEx } from 'obsidian-typings';
+import type { DataAdapterEx } from '@obsidian-typings/obsidian-public-latest';
 
 import { strictProxy } from 'obsidian-dev-utils/strict-proxy';
 import {
   CapacitorAdapter,
   FileSystemAdapter
 } from 'obsidian-test-mocks/obsidian';
-import { getDataAdapterEx } from 'obsidian-typings/implementations';
+import { getDataAdapterEx } from '@obsidian-typings/obsidian-public-latest/implementations';
 import {
   beforeEach,
   describe,
@@ -22,7 +22,7 @@ import {
   writeSafe
 } from './data-adapter-safe.ts';
 
-vi.mock('obsidian-typings/implementations', () => ({
+vi.mock('@obsidian-typings/obsidian-public-latest/implementations', () => ({
   getDataAdapterEx: vi.fn()
 }));
 

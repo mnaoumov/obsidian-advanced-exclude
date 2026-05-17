@@ -1,14 +1,14 @@
 import type { App } from 'obsidian';
 import type { ConsoleDebugComponent } from 'obsidian-dev-utils/obsidian/plugin/components/console-debug-component';
 import type { LayoutReadyComponent } from 'obsidian-dev-utils/obsidian/plugin/components/layout-ready-component';
-import type { FileExplorerView } from 'obsidian-typings';
+import type { FileExplorerView } from '@obsidian-typings/obsidian-public-latest';
 
 import { FileSystemAdapter } from 'obsidian';
 import { sleep } from 'obsidian-dev-utils/async';
 import { AsyncComponentBase } from 'obsidian-dev-utils/obsidian/components/async-component';
 import { basename } from 'obsidian-dev-utils/path';
 import { ensureNonNullable } from 'obsidian-dev-utils/type-guards';
-import { getDataAdapterEx } from 'obsidian-typings/implementations';
+import { getDataAdapterEx } from '@obsidian-typings/obsidian-public-latest/implementations';
 
 import type { IgnorePatternsComponent } from './ignore-patterns-component.ts';
 import type { VaultLoadPatch } from './patches/vault-load-patch.ts';

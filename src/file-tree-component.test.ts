@@ -4,14 +4,14 @@ import type {
   TFolder
 } from 'obsidian';
 import type { ConsoleDebugComponent } from 'obsidian-dev-utils/obsidian/plugin/components/console-debug-component';
-import type { DataAdapterEx } from 'obsidian-typings';
+import type { DataAdapterEx } from '@obsidian-typings/obsidian-public-latest';
 
 import {
   FileSystemAdapter,
   Notice
 } from 'obsidian';
 import { strictProxy } from 'obsidian-dev-utils/strict-proxy';
-import { getDataAdapterEx } from 'obsidian-typings/implementations';
+import { getDataAdapterEx } from '@obsidian-typings/obsidian-public-latest/implementations';
 import {
   beforeEach,
   describe,
@@ -34,7 +34,7 @@ vi.mock('obsidian-dev-utils/async', () => ({
   sleep: vi.fn().mockResolvedValue(undefined)
 }));
 
-vi.mock('obsidian-typings/implementations', () => ({
+vi.mock('@obsidian-typings/obsidian-public-latest/implementations', () => ({
   getDataAdapterEx: vi.fn()
 }));
 

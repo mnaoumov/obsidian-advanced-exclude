@@ -1,4 +1,4 @@
-import type { FileExplorerView } from 'obsidian-typings';
+import type { FileExplorerView } from '@obsidian-typings/obsidian-public-latest';
 
 import { TAbstractFile } from 'obsidian';
 import { isFolder } from 'obsidian-dev-utils/obsidian/file-system';

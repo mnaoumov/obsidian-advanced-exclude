@@ -11,6 +11,7 @@
     "jsx": "react-jsx",
     "lib": [
       "DOM",
+        "DOM.Iterable",
       "ES2024"
     ],
     "libReplacement": true,
@@ -22,7 +23,7 @@
     "types": [
       "@total-typescript/ts-reset",
       "node",
-      "obsidian-typings",
+      "@obsidian-typings/obsidian-public-latest",
       "svelte"
     ],
     "verbatimModuleSyntax": true

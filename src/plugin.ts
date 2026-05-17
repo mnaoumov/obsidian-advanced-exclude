@@ -80,7 +80,10 @@ export class Plugin extends PluginBase {
       new CommandHandlerComponent({
         activeFileProvider: new AppActiveFileProvider(app),
         commandHandlers: [
-          new OpenSettingsCommandHandler(pluginSettingsTab)
+          new OpenSettingsCommandHandler({
+            app,
+            settingTab: pluginSettingsTab
+          })
         ],
         commandRegistrar: new PluginCommandRegistrar(this),
         menuEventRegistrar: new AppMenuEventRegistrar(app, this),

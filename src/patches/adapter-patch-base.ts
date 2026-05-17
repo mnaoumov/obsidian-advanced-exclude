@@ -1,5 +1,5 @@
 import type { App } from 'obsidian';
-import type { DataAdapterEx } from 'obsidian-typings';
+import type { DataAdapterEx } from '@obsidian-typings/obsidian-public-latest';
 
 import { Component } from 'obsidian';
 
