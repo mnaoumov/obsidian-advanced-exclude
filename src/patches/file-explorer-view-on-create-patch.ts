@@ -1,5 +1,5 @@
 import type { LayoutReadyComponent } from 'obsidian-dev-utils/obsidian/plugin/components/layout-ready-component';
-import type { FileExplorerView } from 'obsidian-typings';
+import type { FileExplorerView } from '@obsidian-typings/obsidian-public-latest';
 
 import {
   App,
