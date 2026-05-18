@@ -1,5 +1,5 @@
-import type { LayoutReadyComponent } from 'obsidian-dev-utils/obsidian/plugin/components/layout-ready-component';
-import type { ReadonlyPluginSettingsState } from 'obsidian-dev-utils/obsidian/plugin/components/plugin-settings-component';
+import type { LayoutReadyComponent } from 'obsidian-dev-utils/obsidian/components/layout-ready-component';
+import type { ReadonlyPluginSettingsState } from 'obsidian-dev-utils/obsidian/components/plugin-settings-component';
 
 import ignore from 'ignore';
 import {

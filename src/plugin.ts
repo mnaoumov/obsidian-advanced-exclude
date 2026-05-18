@@ -8,8 +8,8 @@ import { CommandHandlerComponent } from 'obsidian-dev-utils/obsidian/command-han
 import { OpenSettingsCommandHandler } from 'obsidian-dev-utils/obsidian/command-handlers/open-settings-command-handler';
 import { PluginCommandRegistrar } from 'obsidian-dev-utils/obsidian/command-registrar';
 import { PluginDataHandler } from 'obsidian-dev-utils/obsidian/data-handler';
-import { AppMenuEventRegistrar } from 'obsidian-dev-utils/obsidian/menu-event-registrar';
-import { PluginSettingsTabComponent } from 'obsidian-dev-utils/obsidian/plugin/components/plugin-settings-tab-component';
+import { MenuEventRegistrarComponent } from 'obsidian-dev-utils/obsidian/components/menu-event-registrar-component';
+import { PluginSettingsTabComponent } from 'obsidian-dev-utils/obsidian/components/plugin-settings-tab-component';
 import { PluginBase } from 'obsidian-dev-utils/obsidian/plugin/plugin';
 
 import { FileTreeComponent } from './file-tree-component.ts';
@@ -76,6 +76,7 @@ export class Plugin extends PluginBase {
       })
     );
 
+    const menuEventRegistrar = this.addChild(new MenuEventRegistrarComponent(app));
     this.addChild(
       new CommandHandlerComponent({
         activeFileProvider: new AppActiveFileProvider(app),
