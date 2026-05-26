@@ -895,6 +895,31 @@ describe('IgnorePatternsComponent', () => {
       // Onload calls reload() without argument, which triggers readObsidianIgnore
       expect(readSafe).toHaveBeenCalled();
     });
+
+    it('should clear fileIgnoreMap when obsidianignore patterns change', async () => {
+      setupIndexedDb();
+      vi.mocked(readSafe).mockResolvedValue('');
+      const pluginSettingsComponent = createPluginSettingsComponent();
+      const component = createComponent({ pluginSettingsComponent });
+      await component.loadWithPromises();
+
+      // Populate fileIgnoreMap by calling isIgnored — no patterns loaded, so not ignored
+      component.isIgnored('test-file.md', false);
+      expect(component.isIgnored('test-file.md', false)).toBe(false);
+
+      // Trigger saveSettings with new obsidianignore content, which calls reload()
+      const saveSettingsCall = (vi.mocked(pluginSettingsComponent.on).mock.calls as MockCallEntry[]).find(([name]) => name === 'saveSettings');
+      if (saveSettingsCall) {
+        const callback = saveSettingsCall[1] as (newState: SaveSettingsState) => Promise<void>;
+        await callback({ effectiveValues: { obsidianIgnoreContent: 'test-*\n' } });
+      } else {
+        expect.fail('saveSettings event was not registered');
+      }
+
+      // After reload with changed patterns, cached entry should be cleared
+      // And re-evaluated with new patterns
+      expect(component.isIgnored('test-file.md', false)).toBe(true);
+    });
   });
 
   describe('processStoreActions', () => {

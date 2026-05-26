@@ -338,12 +338,18 @@ export class IgnorePatternsComponent extends ComponentEx {
 
   private async reload(obsidianIgnoreContent?: string): Promise<void> {
     this.cachedIgnoreTester = null;
+    let hasPatternChanges: boolean;
     if (obsidianIgnoreContent === undefined) {
-      await this.readObsidianIgnore();
+      hasPatternChanges = await this.readObsidianIgnore();
     } else {
+      hasPatternChanges = this.cachedObsidianIgnoreContent !== obsidianIgnoreContent;
       await this.writeObsidianIgnore(obsidianIgnoreContent);
     }
-    await this.readGitIgnore();
+
+    const hasGitIgnoreChanges = await this.readGitIgnore();
+    if (hasPatternChanges || hasGitIgnoreChanges) {
+      this.fileIgnoreMap.clear();
+    }
   }
 
   private async resetDb(): Promise<void> {
