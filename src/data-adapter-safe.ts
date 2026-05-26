@@ -3,11 +3,11 @@ import type {
   Stat
 } from 'obsidian';
 
+import { getDataAdapterEx } from '@obsidian-typings/obsidian-public-latest/implementations';
 import {
   CapacitorAdapter,
   FileSystemAdapter
 } from 'obsidian';
-import { getDataAdapterEx } from '@obsidian-typings/obsidian-public-latest/implementations';
 
 export async function existsSafe(app: App, path: string): Promise<boolean> {
   const adapter = getDataAdapterEx(app);

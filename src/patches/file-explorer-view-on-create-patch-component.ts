@@ -1,21 +1,20 @@
-import type { LayoutReadyComponent } from 'obsidian-dev-utils/obsidian/components/layout-ready-component';
 import type { FileExplorerView } from '@obsidian-typings/obsidian-public-latest';
 
 import {
   App,
-  Component,
   TAbstractFile
 } from 'obsidian';
 import { getPrototypeOf } from 'obsidian-dev-utils/object-utils';
+import { CallbackLayoutReadyComponent } from 'obsidian-dev-utils/obsidian/components/layout-ready-component';
+import { MonkeyAroundComponent } from 'obsidian-dev-utils/obsidian/components/monkey-around-component';
 import { isFolder as isFolderFn } from 'obsidian-dev-utils/obsidian/file-system';
-import { registerPatch } from 'obsidian-dev-utils/obsidian/monkey-around';
 
 import type { IgnorePatternsComponent } from '../ignore-patterns-component.ts';
 import type { PluginSettingsComponent } from '../plugin-settings-component.ts';
 
 import { ExcludeMode } from '../plugin-settings.ts';
 
-interface FileExplorerViewOnCreateConstructorParams {
+interface FileExplorerViewOnCreatePatchComponentConstructorParams {
   readonly app: App;
   readonly ignorePatternsComponent: IgnorePatternsComponent;
   readonly pluginSettingsComponent: PluginSettingsComponent;
@@ -23,12 +22,12 @@ interface FileExplorerViewOnCreateConstructorParams {
 
 type OnCreateFn = FileExplorerView['onCreate'];
 
-export class FileExplorerViewOnCreatePatch extends Component implements LayoutReadyComponent {
+export class FileExplorerViewOnCreatePatchComponent extends MonkeyAroundComponent {
   private readonly app: App;
   private readonly ignorePatternsComponent: IgnorePatternsComponent;
   private readonly pluginSettingsComponent: PluginSettingsComponent;
 
-  public constructor(params: FileExplorerViewOnCreateConstructorParams) {
+  public constructor(params: FileExplorerViewOnCreatePatchComponentConstructorParams) {
     super();
     this.app = params.app;
     this.pluginSettingsComponent = params.pluginSettingsComponent;
@@ -39,14 +38,22 @@ export class FileExplorerViewOnCreatePatch extends Component implements LayoutRe
     const that = this;
     const view = this.getFileExplorerView();
     if (view) {
-      registerPatch(this, getPrototypeOf(view), {
-        onCreate: (next: OnCreateFn): OnCreateFn => {
-          return function onCreatePatched(this: FileExplorerView, file: TAbstractFile): void {
-            that.onCreate(next, this, file);
-          };
+      this.registerMethodPatch({
+        methodName: 'onCreate',
+        obj: getPrototypeOf(view),
+        patchHandler: ({
+          originalArgs: [file],
+          originalMethod,
+          originalThis
+        }) => {
+          that.onCreate(originalMethod, originalThis, file);
         }
       });
     }
+  }
+
+  public override onload(): void {
+    this.addChild(new CallbackLayoutReadyComponent(this.app, this.onLayoutReady.bind(this)));
   }
 
   private getFileExplorerView(): FileExplorerView | undefined {

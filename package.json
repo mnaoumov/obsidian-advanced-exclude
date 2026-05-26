@@ -36,6 +36,7 @@
   },
   "overrides": {
     "@eslint/config-helpers": "^0.6.0",
+    "@vitest/coverage-v8": "$@vitest/coverage-v8",
     "eslint": "^10.4.0",
     "type-fest": "^5.6.0",
     "typescript": "^6.0.3"
@@ -44,11 +45,11 @@
     "@commitlint/cli": "^21.0.1",
     "@commitlint/config-conventional": "^21.0.1",
     "@commitlint/types": "^21.0.1",
-    "@obsidian-typings/obsidian-public-latest": "^6.4.0",
+    "@obsidian-typings/obsidian-public-latest": "^6.11.0",
     "@total-typescript/ts-reset": "^0.6.1",
     "@tsconfig/strictest": "^2.0.8",
-    "@types/node": "^25.8.0",
-    "@vitest/coverage-v8": "^4.1.6",
+    "@types/node": "^25.9.1",
+    "@vitest/coverage-v8": "^4.1.7",
     "better-typescript-lib": "^2.12.0",
     "czg": "^1.13.1",
     "eslint": "^10.4.0",
@@ -58,9 +59,9 @@
     "jsdom": "^29.1.1",
     "nano-staged": "^1.0.2",
     "obsidian": "^1.12.3",
-    "obsidian-dev-utils": "^66.0.1",
-    "obsidian-integration-testing": "^4.1.4",
-    "obsidian-test-mocks": "^2.0.3",
-    "vitest": "^4.1.6"
+    "obsidian-dev-utils": "^69.1.1",
+    "obsidian-integration-testing": "^4.1.5",
+    "obsidian-test-mocks": "^3.0.0",
+    "vitest": "^4.1.7"
   }
 }

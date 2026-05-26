@@ -1,12 +1,12 @@
-import type { App as AppOriginal } from 'obsidian';
 import type { DataAdapterEx } from '@obsidian-typings/obsidian-public-latest';
+import type { App as AppOriginal } from 'obsidian';
 
+import { getDataAdapterEx } from '@obsidian-typings/obsidian-public-latest/implementations';
 import { strictProxy } from 'obsidian-dev-utils/strict-proxy';
 import {
   CapacitorAdapter,
   FileSystemAdapter
 } from 'obsidian-test-mocks/obsidian';
-import { getDataAdapterEx } from '@obsidian-typings/obsidian-public-latest/implementations';
 import {
   beforeEach,
   describe,

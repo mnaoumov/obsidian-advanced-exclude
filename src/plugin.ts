@@ -7,16 +7,17 @@ import { AppActiveFileProvider } from 'obsidian-dev-utils/obsidian/active-file-p
 import { CommandHandlerComponent } from 'obsidian-dev-utils/obsidian/command-handlers/command-handler-component';
 import { OpenSettingsCommandHandler } from 'obsidian-dev-utils/obsidian/command-handlers/open-settings-command-handler';
 import { PluginCommandRegistrar } from 'obsidian-dev-utils/obsidian/command-registrar';
-import { PluginDataHandler } from 'obsidian-dev-utils/obsidian/data-handler';
 import { MenuEventRegistrarComponent } from 'obsidian-dev-utils/obsidian/components/menu-event-registrar-component';
 import { PluginSettingsTabComponent } from 'obsidian-dev-utils/obsidian/components/plugin-settings-tab-component';
+import { PluginDataHandler } from 'obsidian-dev-utils/obsidian/data-handler';
 import { PluginBase } from 'obsidian-dev-utils/obsidian/plugin/plugin';
+import { PluginEventSourceImpl } from 'obsidian-dev-utils/obsidian/plugin/plugin-event-source';
 
 import { FileTreeComponent } from './file-tree-component.ts';
 import { IgnorePatternsComponent } from './ignore-patterns-component.ts';
-import { AdapterPatch } from './patches/adapter-patch.ts';
-import { FileExplorerViewOnCreatePatch } from './patches/file-explorer-view-on-create-patch.ts';
-import { VaultLoadPatch } from './patches/vault-load-patch.ts';
+import { AdapterPatchComponent } from './patches/adapter-patch-component.ts';
+import { FileExplorerViewOnCreatePatchComponent } from './patches/file-explorer-view-on-create-patch-component.ts';
+import { VaultLoadPatchComponent } from './patches/vault-load-patch-component.ts';
 import { PluginSettingsComponent } from './plugin-settings-component.ts';
 import { PluginSettingsTab } from './plugin-settings-tab.ts';
 
@@ -24,8 +25,13 @@ export class Plugin extends PluginBase {
   public constructor(app: App, manifest: PluginManifest) {
     super(app, manifest);
 
-    const pluginSettingsComponent = this.addChild(new PluginSettingsComponent(new PluginDataHandler(this)));
-    const vaultLoadPatch = this.addChild(new VaultLoadPatch(app));
+    const pluginSettingsComponent = this.addChild(
+      new PluginSettingsComponent({
+        dataHandler: new PluginDataHandler(this),
+        pluginEventSource: new PluginEventSourceImpl(this)
+      })
+    );
+    const vaultLoadPatch = this.addChild(new VaultLoadPatchComponent(app));
 
     const ignorePatternsComponent: IgnorePatternsComponent = this.addChild(
       new IgnorePatternsComponent({
@@ -60,7 +66,7 @@ export class Plugin extends PluginBase {
     );
 
     this.addChild(
-      new FileExplorerViewOnCreatePatch({
+      new FileExplorerViewOnCreatePatchComponent({
         app,
         ignorePatternsComponent,
         pluginSettingsComponent
@@ -68,7 +74,7 @@ export class Plugin extends PluginBase {
     );
 
     this.addChild(
-      new AdapterPatch({
+      new AdapterPatchComponent({
         app,
         fileTreeComponent,
         ignorePatternsComponent,
@@ -87,7 +93,7 @@ export class Plugin extends PluginBase {
           })
         ],
         commandRegistrar: new PluginCommandRegistrar(this),
-        menuEventRegistrar: new AppMenuEventRegistrar(app, this),
+        menuEventRegistrar,
         pluginName: this.manifest.name
       })
     );

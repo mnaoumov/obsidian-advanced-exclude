@@ -122,7 +122,7 @@ describe('Plugin', () => {
   });
 
   it('should call addChild the expected number of times', () => {
-    const EXPECTED_ADD_CHILD_CALLS = 8;
+    const EXPECTED_ADD_CHILD_CALLS = 9;
     let addChildCallCount = 0;
     const appOriginal = app.asOriginalType__();
 
