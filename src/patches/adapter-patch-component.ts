@@ -1,32 +1,33 @@
 import type { App } from 'obsidian';
 
+import { getDataAdapterEx } from '@obsidian-typings/obsidian-public-latest/implementations';
 import {
   CapacitorAdapter,
-  Component,
   FileSystemAdapter
 } from 'obsidian';
+import { MonkeyAroundComponent } from 'obsidian-dev-utils/obsidian/components/monkey-around-component';
 
 import type { FileTreeComponent } from '../file-tree-component.ts';
 import type { IgnorePatternsComponent } from '../ignore-patterns-component.ts';
 import type { PluginSettingsComponent } from '../plugin-settings-component.ts';
 
-import { CapacitorAdapterPatch } from './capacitor-adapter-patch.ts';
-import { FileSystemAdapterPatch } from './file-system-adapter-patch.ts';
+import { CapacitorAdapterPatchComponent } from './capacitor-adapter-patch-component.ts';
+import { FileSystemAdapterPatchComponent } from './file-system-adapter-patch-component.ts';
 
-export interface AdapterPatchConstructorParams {
+export interface AdapterPatchComponentConstructorParams {
   readonly app: App;
   readonly fileTreeComponent: FileTreeComponent;
   readonly ignorePatternsComponent: IgnorePatternsComponent;
   readonly pluginSettingsComponent: PluginSettingsComponent;
 }
 
-export class AdapterPatch extends Component {
+export class AdapterPatchComponent extends MonkeyAroundComponent {
   private readonly app: App;
   private readonly fileTreeComponent: FileTreeComponent;
   private readonly ignorePatternsComponent: IgnorePatternsComponent;
   private readonly pluginSettingsComponent: PluginSettingsComponent;
 
-  public constructor(params: AdapterPatchConstructorParams) {
+  public constructor(params: AdapterPatchComponentConstructorParams) {
     super();
     this.app = params.app;
     this.ignorePatternsComponent = params.ignorePatternsComponent;
@@ -35,10 +36,20 @@ export class AdapterPatch extends Component {
   }
 
   public override onload(): void {
-    super.onload();
+    this.registerMethodPatch({
+      methodName: 'reconcileDeletion',
+      obj: getDataAdapterEx(this.app),
+      patchHandler: ({
+        fallback,
+        originalArgs: [normalizedPath]
+      }) => {
+        return this.reconcileDeletion(fallback, normalizedPath);
+      }
+    });
+
     if (this.app.vault.adapter instanceof FileSystemAdapter) {
       this.addChild(
-        new FileSystemAdapterPatch({
+        new FileSystemAdapterPatchComponent({
           adapter: this.app.vault.adapter,
           app: this.app,
           fileTreeComponent: this.fileTreeComponent,
@@ -48,7 +59,7 @@ export class AdapterPatch extends Component {
       );
     } else if (this.app.vault.adapter instanceof CapacitorAdapter) {
       this.addChild(
-        new CapacitorAdapterPatch({
+        new CapacitorAdapterPatchComponent({
           adapter: this.app.vault.adapter,
           app: this.app,
           fileTreeComponent: this.fileTreeComponent,
@@ -57,5 +68,14 @@ export class AdapterPatch extends Component {
         })
       );
     }
+  }
+
+  protected async reconcileDeletion(fallback: () => Promise<void>, normalizedPath: string): Promise<void> {
+    await fallback();
+    if (!this.app.workspace.layoutReady) {
+      return;
+    }
+
+    await this.ignorePatternsComponent.handleDeletedOrDotFile(normalizedPath);
   }
 }

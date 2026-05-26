@@ -1,7 +1,7 @@
-import type { App } from 'obsidian';
 import type { DataAdapterEx } from '@obsidian-typings/obsidian-public-latest';
+import type { App } from 'obsidian';
 
-import { Component } from 'obsidian';
+import { MonkeyAroundComponent } from 'obsidian-dev-utils/obsidian/components/monkey-around-component';
 
 import type { FileTreeComponent } from '../file-tree-component.ts';
 import type { IgnorePatternsComponent } from '../ignore-patterns-component.ts';
@@ -9,7 +9,7 @@ import type { PluginSettingsComponent } from '../plugin-settings-component.ts';
 
 import { ExcludeMode } from '../plugin-settings.ts';
 
-export interface AdapterPatchBaseConstructorParams {
+export interface AdapterPatchBaseComponentConstructorParams {
   readonly app: App;
   readonly fileTreeComponent: FileTreeComponent;
   readonly ignorePatternsComponent: IgnorePatternsComponent;
@@ -19,13 +19,13 @@ export type DataAdapterReconcileDeletionFn = DataAdapterEx['reconcileDeletion'];
 export type DataAdapterReconcileFolderCreationFn = DataAdapterEx['reconcileFolderCreation'];
 export type GenericReconcileFn = (normalizedPath: string, ...args: unknown[]) => Promise<void>;
 
-export class AdapterPatchBase extends Component {
+export class AdapterPatchBaseComponent extends MonkeyAroundComponent {
   private readonly app: App;
   private readonly fileTreeComponent: FileTreeComponent;
   private readonly ignorePatternsComponent: IgnorePatternsComponent;
   private readonly pluginSettingsComponent: PluginSettingsComponent;
 
-  public constructor(params: AdapterPatchBaseConstructorParams) {
+  public constructor(params: AdapterPatchBaseComponentConstructorParams) {
     super();
     this.app = params.app;
     this.ignorePatternsComponent = params.ignorePatternsComponent;
@@ -47,19 +47,5 @@ export class AdapterPatchBase extends Component {
         this.fileTreeComponent.deleteFromFilesPane(normalizedPath);
       }
     };
-  }
-
-  protected async reconcileDeletion(
-    next: DataAdapterReconcileDeletionFn,
-    normalizedPath: string,
-    normalizedNewPath: string,
-    shouldSkipDeletionTimeout?: boolean
-  ): Promise<void> {
-    await next.call(this.app.vault.adapter, normalizedPath, normalizedNewPath, shouldSkipDeletionTimeout);
-    if (!this.app.workspace.layoutReady) {
-      return;
-    }
-
-    await this.ignorePatternsComponent.handleDeletedOrDotFile(normalizedPath);
   }
 }

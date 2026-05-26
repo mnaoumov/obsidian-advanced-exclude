@@ -1,4 +1,3 @@
-import type { LayoutReadyComponent } from 'obsidian-dev-utils/obsidian/components/layout-ready-component';
 import type { ReadonlyPluginSettingsState } from 'obsidian-dev-utils/obsidian/components/plugin-settings-component';
 
 import ignore from 'ignore';
@@ -8,12 +7,13 @@ import {
 } from 'obsidian';
 import { invokeAsyncSafelyAfterDelay } from 'obsidian-dev-utils/async';
 import { deepEqual } from 'obsidian-dev-utils/object-utils';
-import { AsyncComponentBase } from 'obsidian-dev-utils/obsidian/components/async-component';
 import { registerAsyncEvent } from 'obsidian-dev-utils/obsidian/components/async-events-component';
+import { ComponentEx } from 'obsidian-dev-utils/obsidian/components/component-ex';
+import { CallbackLayoutReadyComponent } from 'obsidian-dev-utils/obsidian/components/layout-ready-component';
 import { ensureMetadataCacheReady } from 'obsidian-dev-utils/obsidian/metadata-cache';
 import { escapeRegExp } from 'obsidian-dev-utils/reg-exp';
 
-import type { VaultLoadPatch } from './patches/vault-load-patch.ts';
+import type { VaultLoadPatchComponent } from './patches/vault-load-patch-component.ts';
 import type { PluginSettingsComponent } from './plugin-settings-component.ts';
 import type { PluginSettings } from './plugin-settings.ts';
 
@@ -46,12 +46,12 @@ interface DbMtimeEntry {
 
 interface IgnorePatternsComponentConstructorParams {
   readonly app: App;
-  readonly onUpdateFileTree: () => Promise<void>;
+  onUpdateFileTree(this: void): Promise<void>;
   readonly pluginSettingsComponent: PluginSettingsComponent;
-  readonly vaultLoadPatch: VaultLoadPatch;
+  readonly vaultLoadPatch: VaultLoadPatchComponent;
 }
 
-export class IgnorePatternsComponent extends AsyncComponentBase implements LayoutReadyComponent {
+export class IgnorePatternsComponent extends ComponentEx {
   private _db?: IDBDatabase;
   private readonly app: App;
   private cachedExcludeRegExps: null | RegExp[] = null;
@@ -67,7 +67,7 @@ export class IgnorePatternsComponent extends AsyncComponentBase implements Layou
     this.processStoreActions();
   }, PROCESS_STORE_ACTIONS_DEBOUNCE_INTERVAL_IN_MILLISECONDS);
 
-  private readonly vaultLoadPatch: VaultLoadPatch;
+  private readonly vaultLoadPatch: VaultLoadPatchComponent;
 
   private get db(): IDBDatabase {
     if (!this._db) {
@@ -154,8 +154,7 @@ export class IgnorePatternsComponent extends AsyncComponentBase implements Layou
     }
   }
 
-  public override async onload(): Promise<void> {
-    await super.onload();
+  public override async onloadAsync(): Promise<void> {
     await this.loadDb();
     await this.reload();
     registerAsyncEvent(
@@ -174,6 +173,8 @@ export class IgnorePatternsComponent extends AsyncComponentBase implements Layou
         this.hadConfigChanges = true;
       })
     );
+
+    this.addChild(new CallbackLayoutReadyComponent(this.app, this.onLayoutReady.bind(this)));
   }
 
   public async processConfigChanges(): Promise<void> {

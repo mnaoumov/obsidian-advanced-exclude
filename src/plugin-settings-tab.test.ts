@@ -26,8 +26,8 @@ interface MockPlugin {
 }
 
 interface MockPluginSettingsTabBaseParams {
-  plugin: MockPlugin;
-  pluginSettingsComponent: PluginSettingsComponentBase<PluginSettings>;
+  readonly plugin: MockPlugin;
+  readonly pluginSettingsComponent: PluginSettingsComponentBase<PluginSettings>;
 }
 
 vi.mock('obsidian-dev-utils/obsidian/plugin/plugin-settings-tab', () => {

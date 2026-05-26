@@ -1,33 +1,50 @@
 import type { DataHandler } from 'obsidian-dev-utils/obsidian/data-handler';
+import type { PluginEventSource } from 'obsidian-dev-utils/obsidian/plugin/plugin-event-source';
 
 import { strictProxy } from 'obsidian-dev-utils/strict-proxy';
 import {
   describe,
   expect,
-  it
+  it,
+  vi
 } from 'vitest';
 
 import { PluginSettingsComponent } from './plugin-settings-component.ts';
-import {
-  ExcludeMode,
-  PluginSettings
-} from './plugin-settings.ts';
+import { PluginSettings } from './plugin-settings.ts';
 
-class TestPluginSettingsComponent extends PluginSettingsComponent {
-  public testCreateDefaultSettings(): PluginSettings {
-    return this.createDefaultSettings();
+vi.mock('obsidian-dev-utils/obsidian/components/plugin-settings-component', () => {
+  class MockPluginSettingsComponentBase {
+    public settings: PluginSettings = new PluginSettings();
+
+    public constructor(params: Record<string, unknown>) {
+      expect(params['pluginSettingsClass']).toBe(PluginSettings);
+    }
   }
-}
+  return { PluginSettingsComponentBase: MockPluginSettingsComponentBase };
+});
 
 describe('PluginSettingsComponent', () => {
-  it('should create default settings with correct values', () => {
+  it('should pass PluginSettings class to base constructor', () => {
     const dataHandler = strictProxy<DataHandler>({});
-    const component = new TestPluginSettingsComponent(dataHandler);
-    const settings = component.testCreateDefaultSettings();
-    expect(settings).toBeInstanceOf(PluginSettings);
-    expect(settings.excludeMode).toBe(ExcludeMode.Full);
-    expect(settings.obsidianIgnoreContent).toBe('');
-    expect(settings.shouldIgnoreExcludedFiles).toBe(false);
-    expect(settings.shouldIncludeGitIgnorePatterns).toBe(true);
+    const pluginEventSource = strictProxy<PluginEventSource>({});
+
+    const component = new PluginSettingsComponent({
+      dataHandler,
+      pluginEventSource
+    });
+
+    expect(component).toBeInstanceOf(PluginSettingsComponent);
+  });
+
+  it('should expose settings from base class', () => {
+    const dataHandler = strictProxy<DataHandler>({});
+    const pluginEventSource = strictProxy<PluginEventSource>({});
+
+    const component = new PluginSettingsComponent({
+      dataHandler,
+      pluginEventSource
+    });
+
+    expect(component.settings).toBeInstanceOf(PluginSettings);
   });
 });

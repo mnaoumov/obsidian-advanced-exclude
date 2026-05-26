@@ -1,17 +1,17 @@
+import type { FileExplorerView } from '@obsidian-typings/obsidian-public-latest';
 import type { App } from 'obsidian';
 import type { ConsoleDebugComponent } from 'obsidian-dev-utils/obsidian/components/console-debug-component';
-import type { LayoutReadyComponent } from 'obsidian-dev-utils/obsidian/components/layout-ready-component';
-import type { FileExplorerView } from '@obsidian-typings/obsidian-public-latest';
 
+import { getDataAdapterEx } from '@obsidian-typings/obsidian-public-latest/implementations';
 import { FileSystemAdapter } from 'obsidian';
 import { sleep } from 'obsidian-dev-utils/async';
-import { AsyncComponentBase } from 'obsidian-dev-utils/obsidian/components/async-component';
+import { ComponentEx } from 'obsidian-dev-utils/obsidian/components/component-ex';
+import { CallbackLayoutReadyComponent } from 'obsidian-dev-utils/obsidian/components/layout-ready-component';
 import { basename } from 'obsidian-dev-utils/path';
 import { ensureNonNullable } from 'obsidian-dev-utils/type-guards';
-import { getDataAdapterEx } from '@obsidian-typings/obsidian-public-latest/implementations';
 
 import type { IgnorePatternsComponent } from './ignore-patterns-component.ts';
-import type { VaultLoadPatch } from './patches/vault-load-patch.ts';
+import type { VaultLoadPatchComponent } from './patches/vault-load-patch-component.ts';
 import type { PluginSettingsComponent } from './plugin-settings-component.ts';
 
 import { ROOT_PATH } from './constants.ts';
@@ -22,10 +22,10 @@ interface FileTreeComponentConstructorParams {
   readonly consoleDebugComponent: ConsoleDebugComponent;
   readonly ignorePatternsComponent: IgnorePatternsComponent;
   readonly pluginSettingsComponent: PluginSettingsComponent;
-  readonly vaultLoadPatch: VaultLoadPatch;
+  readonly vaultLoadPatch: VaultLoadPatchComponent;
 }
 
-export class FileTreeComponent extends AsyncComponentBase implements LayoutReadyComponent {
+export class FileTreeComponent extends ComponentEx {
   private _updateProgressEl?: HTMLProgressElement;
   private readonly app: App;
   private readonly consoleDebugComponent: ConsoleDebugComponent;
@@ -34,7 +34,7 @@ export class FileTreeComponent extends AsyncComponentBase implements LayoutReady
   private readonly pluginSettingsComponent: PluginSettingsComponent;
   private updateFileTreeAbortController: AbortController | null = null;
 
-  private readonly vaultLoadPatch: VaultLoadPatch;
+  private readonly vaultLoadPatch: VaultLoadPatchComponent;
 
   private get updateProgressEl(): HTMLProgressElement {
     return ensureNonNullable(this._updateProgressEl);
@@ -73,9 +73,9 @@ export class FileTreeComponent extends AsyncComponentBase implements LayoutReady
     }
   }
 
-  public override async onload(): Promise<void> {
-    await super.onload();
+  public override async onloadAsync(): Promise<void> {
     await this.update();
+    this.addChild(new CallbackLayoutReadyComponent(this.app, this.onLayoutReady.bind(this)));
   }
 
   public async processConfigChanges(): Promise<void> {

@@ -18,7 +18,7 @@ import {
   vi
 } from 'vitest';
 
-import type { VaultLoadPatch } from './patches/vault-load-patch.ts';
+import type { VaultLoadPatchComponent } from './patches/vault-load-patch-component.ts';
 import type { PluginSettingsComponent } from './plugin-settings-component.ts';
 
 import {
@@ -55,9 +55,9 @@ vi.mock('obsidian-dev-utils/object-utils', () => ({
 
 interface CreateComponentOverrides {
   app?: AppOriginal;
-  onUpdateFileTree?: () => Promise<void>;
+  onUpdateFileTree?(): Promise<void>;
   pluginSettingsComponent?: PluginSettingsComponent;
-  vaultLoadPatch?: VaultLoadPatch;
+  vaultLoadPatch?: VaultLoadPatchComponent;
 }
 
 interface FileIgnoreEntry {
@@ -101,9 +101,9 @@ interface SaveSettingsState {
 }
 
 interface SetupIndexedDbParams {
-  filesEntries?: FileIgnoreEntry[];
-  mtimeEntry?: unknown;
-  upgradeNewVersion?: number;
+  readonly filesEntries?: FileIgnoreEntry[];
+  readonly mtimeEntry?: unknown;
+  readonly upgradeNewVersion?: number;
 }
 
 interface SetupIndexedDbResult {
@@ -174,8 +174,8 @@ function createPluginSettingsComponent(settings?: Partial<PluginSettings>): Plug
   });
 }
 
-function createVaultLoadPatch(vaultLoadCalled = false): VaultLoadPatch {
-  return strictProxy<VaultLoadPatch>({
+function createVaultLoadPatch(vaultLoadCalled = false): VaultLoadPatchComponent {
+  return strictProxy<VaultLoadPatchComponent>({
     vaultLoadCalled
   });
 }
@@ -245,7 +245,7 @@ describe('IgnorePatternsComponent', () => {
     it('should return cached result when available', async () => {
       setupIndexedDb();
       const component = createComponent();
-      await component.onload();
+      await component.loadWithPromises();
 
       // First call caches the result
       const result1 = component.isIgnored('some/file.md', false);
@@ -261,7 +261,7 @@ describe('IgnorePatternsComponent', () => {
       const pluginSettingsComponent = createPluginSettingsComponent();
       vi.mocked(readSafe).mockResolvedValueOnce('*.log');
       const component = createComponent({ pluginSettingsComponent });
-      await component.onload();
+      await component.loadWithPromises();
 
       expect(component.isIgnored('debug.log', false)).toBe(true);
       expect(component.isIgnored('readme.md', false)).toBe(false);
@@ -271,7 +271,7 @@ describe('IgnorePatternsComponent', () => {
       setupIndexedDb();
       vi.mocked(readSafe).mockResolvedValueOnce('build/');
       const component = createComponent();
-      await component.onload();
+      await component.loadWithPromises();
 
       expect(component.isIgnored('build', true)).toBe(true);
     });
@@ -284,7 +284,7 @@ describe('IgnorePatternsComponent', () => {
         shouldIgnoreExcludedFiles: true
       });
       const component = createComponent({ app, pluginSettingsComponent });
-      await component.onload();
+      await component.loadWithPromises();
 
       expect(component.isIgnored('secret/file.md', false)).toBe(true);
     });
@@ -297,7 +297,7 @@ describe('IgnorePatternsComponent', () => {
         shouldIgnoreExcludedFiles: true
       });
       const component = createComponent({ app, pluginSettingsComponent });
-      await component.onload();
+      await component.loadWithPromises();
 
       expect(component.isIgnored('file.tmp', false)).toBe(true);
       expect(component.isIgnored('file.md', false)).toBe(false);
@@ -312,7 +312,7 @@ describe('IgnorePatternsComponent', () => {
       });
       const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
       const component = createComponent({ app, pluginSettingsComponent });
-      await component.onload();
+      await component.loadWithPromises();
 
       component.isIgnored('anything', false);
       expect(consoleErrorSpy).toHaveBeenCalledWith('Invalid exclude filter: /[invalid/');
@@ -326,7 +326,7 @@ describe('IgnorePatternsComponent', () => {
         shouldIgnoreExcludedFiles: false
       });
       const component = createComponent({ app, pluginSettingsComponent });
-      await component.onload();
+      await component.loadWithPromises();
 
       expect(component.isIgnored('secret/file.md', false)).toBe(false);
     });
@@ -340,7 +340,7 @@ describe('IgnorePatternsComponent', () => {
         shouldIgnoreExcludedFiles: true
       });
       const component = createComponent({ app, pluginSettingsComponent });
-      await component.onload();
+      await component.loadWithPromises();
 
       component.isIgnored('secret/file.md', false);
       component.isIgnored('secret/other.md', false);
@@ -359,7 +359,7 @@ describe('IgnorePatternsComponent', () => {
         shouldIgnoreExcludedFiles: true
       });
       const component = createComponent({ app, pluginSettingsComponent });
-      await component.onload();
+      await component.loadWithPromises();
 
       // Single "/" has length 1, so filter.length > 1 is false. It should be treated as plain prefix match.
       // The escapeRegExp('/') produces '\/' and the regex becomes /^\//i
@@ -369,7 +369,7 @@ describe('IgnorePatternsComponent', () => {
     it('should store results in IndexedDB via addStoreAction', async () => {
       const { filesStore } = setupIndexedDb();
       const component = createComponent();
-      await component.onload();
+      await component.loadWithPromises();
 
       component.isIgnored('test.md', false);
 
@@ -387,7 +387,7 @@ describe('IgnorePatternsComponent', () => {
         shouldIgnoreExcludedFiles: false
       });
       const component = createComponent({ pluginSettingsComponent });
-      await component.onload();
+      await component.loadWithPromises();
 
       component.clearCachedExcludeRegExps();
       // No error means it cleared successfully
@@ -400,7 +400,7 @@ describe('IgnorePatternsComponent', () => {
         shouldIgnoreExcludedFiles: true
       });
       const component = createComponent({ pluginSettingsComponent });
-      await component.onload();
+      await component.loadWithPromises();
 
       vi.mocked(invokeAsyncSafelyAfterDelay).mockClear();
       component.clearCachedExcludeRegExps();
@@ -413,7 +413,7 @@ describe('IgnorePatternsComponent', () => {
     it('should remove path from fileIgnoreMap if present', async () => {
       setupIndexedDb();
       const component = createComponent();
-      await component.onload();
+      await component.loadWithPromises();
 
       // Populate the cache
       component.isIgnored('test.md', false);
@@ -426,7 +426,7 @@ describe('IgnorePatternsComponent', () => {
     it('should not add store action when path is not in fileIgnoreMap', async () => {
       const { filesStore } = setupIndexedDb();
       const component = createComponent();
-      await component.onload();
+      await component.loadWithPromises();
 
       await component.handleDeletedOrDotFile('nonexistent.md');
 
@@ -439,7 +439,7 @@ describe('IgnorePatternsComponent', () => {
       setupIndexedDb();
       vi.mocked(readSafe).mockResolvedValue('');
       const component = createComponent();
-      await component.onload();
+      await component.loadWithPromises();
 
       vi.mocked(readSafe).mockResolvedValueOnce('new-pattern');
       await component.handleDeletedOrDotFile('.obsidianignore');
@@ -454,7 +454,7 @@ describe('IgnorePatternsComponent', () => {
       });
       vi.mocked(readSafe).mockResolvedValue('');
       const component = createComponent({ pluginSettingsComponent });
-      await component.onload();
+      await component.loadWithPromises();
 
       vi.mocked(readSafe).mockResolvedValueOnce('new-git-pattern');
       await component.handleDeletedOrDotFile('.gitignore');
@@ -466,7 +466,7 @@ describe('IgnorePatternsComponent', () => {
       setupIndexedDb();
       vi.mocked(readSafe).mockResolvedValue('');
       const component = createComponent();
-      await component.onload();
+      await component.loadWithPromises();
 
       vi.mocked(invokeAsyncSafelyAfterDelay).mockClear();
       // ReadSafe returns '' which matches the initial cached content
@@ -480,7 +480,7 @@ describe('IgnorePatternsComponent', () => {
       setupIndexedDb();
       vi.mocked(readSafe).mockResolvedValue('');
       const component = createComponent();
-      await component.onload();
+      await component.loadWithPromises();
 
       // Populate cache with the obsidian ignore file path
       component.isIgnored('.obsidianignore', false);
@@ -497,7 +497,7 @@ describe('IgnorePatternsComponent', () => {
       setupIndexedDb();
       const onUpdateFileTree = vi.fn().mockResolvedValue(undefined);
       const component = createComponent({ onUpdateFileTree });
-      await component.onload();
+      await component.loadWithPromises();
 
       await component.processConfigChanges();
 
@@ -509,7 +509,7 @@ describe('IgnorePatternsComponent', () => {
       const onUpdateFileTree = vi.fn().mockResolvedValue(undefined);
       const pluginSettingsComponent = createPluginSettingsComponent();
       const component = createComponent({ onUpdateFileTree, pluginSettingsComponent });
-      await component.onload();
+      await component.loadWithPromises();
 
       // We need to simulate the saveSettings event. Since registerAsyncEvent is mocked,
       // We access the on() calls on pluginSettingsComponent
@@ -532,7 +532,7 @@ describe('IgnorePatternsComponent', () => {
       setupIndexedDb();
       vi.mocked(readSafe).mockResolvedValue('existing-content');
       const component = createComponent();
-      await component.onload();
+      await component.loadWithPromises();
 
       vi.mocked(writeSafe).mockClear();
       await component.writeObsidianIgnore('existing-content');
@@ -545,7 +545,7 @@ describe('IgnorePatternsComponent', () => {
       vi.mocked(readSafe).mockResolvedValue('');
       const pluginSettingsComponent = createPluginSettingsComponent();
       const component = createComponent({ pluginSettingsComponent });
-      await component.onload();
+      await component.loadWithPromises();
 
       await component.writeObsidianIgnore('new-content');
 
@@ -557,7 +557,7 @@ describe('IgnorePatternsComponent', () => {
       setupIndexedDb();
       vi.mocked(readSafe).mockResolvedValue('');
       const component = createComponent();
-      await component.onload();
+      await component.loadWithPromises();
 
       vi.mocked(writeSafe).mockClear();
       await component.writeObsidianIgnore('new-content');
@@ -572,7 +572,7 @@ describe('IgnorePatternsComponent', () => {
     it('should call ensureMetadataCacheReady', async () => {
       setupIndexedDb();
       const component = createComponent();
-      await component.onload();
+      await component.loadWithPromises();
       await component.onLayoutReady();
 
       expect(ensureMetadataCacheReady).toHaveBeenCalled();
@@ -583,7 +583,7 @@ describe('IgnorePatternsComponent', () => {
       const onUpdateFileTree = vi.fn().mockResolvedValue(undefined);
       const vaultLoadPatch = createVaultLoadPatch(false);
       const component = createComponent({ onUpdateFileTree, vaultLoadPatch });
-      await component.onload();
+      await component.loadWithPromises();
       await component.onLayoutReady();
 
       expect(onUpdateFileTree).toHaveBeenCalled();
@@ -594,7 +594,7 @@ describe('IgnorePatternsComponent', () => {
       const onUpdateFileTree = vi.fn().mockResolvedValue(undefined);
       const vaultLoadPatch = createVaultLoadPatch(true);
       const component = createComponent({ onUpdateFileTree, vaultLoadPatch });
-      await component.onload();
+      await component.loadWithPromises();
       await component.onLayoutReady();
 
       expect(onUpdateFileTree).not.toHaveBeenCalled();
@@ -605,7 +605,7 @@ describe('IgnorePatternsComponent', () => {
       const app = createApp();
       const vaultOnSpy = vi.spyOn(app.vault, 'on');
       const component = createComponent({ app });
-      await component.onload();
+      await component.loadWithPromises();
       await component.onLayoutReady();
 
       expect(vaultOnSpy).toHaveBeenCalledWith('config-changed', expect.any(Function));
@@ -619,7 +619,7 @@ describe('IgnorePatternsComponent', () => {
         shouldIgnoreExcludedFiles: true
       });
       const component = createComponent({ app, pluginSettingsComponent });
-      await component.onload();
+      await component.loadWithPromises();
       await component.onLayoutReady();
 
       const configChangedCall = (vaultOnSpy.mock.calls as MockCallEntry[]).find(([name]) => name === 'config-changed');
@@ -638,7 +638,7 @@ describe('IgnorePatternsComponent', () => {
       const app = createApp();
       const vaultOnSpy = vi.spyOn(app.vault, 'on');
       const component = createComponent({ app });
-      await component.onload();
+      await component.loadWithPromises();
       await component.onLayoutReady();
 
       const configChangedCall = (vaultOnSpy.mock.calls as MockCallEntry[]).find(([name]) => name === 'config-changed');
@@ -657,7 +657,7 @@ describe('IgnorePatternsComponent', () => {
     it('should load DB and reload ignore files', async () => {
       const { openFn } = setupIndexedDb();
       const component = createComponent();
-      await component.onload();
+      await component.loadWithPromises();
 
       expect(openFn).toHaveBeenCalled();
       expect(readSafe).toHaveBeenCalled();
@@ -667,7 +667,7 @@ describe('IgnorePatternsComponent', () => {
       setupIndexedDb();
       const pluginSettingsComponent = createPluginSettingsComponent();
       const component = createComponent({ pluginSettingsComponent });
-      await component.onload();
+      await component.loadWithPromises();
 
       // RegisterAsyncEvent is called for loadSettings and saveSettings from this component;
       // But it may also be called by other components in the chain. Just check it was called.
@@ -680,7 +680,7 @@ describe('IgnorePatternsComponent', () => {
       setupIndexedDb();
       const pluginSettingsComponent = createPluginSettingsComponent();
       const component = createComponent({ pluginSettingsComponent });
-      await component.onload();
+      await component.loadWithPromises();
 
       const loadSettingsCall = (vi.mocked(pluginSettingsComponent.on).mock.calls as MockCallEntry[]).find(([name]) => name === 'loadSettings');
       if (loadSettingsCall) {
@@ -697,7 +697,7 @@ describe('IgnorePatternsComponent', () => {
       setupIndexedDb();
       const pluginSettingsComponent = createPluginSettingsComponent();
       const component = createComponent({ pluginSettingsComponent });
-      await component.onload();
+      await component.loadWithPromises();
 
       const loadSettingsCall = (vi.mocked(pluginSettingsComponent.on).mock.calls as MockCallEntry[]).find(([name]) => name === 'loadSettings');
       if (loadSettingsCall) {
@@ -714,7 +714,7 @@ describe('IgnorePatternsComponent', () => {
       setupIndexedDb();
       const pluginSettingsComponent = createPluginSettingsComponent();
       const component = createComponent({ pluginSettingsComponent });
-      await component.onload();
+      await component.loadWithPromises();
 
       const saveSettingsCall = (vi.mocked(pluginSettingsComponent.on).mock.calls as MockCallEntry[]).find(([name]) => name === 'saveSettings');
       if (saveSettingsCall) {
@@ -735,7 +735,7 @@ describe('IgnorePatternsComponent', () => {
       const { openFn } = setupIndexedDb();
       const app = createApp();
       const component = createComponent({ app });
-      await component.onload();
+      await component.loadWithPromises();
 
       expect(openFn).toHaveBeenCalledWith('test-app/advanced-exclude', 1);
     });
@@ -743,7 +743,7 @@ describe('IgnorePatternsComponent', () => {
     it('should create object stores on upgradeneeded with newVersion 1', async () => {
       const { mockDb } = setupIndexedDb();
       const component = createComponent();
-      await component.onload();
+      await component.loadWithPromises();
 
       expect(mockDb.createObjectStore).toHaveBeenCalledTimes(2);
     });
@@ -751,7 +751,7 @@ describe('IgnorePatternsComponent', () => {
     it('should skip object store creation when newVersion is not 1', async () => {
       const { mockDb } = setupIndexedDb({ upgradeNewVersion: 2 });
       const component = createComponent();
-      await component.onload();
+      await component.loadWithPromises();
 
       expect(mockDb.createObjectStore).not.toHaveBeenCalled();
     });
@@ -765,7 +765,7 @@ describe('IgnorePatternsComponent', () => {
         ]
       });
       const component = createComponent();
-      await component.onload();
+      await component.loadWithPromises();
 
       // The cached entries should be loaded
       expect(component.isIgnored('ignored.md', false)).toBe(true);
@@ -778,7 +778,7 @@ describe('IgnorePatternsComponent', () => {
         filesEntries: [{ isIgnored: true, path: 'old.md' }]
       });
       const component = createComponent();
-      await component.onload();
+      await component.loadWithPromises();
 
       expect(filesStore.clear).toHaveBeenCalled();
     });
@@ -787,7 +787,7 @@ describe('IgnorePatternsComponent', () => {
       vi.mocked(deepEqual).mockReturnValue(true);
       setupIndexedDb({ mtimeEntry: undefined });
       const component = createComponent();
-      await component.onload();
+      await component.loadWithPromises();
 
       expect(deepEqual).toHaveBeenCalled();
     });
@@ -801,7 +801,7 @@ describe('IgnorePatternsComponent', () => {
       });
       const component = createComponent({ pluginSettingsComponent });
       vi.mocked(readSafe).mockClear();
-      await component.onload();
+      await component.loadWithPromises();
 
       // ReadSafe should only be called for obsidian ignore, not git ignore
       const readSafeCalls = vi.mocked(readSafe).mock.calls;
@@ -816,7 +816,7 @@ describe('IgnorePatternsComponent', () => {
       });
       vi.mocked(readSafe).mockResolvedValue('');
       const component = createComponent({ pluginSettingsComponent });
-      await component.onload();
+      await component.loadWithPromises();
 
       expect(readSafe).toHaveBeenCalled();
     });
@@ -828,7 +828,7 @@ describe('IgnorePatternsComponent', () => {
       });
       vi.mocked(readSafe).mockResolvedValue('');
       const component = createComponent({ pluginSettingsComponent });
-      await component.onload();
+      await component.loadWithPromises();
 
       // Now simulate git ignore changing
       vi.mocked(readSafe).mockResolvedValueOnce('node_modules');
@@ -844,7 +844,7 @@ describe('IgnorePatternsComponent', () => {
       const pluginSettingsComponent = createPluginSettingsComponent();
       vi.mocked(readSafe).mockResolvedValue('initial-content');
       const component = createComponent({ pluginSettingsComponent });
-      await component.onload();
+      await component.loadWithPromises();
 
       expect(pluginSettingsComponent.setProperty).toHaveBeenCalledWith('obsidianIgnoreContent', 'initial-content');
     });
@@ -853,7 +853,7 @@ describe('IgnorePatternsComponent', () => {
       setupIndexedDb();
       vi.mocked(readSafe).mockResolvedValue('');
       const component = createComponent();
-      await component.onload();
+      await component.loadWithPromises();
 
       // Trigger readObsidianIgnore again with same content
       vi.mocked(readSafe).mockResolvedValueOnce('');
@@ -871,7 +871,7 @@ describe('IgnorePatternsComponent', () => {
       setupIndexedDb();
       const pluginSettingsComponent = createPluginSettingsComponent();
       const component = createComponent({ pluginSettingsComponent });
-      await component.onload();
+      await component.loadWithPromises();
 
       // Trigger saveSettings which calls reload with content
       const saveSettingsCall = (vi.mocked(pluginSettingsComponent.on).mock.calls as MockCallEntry[]).find(([name]) => name === 'saveSettings');
@@ -890,7 +890,7 @@ describe('IgnorePatternsComponent', () => {
       vi.mocked(readSafe).mockResolvedValue('');
       const component = createComponent();
       vi.mocked(readSafe).mockClear();
-      await component.onload();
+      await component.loadWithPromises();
 
       // Onload calls reload() without argument, which triggers readObsidianIgnore
       expect(readSafe).toHaveBeenCalled();
@@ -901,7 +901,7 @@ describe('IgnorePatternsComponent', () => {
     it('should batch pending store operations', async () => {
       const { filesStore } = setupIndexedDb();
       const component = createComponent();
-      await component.onload();
+      await component.loadWithPromises();
 
       // Trigger multiple isIgnored calls to queue store actions
       component.isIgnored('file1.md', false);
@@ -916,7 +916,7 @@ describe('IgnorePatternsComponent', () => {
     it('should clear pending actions after processing', async () => {
       const { filesStore } = setupIndexedDb();
       const component = createComponent();
-      await component.onload();
+      await component.loadWithPromises();
 
       component.isIgnored('file1.md', false);
       vi.runAllTimers();
@@ -935,7 +935,7 @@ describe('IgnorePatternsComponent', () => {
       vi.mocked(deepEqual).mockReturnValue(false);
       const { filesStore } = setupIndexedDb();
       const component = createComponent();
-      await component.onload();
+      await component.loadWithPromises();
 
       // ResetDb is called during loadDb when mtime doesn't match
       expect(filesStore.clear).toHaveBeenCalled();
@@ -945,7 +945,7 @@ describe('IgnorePatternsComponent', () => {
       vi.mocked(deepEqual).mockReturnValue(false);
       const { mtimeStore } = setupIndexedDb();
       const component = createComponent();
-      await component.onload();
+      await component.loadWithPromises();
 
       expect(mtimeStore.put).toHaveBeenCalled();
     });
@@ -960,7 +960,7 @@ describe('IgnorePatternsComponent', () => {
       });
       setupIndexedDb();
       const component = createComponent({ pluginSettingsComponent });
-      await component.onload();
+      await component.loadWithPromises();
 
       // ResetDb calls getCurrentMtimeEntry, which uses statSafe
       expect(statSafe).toHaveBeenCalled();
@@ -973,7 +973,7 @@ describe('IgnorePatternsComponent', () => {
       });
       const { mtimeStore } = setupIndexedDb();
       const component = createComponent({ pluginSettingsComponent });
-      await component.onload();
+      await component.loadWithPromises();
 
       const putCall = mtimeStore.put.mock.calls[0];
       if (putCall) {
@@ -989,7 +989,7 @@ describe('IgnorePatternsComponent', () => {
       vi.mocked(statSafe).mockResolvedValue(null);
       const { mtimeStore } = setupIndexedDb();
       const component = createComponent();
-      await component.onload();
+      await component.loadWithPromises();
 
       const putCall = mtimeStore.put.mock.calls[0];
       if (putCall) {
@@ -1009,7 +1009,7 @@ describe('IgnorePatternsComponent', () => {
       });
       const { mtimeStore } = setupIndexedDb();
       const component = createComponent({ app, pluginSettingsComponent });
-      await component.onload();
+      await component.loadWithPromises();
 
       const putCall = mtimeStore.put.mock.calls[0];
       if (putCall) {
@@ -1027,7 +1027,7 @@ describe('IgnorePatternsComponent', () => {
       });
       const { mtimeStore } = setupIndexedDb();
       const component = createComponent({ pluginSettingsComponent });
-      await component.onload();
+      await component.loadWithPromises();
 
       const putCall = mtimeStore.put.mock.calls[0];
       if (putCall) {
@@ -1047,7 +1047,7 @@ describe('IgnorePatternsComponent', () => {
       });
       const { mtimeStore } = setupIndexedDb();
       const component = createComponent({ app, pluginSettingsComponent });
-      await component.onload();
+      await component.loadWithPromises();
 
       const putCall = mtimeStore.put.mock.calls[0];
       if (putCall) {
@@ -1069,7 +1069,7 @@ describe('IgnorePatternsComponent', () => {
         shouldIncludeGitIgnorePatterns: true
       });
       const component = createComponent({ pluginSettingsComponent });
-      await component.onload();
+      await component.loadWithPromises();
 
       expect(component.isIgnored('debug.log', false)).toBe(true);
       expect(component.isIgnored('node_modules/pkg', false)).toBe(true);
@@ -1080,7 +1080,7 @@ describe('IgnorePatternsComponent', () => {
       setupIndexedDb();
       vi.mocked(readSafe).mockResolvedValue('*.log');
       const component = createComponent();
-      await component.onload();
+      await component.loadWithPromises();
 
       // Both calls should use the same tester
       component.isIgnored('a.log', false);
@@ -1112,7 +1112,7 @@ describe('IgnorePatternsComponent', () => {
     it('should add a delete store action when path was cached', async () => {
       const { filesStore } = setupIndexedDb();
       const component = createComponent();
-      await component.onload();
+      await component.loadWithPromises();
 
       // Cache a path
       component.isIgnored('cached.md', false);
@@ -1163,7 +1163,7 @@ describe('IgnorePatternsComponent', () => {
       });
 
       const component = createComponent();
-      await component.onload();
+      await component.loadWithPromises();
       expect(component).toBeInstanceOf(IgnorePatternsComponent);
     });
 
@@ -1191,7 +1191,7 @@ describe('IgnorePatternsComponent', () => {
       });
 
       const component = createComponent();
-      await expect(component.onload()).rejects.toThrow('Test DB error');
+      await expect(component.loadWithPromises()).rejects.toThrow('Test DB error');
     });
 
     it('should reject with Unknown error when request.error is null', async () => {
@@ -1216,7 +1216,7 @@ describe('IgnorePatternsComponent', () => {
       });
 
       const component = createComponent();
-      await expect(component.onload()).rejects.toThrow('Unknown error');
+      await expect(component.loadWithPromises()).rejects.toThrow('Unknown error');
     });
   });
 
@@ -1229,7 +1229,7 @@ describe('IgnorePatternsComponent', () => {
         shouldIgnoreExcludedFiles: true
       });
       const component = createComponent({ app, pluginSettingsComponent });
-      await component.onload();
+      await component.loadWithPromises();
 
       expect(component.isIgnored('testing123', false)).toBe(true);
     });
@@ -1242,7 +1242,7 @@ describe('IgnorePatternsComponent', () => {
         shouldIgnoreExcludedFiles: true
       });
       const component = createComponent({ app, pluginSettingsComponent });
-      await component.onload();
+      await component.loadWithPromises();
 
       expect(component.isIgnored('docs/readme.md', false)).toBe(true);
       expect(component.isIgnored('my-docs/readme.md', false)).toBe(false);

@@ -1,17 +1,17 @@
+import type { DataAdapterEx } from '@obsidian-typings/obsidian-public-latest';
 import type {
   App,
   TAbstractFile,
   TFolder
 } from 'obsidian';
 import type { ConsoleDebugComponent } from 'obsidian-dev-utils/obsidian/components/console-debug-component';
-import type { DataAdapterEx } from '@obsidian-typings/obsidian-public-latest';
 
+import { getDataAdapterEx } from '@obsidian-typings/obsidian-public-latest/implementations';
 import {
   FileSystemAdapter,
   Notice
 } from 'obsidian';
 import { strictProxy } from 'obsidian-dev-utils/strict-proxy';
-import { getDataAdapterEx } from '@obsidian-typings/obsidian-public-latest/implementations';
 import {
   beforeEach,
   describe,
@@ -21,7 +21,7 @@ import {
 } from 'vitest';
 
 import type { IgnorePatternsComponent } from './ignore-patterns-component.ts';
-import type { VaultLoadPatch } from './patches/vault-load-patch.ts';
+import type { VaultLoadPatchComponent } from './patches/vault-load-patch-component.ts';
 import type { PluginSettingsComponent } from './plugin-settings-component.ts';
 
 import { FileTreeComponent } from './file-tree-component.ts';
@@ -66,9 +66,9 @@ interface MockFileExplorerView {
 }
 
 interface SetupParams {
-  fileExplorerView?: MockFileExplorerView;
-  isFileSystemAdapter?: boolean;
-  vaultLoadCalled?: boolean;
+  readonly fileExplorerView?: MockFileExplorerView;
+  readonly isFileSystemAdapter?: boolean;
+  readonly vaultLoadCalled?: boolean;
 }
 
 interface SetupResult {
@@ -78,7 +78,7 @@ interface SetupResult {
   ignorePatternsComponent: IgnorePatternsComponent;
   mockAdapter: MockAdapter;
   pluginSettingsComponent: PluginSettingsComponent;
-  vaultLoadPatch: VaultLoadPatch;
+  vaultLoadPatch: VaultLoadPatchComponent;
 }
 
 function createMockAdapter(isFileSystemAdapter = false): MockAdapter {
@@ -148,7 +148,7 @@ function setup(params: SetupParams = {}): SetupResult {
     }
   });
 
-  const vaultLoadPatch = strictProxy<VaultLoadPatch>({
+  const vaultLoadPatch = strictProxy<VaultLoadPatchComponent>({
     vaultLoadCalled
   });
 
@@ -226,7 +226,7 @@ describe('FileTreeComponent', () => {
     it('should call super.onload and update', async () => {
       const { app, component, mockAdapter } = setup();
       vi.mocked(app.vault.getFolderByPath).mockReturnValue(null);
-      await component.onload();
+      await component.loadWithPromises();
       // Update was called (which calls reloadFolder), and since folder is null it returns early
       // The fact that it didn't throw confirms super.onload() + update() both ran
       expect(mockAdapter.reconcileFolderCreation).not.toHaveBeenCalled();
