@@ -44,6 +44,7 @@ vi.mock('obsidian-dev-utils/obsidian/components/async-events-component', () => (
 }));
 
 vi.mock('obsidian-dev-utils/async', () => ({
+  chain: vi.fn((_chainPromise: Promise<void> | undefined, fn: () => Promise<void> | undefined) => fn() ?? undefined),
   invokeAsyncSafelyAfterDelay: vi.fn((cb: () => Promise<void>) => {
     cb().catch(() => undefined);
   })
