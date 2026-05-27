@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## 2.1.1
+
+- refactor: update template
+
 ## 2.1.0
 
 - test: add integration tests
