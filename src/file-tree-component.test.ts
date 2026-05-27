@@ -31,6 +31,10 @@ import { ExcludeMode } from './plugin-settings.ts';
 vi.stubGlobal('Notice', Notice);
 
 vi.mock('obsidian-dev-utils/async', () => ({
+  chain: vi.fn((_chainPromise: Promise<void> | undefined, fn: () => Promise<void> | undefined) => fn() ?? undefined),
+  invokeAsyncSafely: vi.fn((fn: () => Promise<void>) => {
+    fn().catch(() => undefined);
+  }),
   sleep: vi.fn().mockResolvedValue(undefined)
 }));
 
@@ -129,7 +133,10 @@ function setup(params: SetupParams = {}): SetupResult {
       getFolderByPath: mockGetFolderByPath
     },
     workspace: {
-      getLeavesOfType: mockGetLeavesOfType
+      getLeavesOfType: mockGetLeavesOfType,
+      onLayoutReady: vi.fn((cb: () => void) => {
+        cb();
+      })
     }
   });
 
