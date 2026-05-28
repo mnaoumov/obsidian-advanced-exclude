@@ -33,6 +33,13 @@ const MTIME_STORE_NAME = 'mtime';
 const FILES_STORE_NAME = 'files';
 const PROCESS_STORE_ACTIONS_DEBOUNCE_INTERVAL_IN_MILLISECONDS = 5000;
 
+export interface IgnorePatternsComponentConstructorParams {
+  readonly app: App;
+  onUpdateFileTree(this: void): Promise<void>;
+  readonly pluginSettingsComponent: PluginSettingsComponent;
+  readonly vaultLoadPatch: VaultLoadPatchComponent;
+}
+
 interface DbFileEntry {
   isIgnored: boolean;
   path: string;
@@ -42,13 +49,6 @@ interface DbMtimeEntry {
   gitIgnoreMtime: number;
   obsidianIgnoreMtime: number;
   userIgnoreFiltersStr: string;
-}
-
-interface IgnorePatternsComponentConstructorParams {
-  readonly app: App;
-  onUpdateFileTree(this: void): Promise<void>;
-  readonly pluginSettingsComponent: PluginSettingsComponent;
-  readonly vaultLoadPatch: VaultLoadPatchComponent;
 }
 
 export class IgnorePatternsComponent extends ComponentEx {

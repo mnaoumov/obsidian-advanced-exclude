@@ -12,6 +12,8 @@ import {
   vi
 } from 'vitest';
 
+import type { IgnorePatternsComponentConstructorParams } from './ignore-patterns-component.ts';
+
 import { Plugin } from './plugin.ts';
 
 vi.mock('obsidian-dev-utils/obsidian/data-handler', () => ({
@@ -58,8 +60,8 @@ let capturedOnUpdateFileTree: (() => Promise<void>) | undefined;
 vi.mock('./ignore-patterns-component.ts', () => {
   return {
     // eslint-disable-next-line prefer-arrow-callback, func-names -- mock must be constructable with `new`
-    IgnorePatternsComponent: vi.fn().mockImplementation(function (params: Record<string, unknown>) {
-      capturedOnUpdateFileTree = params['onUpdateFileTree'] as () => Promise<void>;
+    IgnorePatternsComponent: vi.fn().mockImplementation(function (params: IgnorePatternsComponentConstructorParams) {
+      capturedOnUpdateFileTree = params.onUpdateFileTree;
     })
   };
 });
