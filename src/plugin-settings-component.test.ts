@@ -1,3 +1,4 @@
+import type { PluginSettingsComponentBaseConstructorParams } from 'obsidian-dev-utils/obsidian/components/plugin-settings-component';
 import type { DataHandler } from 'obsidian-dev-utils/obsidian/data-handler';
 import type { PluginEventSource } from 'obsidian-dev-utils/obsidian/plugin/plugin-event-source';
 
@@ -16,8 +17,8 @@ vi.mock('obsidian-dev-utils/obsidian/components/plugin-settings-component', () =
   class MockPluginSettingsComponentBase {
     public settings: PluginSettings = new PluginSettings();
 
-    public constructor(params: Record<string, unknown>) {
-      expect(params['pluginSettingsClass']).toBe(PluginSettings);
+    public constructor(params: PluginSettingsComponentBaseConstructorParams<PluginSettings>) {
+      expect(params.pluginSettingsClass).toBe(PluginSettings);
     }
   }
   return { PluginSettingsComponentBase: MockPluginSettingsComponentBase };

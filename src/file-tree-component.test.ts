@@ -1,4 +1,8 @@
-import type { DataAdapterEx } from '@obsidian-typings/obsidian-public-latest';
+import type {
+  DataAdapterEx,
+  FileExplorerView,
+  FileTreeItem
+} from '@obsidian-typings/obsidian-public-latest';
 import type {
   App,
   TAbstractFile,
@@ -64,7 +68,7 @@ interface MockAdapter {
 }
 
 interface MockFileExplorerView {
-  fileItems: Record<string, unknown>;
+  fileItems: FileExplorerView['fileItems'];
   onCreate: ReturnType<typeof vi.fn>;
   onDelete: ReturnType<typeof vi.fn>;
 }
@@ -197,7 +201,7 @@ describe('FileTreeComponent', () => {
     });
 
     it('should return early when abstract file is not found', () => {
-      const fileExplorerView = createMockFileExplorerView({ fileItems: { 'some/path': {} } });
+      const fileExplorerView = createMockFileExplorerView({ fileItems: { 'some/path': strictProxy<FileTreeItem>({}) } });
       const { app, component } = setup({ fileExplorerView });
       vi.mocked(app.vault.getAbstractFileByPath).mockReturnValue(null);
       component.deleteFromFilesPane('some/path');
@@ -205,7 +209,7 @@ describe('FileTreeComponent', () => {
     });
 
     it('should call onDelete when all conditions are met', () => {
-      const fileExplorerView = createMockFileExplorerView({ fileItems: { 'some/path': {} } });
+      const fileExplorerView = createMockFileExplorerView({ fileItems: { 'some/path': strictProxy<FileTreeItem>({}) } });
       const mockFile = strictProxy<TAbstractFile>({ path: 'some/path' });
       const { app, component } = setup({ fileExplorerView });
       vi.mocked(app.vault.getAbstractFileByPath).mockReturnValue(mockFile);
@@ -308,7 +312,7 @@ describe('FileTreeComponent', () => {
     });
 
     it('should not add when item already exists in view', async () => {
-      const fileExplorerView = createMockFileExplorerView({ fileItems: { 'test.md': {} } });
+      const fileExplorerView = createMockFileExplorerView({ fileItems: { 'test.md': strictProxy<FileTreeItem>({}) } });
       const mockFolder = strictProxy<TFolder>({ children: [] });
       const { app, component, mockAdapter, pluginSettingsComponent } = setup({ fileExplorerView });
       vi.mocked(app.vault.getFolderByPath).mockReturnValue(mockFolder);
@@ -384,7 +388,7 @@ describe('FileTreeComponent', () => {
     });
 
     it('should delete from files pane when ignored but not Full mode', async () => {
-      const fileExplorerView = createMockFileExplorerView({ fileItems: { 'ignored.md': {} } });
+      const fileExplorerView = createMockFileExplorerView({ fileItems: { 'ignored.md': strictProxy<FileTreeItem>({}) } });
       const mockFile = strictProxy<TAbstractFile>({ path: 'ignored.md' });
       const mockFolder = strictProxy<TFolder>({ children: [] });
       const { app, component, ignorePatternsComponent, mockAdapter, pluginSettingsComponent } = setup({ fileExplorerView });

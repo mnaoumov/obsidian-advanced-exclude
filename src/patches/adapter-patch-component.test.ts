@@ -1,5 +1,8 @@
 import type { DataAdapterEx } from '@obsidian-typings/obsidian-public-latest';
-import type { DataAdapter } from 'obsidian';
+import type {
+  Component,
+  DataAdapter
+} from 'obsidian';
 
 import { getDataAdapterEx } from '@obsidian-typings/obsidian-public-latest/implementations';
 import { strictProxy } from 'obsidian-dev-utils/strict-proxy';
@@ -26,7 +29,7 @@ vi.mock('@obsidian-typings/obsidian-public-latest/implementations', () => ({
   getDataAdapterEx: vi.fn()
 }));
 
-function createMockComponent(): Record<string, unknown> {
+function createMockComponent(): Pick<Component, 'load'> {
   return { load: vi.fn() };
 }
 
