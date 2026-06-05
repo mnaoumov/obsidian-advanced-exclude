@@ -1,3 +1,6 @@
+// eslint-disable-next-line import/no-nodejs-modules, import-x/no-nodejs-modules -- Desktop code.
+import type { Stats } from 'node:fs';
+
 import { strictProxy } from 'obsidian-dev-utils/strict-proxy';
 import {
   App,
@@ -68,7 +71,7 @@ describe('FileSystemAdapterPatchComponent', () => {
 
   it('should register patches for reconcileFileCreation and reconcileFolderCreation on load', () => {
     const component = createComponent();
-    const registerMethodPatchSpy = vi.spyOn(component, 'registerMethodPatch' as never);
+    const registerMethodPatchSpy = vi.spyOn(component, 'registerMethodPatch');
 
     component.load();
 
@@ -108,7 +111,7 @@ describe('FileSystemAdapterPatchComponent', () => {
     component2.load();
 
     // Trigger the patched reconcileFileCreation
-    await adapter.reconcileFileCreation('test/file.md', 'test/file.md', {} as never);
+    await adapter.reconcileFileCreation('test/file.md', 'test/file.md', strictProxy<Stats>({}));
 
     expect(vi.mocked(ignorePatternsComponent.isIgnored)).toHaveBeenCalledWith('test/file.md', false);
   });

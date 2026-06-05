@@ -94,6 +94,7 @@ describe('PluginSettingsTab', () => {
 
   describe('display', () => {
     it('should create settings UI elements in containerEl', () => {
+      // eslint-disable-next-line @typescript-eslint/no-deprecated -- Not ready to migrate `display()`.
       tab.display();
 
       // Display creates 4 Setting elements as children

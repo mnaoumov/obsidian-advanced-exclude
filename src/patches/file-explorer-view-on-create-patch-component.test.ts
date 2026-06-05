@@ -1,8 +1,16 @@
 import type { FileExplorerView } from '@obsidian-typings/obsidian-public-latest';
 import type { TAbstractFile } from 'obsidian';
 
+import {
+  View,
+  Workspace
+} from 'obsidian';
+import { castTo } from 'obsidian-dev-utils/object-utils';
 import { strictProxy } from 'obsidian-dev-utils/strict-proxy';
-import { App } from 'obsidian-test-mocks/obsidian';
+import {
+  App,
+  WorkspaceLeaf
+} from 'obsidian-test-mocks/obsidian';
 import {
   beforeEach,
   describe,
@@ -20,13 +28,22 @@ import {
 } from '../plugin-settings.ts';
 import { FileExplorerViewOnCreatePatchComponent } from './file-explorer-view-on-create-patch-component.ts';
 
-class MockFileExplorerView {
+class MockFileExplorerView extends View {
+  public override getDisplayText(): string {
+    return 'MockFileExplorerView';
+  }
+
+  public override getViewType(): string {
+    return 'MockFileExplorerView';
+  }
+
   public onCreate(_file: TAbstractFile): void {
     // Original implementation
   }
 }
 
 vi.mock('obsidian-dev-utils/object-utils', () => ({
+  castTo: vi.fn((obj: unknown) => obj),
   getPrototypeOf: vi.fn((obj: object) => Object.getPrototypeOf(obj))
 }));
 
@@ -86,7 +103,7 @@ describe('FileExplorerViewOnCreatePatchComponent', () => {
       vi.mocked(app.asOriginalType__().workspace.getLeavesOfType).mockReturnValue([]);
 
       const component = createComponent();
-      const registerMethodPatchSpy = vi.spyOn(component, 'registerMethodPatch' as never);
+      const registerMethodPatchSpy = vi.spyOn(component, 'registerMethodPatch');
 
       component.onLayoutReady();
 
@@ -99,7 +116,7 @@ describe('FileExplorerViewOnCreatePatchComponent', () => {
         onCreate: mockOnCreate
       });
       vi.mocked(app.asOriginalType__().workspace.getLeavesOfType).mockReturnValue(
-        [{ view: mockView }] as never
+        castTo<ReturnType<Workspace['getLeavesOfType']>>([strictProxy<WorkspaceLeaf>({ view: mockView })])
       );
 
       const component = createComponent();
@@ -114,9 +131,9 @@ describe('FileExplorerViewOnCreatePatchComponent', () => {
 
   describe('onCreate', () => {
     function setupOnCreateTest(): MockFileExplorerView {
-      const mockView = new MockFileExplorerView();
+      const mockView = new MockFileExplorerView(WorkspaceLeaf.create2__(app).asOriginalType3__());
       vi.mocked(app.asOriginalType__().workspace.getLeavesOfType).mockReturnValue(
-        [{ view: mockView }] as never
+        castTo<ReturnType<Workspace['getLeavesOfType']>>([strictProxy<WorkspaceLeaf>({ view: mockView })])
       );
       return mockView;
     }
