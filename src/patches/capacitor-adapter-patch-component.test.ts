@@ -1,3 +1,5 @@
+import type { CapacitorFileEntry } from '@obsidian-typings/obsidian-public-latest';
+
 import { strictProxy } from 'obsidian-dev-utils/strict-proxy';
 import {
   App,
@@ -73,7 +75,7 @@ describe('CapacitorAdapterPatchComponent', () => {
       pluginSettingsComponent
     });
 
-    const registerMethodPatchSpy = vi.spyOn(component, 'registerMethodPatch' as never);
+    const registerMethodPatchSpy = vi.spyOn(component, 'registerMethodPatch');
     component.load();
 
     expect(registerMethodPatchSpy).toHaveBeenCalledTimes(2);
@@ -113,7 +115,7 @@ describe('CapacitorAdapterPatchComponent', () => {
     });
     component.load();
 
-    await adapter.reconcileFileCreation('test/file.md', 'test/file.md', {} as never);
+    await adapter.reconcileFileCreation('test/file.md', 'test/file.md', strictProxy<CapacitorFileEntry>({}));
 
     expect(vi.mocked(ignorePatternsComponent.isIgnored)).toHaveBeenCalledWith('test/file.md', false);
   });

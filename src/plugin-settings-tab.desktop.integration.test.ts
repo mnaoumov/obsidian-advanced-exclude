@@ -22,6 +22,7 @@ describe('PluginSettingsTab', () => {
 
         app.setting.open();
         app.setting.openTabById(plugin.manifest.id);
+        // eslint-disable-next-line @typescript-eslint/no-deprecated -- Not ready to migrate `display()`.
         settingTab.display();
 
         const buttons = Array.from(settingTab.containerEl.querySelectorAll('button'));
