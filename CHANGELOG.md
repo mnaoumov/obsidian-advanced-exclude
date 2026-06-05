@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## 2.1.2
+
+- chore: update libs
+- refactor(test): replace Record\<string, unknown\> mock types with real ones
+- chore: remove stale .czrc
+
 ## 2.1.1
 
 - refactor: update template
