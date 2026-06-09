@@ -145,7 +145,7 @@ function setup(params: SetupParams = {}): SetupResult {
   });
 
   const consoleDebugComponent = strictProxy<ConsoleDebugComponent>({
-    debug: vi.fn()
+    consoleDebug: vi.fn()
   });
 
   const ignorePatternsComponent = strictProxy<IgnorePatternsComponent>({
