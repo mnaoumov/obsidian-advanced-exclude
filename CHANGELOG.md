@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## 2.1.3
+
+- chore: update libs
+- chore: use $name shorthand for eslint override
+
 ## 2.1.2
 
 - chore: update libs
