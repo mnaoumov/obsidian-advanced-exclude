@@ -1217,7 +1217,10 @@ describe('IgnorePatternsComponent', () => {
       });
 
       const component = createComponent();
-      await expect(component.loadWithPromises()).rejects.toThrow('Test DB error');
+      // 70.0.0 collects onloadAsync errors and rejects with an AggregateError wrapping them.
+      await expect(component.loadWithPromises()).rejects.toMatchObject({
+        errors: [expect.objectContaining({ message: 'Test DB error' })]
+      });
     });
 
     it('should reject with Unknown error when request.error is null', async () => {
@@ -1242,7 +1245,10 @@ describe('IgnorePatternsComponent', () => {
       });
 
       const component = createComponent();
-      await expect(component.loadWithPromises()).rejects.toThrow('Unknown error');
+      // 70.0.0 collects onloadAsync errors and rejects with an AggregateError wrapping them.
+      await expect(component.loadWithPromises()).rejects.toMatchObject({
+        errors: [expect.objectContaining({ message: 'Unknown error' })]
+      });
     });
   });
 

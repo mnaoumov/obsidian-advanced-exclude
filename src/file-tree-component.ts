@@ -138,7 +138,7 @@ export class FileTreeComponent extends ComponentEx {
   }
 
   private async reloadChildPath(childPath: string, orphanPaths: Set<string>, includedPaths: Set<string>, isFolder: boolean): Promise<void> {
-    this.consoleDebugComponent.debug(`Reloading file: ${childPath}`);
+    this.consoleDebugComponent.consoleDebug(`Reloading file: ${childPath}`);
     if (this.isDotFile(childPath)) {
       return;
     }
@@ -172,7 +172,7 @@ export class FileTreeComponent extends ComponentEx {
       return;
     }
     /* v8 ignore stop */
-    this.consoleDebugComponent.debug(`Reloading folder: ${folderPath}`);
+    this.consoleDebugComponent.consoleDebug(`Reloading folder: ${folderPath}`);
     if (folderPath !== ROOT_PATH) {
       this.updateProgressEl.max++;
     }
@@ -218,7 +218,7 @@ export class FileTreeComponent extends ComponentEx {
       if (abortSignal.aborted) {
         return;
       }
-      this.consoleDebugComponent.debug(`Cleaning orphan file: ${orphanPath}`);
+      this.consoleDebugComponent.consoleDebug(`Cleaning orphan file: ${orphanPath}`);
       this.updateProgressEl.value++;
       try {
         await adapter.reconcileDeletion(orphanPath, orphanPath);
