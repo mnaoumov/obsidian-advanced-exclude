@@ -108,10 +108,10 @@ interface SetupIndexedDbParams {
 }
 
 interface SetupIndexedDbResult {
-  filesStore: MockIDBObjectStore;
-  mockDb: IDBDatabase;
-  mtimeStore: MockIDBObjectStore;
-  openFn: ReturnType<typeof vi.fn>;
+  readonly filesStore: MockIDBObjectStore;
+  readonly mockDb: IDBDatabase;
+  readonly mtimeStore: MockIDBObjectStore;
+  readonly openFn: ReturnType<typeof vi.fn>;
 }
 
 interface UpgradeEvent {

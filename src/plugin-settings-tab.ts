@@ -27,10 +27,8 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginSettings> {
     this.ignorePatternsComponent = params.ignorePatternsComponent;
   }
 
-  public override display(): void {
-    // eslint-disable-next-line @typescript-eslint/no-deprecated -- Not ready to migrate `display()`.
-    super.display();
-    this.containerEl.empty();
+  public override displayLegacy(): void {
+    super.displayLegacy();
 
     new Setting(this.containerEl)
       .setName('Ignore patterns')

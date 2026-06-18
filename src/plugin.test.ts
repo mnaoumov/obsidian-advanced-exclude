@@ -3,6 +3,7 @@ import type {
   PluginManifest
 } from 'obsidian';
 
+import { noopAsync } from 'obsidian-dev-utils/function';
 import { App } from 'obsidian-test-mocks/obsidian';
 import {
   beforeEach,
@@ -40,6 +41,14 @@ vi.mock('obsidian-dev-utils/obsidian/plugin/plugin', () => {
     public addChild<T>(child: T): T {
       this.children.push(child);
       return child;
+    }
+
+    public async onload(): Promise<void> {
+      await this.onloadImpl();
+    }
+
+    protected onloadImpl(): Promise<void> {
+      return noopAsync();
     }
   }
 
@@ -106,24 +115,17 @@ describe('Plugin', () => {
     };
   });
 
-  it('should create plugin and add all children via addChild', () => {
+  it('should create plugin and add all children via addChild', async () => {
     const appOriginal = app.asOriginalType__();
     const plugin = new Plugin(appOriginal, manifest);
-    vi.spyOn(plugin, 'addChild');
+    await plugin.onload();
 
-    // The constructor already ran, so we check that the plugin was constructed successfully
     expect(plugin).toBeInstanceOf(Plugin);
     expect(plugin.app).toBe(appOriginal);
     expect(plugin.manifest).toBe(manifest);
-
-    // Re-create to capture addChild calls
-    const plugin2 = new Plugin(appOriginal, manifest);
-    // AddChild should have been called during construction
-    // We verify the plugin exists and has correct properties
-    expect(plugin2.app).toBe(appOriginal);
   });
 
-  it('should call addChild the expected number of times', () => {
+  it('should call addChild the expected number of times', async () => {
     const EXPECTED_ADD_CHILD_CALLS = 9;
     let addChildCallCount = 0;
     const appOriginal = app.asOriginalType__();
@@ -134,18 +136,20 @@ describe('Plugin', () => {
       return child;
     });
 
-    new Plugin(appOriginal, manifest);
+    const plugin = new Plugin(appOriginal, manifest);
+    await plugin.onload();
 
     expect(addChildCallCount).toBe(EXPECTED_ADD_CHILD_CALLS);
 
     vi.mocked(Plugin.prototype.addChild).mockRestore();
   });
 
-  it('should wire onUpdateFileTree callback to fileTreeComponent.update', () => {
+  it('should wire onUpdateFileTree callback to fileTreeComponent.update', async () => {
     resetCapturedOnUpdateFileTree();
     mockUpdate.mockClear();
 
-    new Plugin(app.asOriginalType__(), manifest);
+    const plugin = new Plugin(app.asOriginalType__(), manifest);
+    await plugin.onload();
 
     expect(capturedOnUpdateFileTree).toBeDefined();
     // Invoke the callback — it should call fileTreeComponent.update()

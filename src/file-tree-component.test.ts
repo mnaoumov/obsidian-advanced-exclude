@@ -80,13 +80,13 @@ interface SetupParams {
 }
 
 interface SetupResult {
-  app: App;
-  component: FileTreeComponent;
-  consoleDebugComponent: ConsoleDebugComponent;
-  ignorePatternsComponent: IgnorePatternsComponent;
-  mockAdapter: MockAdapter;
-  pluginSettingsComponent: PluginSettingsComponent;
-  vaultLoadPatch: VaultLoadPatchComponent;
+  readonly app: App;
+  readonly component: FileTreeComponent;
+  readonly consoleDebugComponent: ConsoleDebugComponent;
+  readonly ignorePatternsComponent: IgnorePatternsComponent;
+  readonly mockAdapter: MockAdapter;
+  readonly pluginSettingsComponent: PluginSettingsComponent;
+  readonly vaultLoadPatch: VaultLoadPatchComponent;
 }
 
 function createMockAdapter(isFileSystemAdapter = false): MockAdapter {
