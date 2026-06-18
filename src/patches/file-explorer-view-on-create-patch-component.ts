@@ -35,7 +35,6 @@ export class FileExplorerViewOnCreatePatchComponent extends MonkeyAroundComponen
   }
 
   public onLayoutReady(): void {
-    const that = this;
     const view = this.getFileExplorerView();
     if (view) {
       this.registerMethodPatch({
@@ -46,7 +45,7 @@ export class FileExplorerViewOnCreatePatchComponent extends MonkeyAroundComponen
           originalMethod,
           originalThis
         }) => {
-          that.onCreate(originalMethod, originalThis, file);
+          this.onCreate(originalMethod, originalThis, file);
         }
       });
     }

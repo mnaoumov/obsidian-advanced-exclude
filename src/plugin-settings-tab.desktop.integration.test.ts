@@ -6,6 +6,8 @@ import {
   it
 } from 'vitest';
 
+import type { PluginSettingsTab } from './plugin-settings-tab.ts';
+
 describe('PluginSettingsTab', () => {
   it('should open the file settings tab when "Go to settings" button is clicked', async () => {
     const result = await evalInObsidian({
@@ -22,8 +24,7 @@ describe('PluginSettingsTab', () => {
 
         app.setting.open();
         app.setting.openTabById(plugin.manifest.id);
-        // eslint-disable-next-line @typescript-eslint/no-deprecated -- Not ready to migrate `display()`.
-        settingTab.display();
+        (settingTab as PluginSettingsTab).displayLegacy();
 
         const buttons = Array.from(settingTab.containerEl.querySelectorAll('button'));
         const goToSettingsButton = buttons.find((btn) => btn.textContent === 'Go to settings');

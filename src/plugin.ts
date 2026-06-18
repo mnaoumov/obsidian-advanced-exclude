@@ -1,8 +1,3 @@
-import type {
-  App,
-  PluginManifest
-} from 'obsidian';
-
 import { AppActiveFileProvider } from 'obsidian-dev-utils/obsidian/active-file-provider';
 import { CommandHandlerComponent } from 'obsidian-dev-utils/obsidian/command-handlers/command-handler-component';
 import { OpenSettingsCommandHandler } from 'obsidian-dev-utils/obsidian/command-handlers/open-settings-command-handler';
@@ -22,20 +17,18 @@ import { PluginSettingsComponent } from './plugin-settings-component.ts';
 import { PluginSettingsTab } from './plugin-settings-tab.ts';
 
 export class Plugin extends PluginBase {
-  public constructor(app: App, manifest: PluginManifest) {
-    super(app, manifest);
-
+  protected override onloadImpl(): void {
     const pluginSettingsComponent = this.addChild(
       new PluginSettingsComponent({
         dataHandler: new PluginDataHandler(this),
         pluginEventSource: new PluginEventSourceImpl(this)
       })
     );
-    const vaultLoadPatch = this.addChild(new VaultLoadPatchComponent(app));
+    const vaultLoadPatch = this.addChild(new VaultLoadPatchComponent(this.app));
 
     const ignorePatternsComponent: IgnorePatternsComponent = this.addChild(
       new IgnorePatternsComponent({
-        app,
+        app: this.app,
         onUpdateFileTree: (): Promise<void> => fileTreeComponent.update(),
         pluginSettingsComponent,
         vaultLoadPatch
@@ -44,7 +37,7 @@ export class Plugin extends PluginBase {
 
     const fileTreeComponent = this.addChild(
       new FileTreeComponent({
-        app,
+        app: this.app,
         consoleDebugComponent: this.consoleDebugComponent,
         ignorePatternsComponent,
         pluginSettingsComponent,
@@ -67,7 +60,7 @@ export class Plugin extends PluginBase {
 
     this.addChild(
       new FileExplorerViewOnCreatePatchComponent({
-        app,
+        app: this.app,
         ignorePatternsComponent,
         pluginSettingsComponent
       })
@@ -75,20 +68,20 @@ export class Plugin extends PluginBase {
 
     this.addChild(
       new AdapterPatchComponent({
-        app,
+        app: this.app,
         fileTreeComponent,
         ignorePatternsComponent,
         pluginSettingsComponent
       })
     );
 
-    const menuEventRegistrar = this.addChild(new MenuEventRegistrarComponent(app));
+    const menuEventRegistrar = this.addChild(new MenuEventRegistrarComponent(this.app));
     this.addChild(
       new CommandHandlerComponent({
-        activeFileProvider: new AppActiveFileProvider(app),
+        activeFileProvider: new AppActiveFileProvider(this.app),
         commandHandlers: [
           new OpenSettingsCommandHandler({
-            app,
+            app: this.app,
             settingTab: pluginSettingsTab
           })
         ],

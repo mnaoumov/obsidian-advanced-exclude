@@ -45,7 +45,7 @@ vi.mock('obsidian-dev-utils/obsidian/plugin/plugin-settings-tab', () => {
       // No-op for testing
     }
 
-    public display(): void {
+    public displayLegacy(): void {
       // No-op for testing
     }
 
@@ -94,8 +94,7 @@ describe('PluginSettingsTab', () => {
 
   describe('display', () => {
     it('should create settings UI elements in containerEl', () => {
-      // eslint-disable-next-line @typescript-eslint/no-deprecated -- Not ready to migrate `display()`.
-      tab.display();
+      tab.displayLegacy();
 
       // Display creates 4 Setting elements as children
       expect(tab.containerEl.children.length).toBeGreaterThan(0);
