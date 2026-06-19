@@ -10,6 +10,7 @@ import { PluginEventSourceImpl } from 'obsidian-dev-utils/obsidian/plugin/plugin
 
 import { FileTreeComponent } from './file-tree-component.ts';
 import { IgnorePatternsComponent } from './ignore-patterns-component.ts';
+import { IndexProjectionComponent } from './index-projection-component.ts';
 import { AdapterPatchComponent } from './patches/adapter-patch-component.ts';
 import { FileExplorerViewOnCreatePatchComponent } from './patches/file-explorer-view-on-create-patch-component.ts';
 import { VaultLoadPatchComponent } from './patches/vault-load-patch-component.ts';
@@ -30,7 +31,7 @@ export class Plugin extends PluginBase {
     const ignorePatternsComponent: IgnorePatternsComponent = this.addChild(
       new IgnorePatternsComponent({
         app: this.app,
-        onUpdateFileTree: (): Promise<void> => fileTreeComponent.update(),
+        onUpdateFileTree: (): Promise<void> => indexProjectionComponent.update(),
         pluginSettingsComponent,
         vaultLoadPatch
       })
@@ -38,8 +39,15 @@ export class Plugin extends PluginBase {
 
     const fileTreeComponent = this.addChild(
       new FileTreeComponent({
+        app: this.app
+      })
+    );
+
+    const indexProjectionComponent = this.addChild(
+      new IndexProjectionComponent({
+        addToFilesPane: fileTreeComponent.addToFilesPane.bind(fileTreeComponent),
         app: this.app,
-        consoleDebugComponent: this.consoleDebugComponent,
+        deleteFromFilesPane: fileTreeComponent.deleteFromFilesPane.bind(fileTreeComponent),
         ignorePatternsComponent,
         pluginSettingsComponent,
         vaultLoadPatch

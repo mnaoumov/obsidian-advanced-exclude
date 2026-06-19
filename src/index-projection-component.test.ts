@@ -7,6 +7,7 @@ import type {
 import { getDataAdapterEx } from '@obsidian-typings/obsidian-public-latest/implementations';
 import { isFolder } from 'obsidian-dev-utils/obsidian/file-system';
 import { strictProxy } from 'obsidian-dev-utils/strict-proxy';
+import { ensureNonNullable } from 'obsidian-dev-utils/type-guards';
 import {
   beforeEach,
   describe,
@@ -16,6 +17,7 @@ import {
 } from 'vitest';
 
 import type { IgnorePatternsComponent } from './ignore-patterns-component.ts';
+import type { VaultLoadPatchComponent } from './patches/vault-load-patch-component.ts';
 import type { PluginSettingsComponent } from './plugin-settings-component.ts';
 
 import { IndexProjectionComponent } from './index-projection-component.ts';
@@ -46,6 +48,7 @@ interface SetupParams {
   readonly entries: readonly MockEntry[];
   readonly excludeMode?: ExcludeMode;
   isIgnored(normalizedPath: string): boolean;
+  readonly vaultLoadCalled?: boolean;
 }
 
 interface SetupResult {
@@ -56,7 +59,7 @@ interface SetupResult {
 }
 
 function setup(params: SetupParams): SetupResult {
-  const { entries, excludeMode = ExcludeMode.Full, isIgnored } = params;
+  const { entries, excludeMode = ExcludeMode.Full, isIgnored, vaultLoadCalled = false } = params;
 
   const mockAdapter: MockAdapter = {
     reconcileDeletion: vi.fn().mockResolvedValue(undefined),
@@ -73,6 +76,9 @@ function setup(params: SetupParams): SetupResult {
   const app = strictProxy<App>({
     vault: {
       getAllLoadedFiles: vi.fn().mockReturnValue(loadedFiles)
+    },
+    workspace: {
+      onLayoutReady: vi.fn()
     }
   });
 
@@ -84,6 +90,8 @@ function setup(params: SetupParams): SetupResult {
     settings: { excludeMode }
   });
 
+  const vaultLoadPatch = strictProxy<VaultLoadPatchComponent>({ vaultLoadCalled });
+
   const addToFilesPane = vi.fn();
   const deleteFromFilesPane = vi.fn();
 
@@ -92,7 +100,8 @@ function setup(params: SetupParams): SetupResult {
     app,
     deleteFromFilesPane,
     ignorePatternsComponent,
-    pluginSettingsComponent
+    pluginSettingsComponent,
+    vaultLoadPatch
   });
 
   return { addToFilesPane, component, deleteFromFilesPane, mockAdapter };
@@ -232,6 +241,126 @@ describe('IndexProjectionComponent', () => {
 
       expect(deleteFromFilesPane).toHaveBeenCalledExactlyOnceWith('gone.md');
       expect(addToFilesPane).toHaveBeenCalledExactlyOnceWith('back.md');
+    });
+  });
+
+  describe('update', () => {
+    it('rebuilds the model and projects the hidden set', async () => {
+      const { component, mockAdapter } = setup({
+        entries: [{ isFolderFlag: false, path: 'drop.md' }],
+        isIgnored: (path) => path === 'drop.md'
+      });
+
+      await component.update();
+
+      expect(mockAdapter.reconcileDeletion).toHaveBeenCalledExactlyOnceWith('drop.md', 'drop.md');
+    });
+
+    it('aborts a previous in-flight update when called again', async () => {
+      const { component, mockAdapter } = setup({
+        entries: [{ isFolderFlag: false, path: 'drop.md' }],
+        isIgnored: (path) => path === 'drop.md'
+      });
+
+      let resolveDeletion: (() => void) | undefined;
+      mockAdapter.reconcileDeletion.mockReturnValueOnce(
+        new Promise<void>((resolve) => {
+          resolveDeletion = resolve;
+        })
+      );
+
+      const firstUpdate = component.update();
+      const secondUpdate = component.update();
+      ensureNonNullable(resolveDeletion)();
+      await Promise.all([firstUpdate, secondUpdate]);
+
+      expect(mockAdapter.reconcileDeletion).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('applyFull abort', () => {
+    it('does nothing when the abort signal is already aborted', async () => {
+      const { component, mockAdapter } = setup({
+        entries: [{ isFolderFlag: false, path: 'drop.md' }],
+        isIgnored: (path) => path === 'drop.md'
+      });
+
+      const controller = new AbortController();
+      controller.abort();
+      await component.applyFull(controller.signal);
+
+      expect(mockAdapter.reconcileDeletion).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('lifecycle', () => {
+    it('projects on load', async () => {
+      const { component, mockAdapter } = setup({
+        entries: [{ isFolderFlag: false, path: 'drop.md' }],
+        isIgnored: (path) => path === 'drop.md'
+      });
+
+      await component.loadWithPromises();
+
+      expect(mockAdapter.reconcileDeletion).toHaveBeenCalledWith('drop.md', 'drop.md');
+    });
+
+    it('projects on layout ready when the vault load was not intercepted', async () => {
+      const { component, mockAdapter } = setup({
+        entries: [{ isFolderFlag: false, path: 'drop.md' }],
+        isIgnored: (path) => path === 'drop.md',
+        vaultLoadCalled: false
+      });
+
+      await component.onLayoutReady();
+
+      expect(mockAdapter.reconcileDeletion).toHaveBeenCalledWith('drop.md', 'drop.md');
+    });
+
+    it('skips projecting on layout ready when the vault load was intercepted', async () => {
+      const { component, mockAdapter } = setup({
+        entries: [{ isFolderFlag: false, path: 'drop.md' }],
+        isIgnored: (path) => path === 'drop.md',
+        vaultLoadCalled: true
+      });
+
+      await component.onLayoutReady();
+
+      expect(mockAdapter.reconcileDeletion).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('onunload', () => {
+    it('is a no-op when no update is in flight', () => {
+      const { component } = setup({
+        entries: [{ isFolderFlag: false, path: 'a.md' }],
+        isIgnored: () => false
+      });
+
+      expect(() => {
+        component.onunload();
+      }).not.toThrow();
+    });
+
+    it('aborts an in-flight update', async () => {
+      const { component, mockAdapter } = setup({
+        entries: [{ isFolderFlag: false, path: 'drop.md' }],
+        isIgnored: (path) => path === 'drop.md'
+      });
+
+      let resolveDeletion: (() => void) | undefined;
+      mockAdapter.reconcileDeletion.mockReturnValueOnce(
+        new Promise<void>((resolve) => {
+          resolveDeletion = resolve;
+        })
+      );
+
+      const updatePromise = component.update();
+      component.onunload();
+      ensureNonNullable(resolveDeletion)();
+      await updatePromise;
+
+      expect(mockAdapter.reconcileDeletion).toHaveBeenCalledExactlyOnceWith('drop.md', 'drop.md');
     });
   });
 });
