@@ -33,7 +33,7 @@ export class AdapterPatchBaseComponent extends MonkeyAroundComponent {
     this.fileTreeComponent = params.fileTreeComponent;
   }
 
-  protected generateReconcileWrapper(next: GenericReconcileFn, isFolder: boolean): GenericReconcileFn {
+  protected generateReconcileWrapper(originalFn: GenericReconcileFn, isFolder: boolean): GenericReconcileFn {
     return async (normalizedPath: string, ...args: unknown[]) => {
       let shouldRemoveFromFilesPane = false;
       if (this.ignorePatternsComponent.isIgnored(normalizedPath, isFolder)) {
@@ -42,7 +42,7 @@ export class AdapterPatchBaseComponent extends MonkeyAroundComponent {
         }
         shouldRemoveFromFilesPane = true;
       }
-      await next.call(this.app.vault.adapter, normalizedPath, ...args);
+      await originalFn.call(this.app.vault.adapter, normalizedPath, ...args);
       if (shouldRemoveFromFilesPane) {
         this.fileTreeComponent.deleteFromFilesPane(normalizedPath);
       }
