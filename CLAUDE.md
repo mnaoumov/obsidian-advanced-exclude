@@ -60,7 +60,12 @@ Built on `obsidian-dev-utils`. Patches Obsidian's `FileSystemAdapter` / `Capacit
 
 ## Current Task
 
-None.
+Rewrite the file-tree mechanism to stop re-reconciling the whole vault on every
+update. Plan: `docs/in-memory-tree-rewrite-plan.md` — maintain an in-memory
+unfiltered shadow tree (snapshot of Obsidian's native traversal) and project a
+filtered view onto Obsidian's index incrementally, hiding only the ignored set.
+Motivated by a measured ~80–160 s full reconcile walk on a 109 GB / ~90k-path
+vault. Status: plan written; implementation not started.
 
 ## Known Issues
 
