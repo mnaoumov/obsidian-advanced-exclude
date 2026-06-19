@@ -60,12 +60,16 @@ Built on `obsidian-dev-utils`. Patches Obsidian's `FileSystemAdapter` / `Capacit
 
 ## Current Task
 
-Rewrite the file-tree mechanism to stop re-reconciling the whole vault on every
-update. Plan: `docs/in-memory-tree-rewrite-plan.md` — maintain an in-memory
-unfiltered shadow tree (snapshot of Obsidian's native traversal) and project a
-filtered view onto Obsidian's index incrementally, hiding only the ignored set.
-Motivated by a measured ~80–160 s full reconcile walk on a 109 GB / ~90k-path
-vault. Status: plan written; implementation not started.
+In-memory shadow-tree rewrite (plan: `docs/in-memory-tree-rewrite-plan.md`).
+Implemented on branch `feat/in-memory-tree`: `VaultModel` (shadow tree +
+bottom-up visibility) and `IndexProjectionComponent` replace the whole-vault
+reconcile walk — initial load snapshots Obsidian's loaded tree and removes only
+the ignored hide-roots; config changes apply a persistent-model delta; live
+adapter events sync the model; unload restores inline for small hidden sets and
+falls back to the reload notice for large ones. Verified live on the 109 GB /
+~90k-path vault: ~4.4 s vs ~80–160 s, zero reconcile walk. 186 unit tests, 100%
+coverage. Pending: run the desktop/android integration suites, then review/merge
+to `master`.
 
 ## Known Issues
 
