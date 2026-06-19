@@ -95,6 +95,14 @@ export class IndexProjectionComponent extends ComponentEx {
     }
   }
 
+  /**
+   * Number of paths the projection currently hides (used to decide whether an
+   * unload restore is cheap enough to do inline).
+   */
+  public getHiddenCount(): number {
+    return this.vaultModel.getPathsByVisibility(false).length;
+  }
+
   public async onLayoutReady(): Promise<void> {
     if (!this.vaultLoadPatch.vaultLoadCalled) {
       await this.update();

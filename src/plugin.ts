@@ -87,7 +87,7 @@ export class Plugin extends PluginBase {
 
     this.addChild(
       new RestoreNoticeComponent({
-        ignorePatternsComponent,
+        indexProjectionComponent,
         pluginNoticeComponent: this.pluginNoticeComponent
       })
     );
