@@ -59,9 +59,9 @@ export class FileExplorerViewOnCreatePatchComponent extends MonkeyAroundComponen
     return this.app.workspace.getLeavesOfType('file-explorer')[0]?.view as FileExplorerView | undefined;
   }
 
-  private onCreate(next: OnCreateFn, view: FileExplorerView, file: TAbstractFile): void {
+  private onCreate(originalFn: OnCreateFn, view: FileExplorerView, file: TAbstractFile): void {
     if (this.pluginSettingsComponent.settings.excludeMode !== ExcludeMode.FilesPane) {
-      next.call(view, file);
+      originalFn.call(view, file);
       return;
     }
 
@@ -69,6 +69,6 @@ export class FileExplorerViewOnCreatePatchComponent extends MonkeyAroundComponen
     if (isIgnored) {
       return;
     }
-    next.call(view, file);
+    originalFn.call(view, file);
   }
 }
