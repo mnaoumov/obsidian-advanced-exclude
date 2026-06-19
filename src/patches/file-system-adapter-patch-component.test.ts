@@ -16,6 +16,7 @@ import {
 
 import type { FileTreeComponent } from '../file-tree-component.ts';
 import type { IgnorePatternsComponent } from '../ignore-patterns-component.ts';
+import type { IndexProjectionComponent } from '../index-projection-component.ts';
 import type { PluginSettingsComponent } from '../plugin-settings-component.ts';
 
 import {
@@ -28,6 +29,7 @@ describe('FileSystemAdapterPatchComponent', () => {
   let app: App;
   let settings: PluginSettings;
   let ignorePatternsComponent: IgnorePatternsComponent;
+  let indexProjectionComponent: IndexProjectionComponent;
   let pluginSettingsComponent: PluginSettingsComponent;
   let fileTreeComponent: FileTreeComponent;
 
@@ -37,6 +39,9 @@ describe('FileSystemAdapterPatchComponent', () => {
 
     ignorePatternsComponent = strictProxy<IgnorePatternsComponent>({
       isIgnored: vi.fn().mockReturnValue(false)
+    });
+    indexProjectionComponent = strictProxy<IndexProjectionComponent>({
+      recordCreate: vi.fn()
     });
     pluginSettingsComponent = strictProxy<PluginSettingsComponent>({
       settings
@@ -65,6 +70,7 @@ describe('FileSystemAdapterPatchComponent', () => {
       app: app.asOriginalType__(),
       fileTreeComponent,
       ignorePatternsComponent,
+      indexProjectionComponent,
       pluginSettingsComponent
     });
   }
@@ -106,6 +112,7 @@ describe('FileSystemAdapterPatchComponent', () => {
       app: app.asOriginalType__(),
       fileTreeComponent,
       ignorePatternsComponent,
+      indexProjectionComponent,
       pluginSettingsComponent
     });
     component2.load();
@@ -135,6 +142,7 @@ describe('FileSystemAdapterPatchComponent', () => {
       app: app.asOriginalType__(),
       fileTreeComponent,
       ignorePatternsComponent,
+      indexProjectionComponent,
       pluginSettingsComponent
     });
     component.load();

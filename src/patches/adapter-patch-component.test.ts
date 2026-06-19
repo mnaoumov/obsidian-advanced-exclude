@@ -21,6 +21,7 @@ import {
 
 import type { FileTreeComponent } from '../file-tree-component.ts';
 import type { IgnorePatternsComponent } from '../ignore-patterns-component.ts';
+import type { IndexProjectionComponent } from '../index-projection-component.ts';
 import type { PluginSettingsComponent } from '../plugin-settings-component.ts';
 
 import { AdapterPatchComponent } from './adapter-patch-component.ts';
@@ -57,11 +58,16 @@ function createMockDataAdapterEx(): DataAdapterEx {
 
 describe('AdapterPatchComponent', () => {
   let ignorePatternsComponent: IgnorePatternsComponent;
+  let indexProjectionComponent: IndexProjectionComponent;
   let pluginSettingsComponent: PluginSettingsComponent;
   let fileTreeComponent: FileTreeComponent;
 
   beforeEach(() => {
     ignorePatternsComponent = strictProxy<IgnorePatternsComponent>({});
+    indexProjectionComponent = strictProxy<IndexProjectionComponent>({
+      recordCreate: vi.fn(),
+      recordDelete: vi.fn()
+    });
     pluginSettingsComponent = strictProxy<PluginSettingsComponent>({});
     fileTreeComponent = strictProxy<FileTreeComponent>({});
     mockGetDataAdapterEx.mockReturnValue(strictProxy(createMockDataAdapterEx()));
@@ -75,6 +81,7 @@ describe('AdapterPatchComponent', () => {
       app: app.asOriginalType__(),
       fileTreeComponent,
       ignorePatternsComponent,
+      indexProjectionComponent,
       pluginSettingsComponent
     });
 
@@ -92,6 +99,7 @@ describe('AdapterPatchComponent', () => {
       app: app.asOriginalType__(),
       fileTreeComponent,
       ignorePatternsComponent,
+      indexProjectionComponent,
       pluginSettingsComponent
     });
 
@@ -109,6 +117,7 @@ describe('AdapterPatchComponent', () => {
       app: app.asOriginalType__(),
       fileTreeComponent,
       ignorePatternsComponent,
+      indexProjectionComponent,
       pluginSettingsComponent
     });
 
@@ -137,6 +146,7 @@ describe('AdapterPatchComponent', () => {
         app: appOriginal,
         fileTreeComponent,
         ignorePatternsComponent,
+        indexProjectionComponent,
         pluginSettingsComponent
       });
 
@@ -145,6 +155,7 @@ describe('AdapterPatchComponent', () => {
       // Call through the patched object to cover the patchHandler lambda
       await mockDataAdapterEx.reconcileDeletion('test/path', 'test/path');
 
+      expect(vi.mocked(indexProjectionComponent.recordDelete)).toHaveBeenCalledWith('test/path');
       expect(mockHandleDeletedOrDotFile).toHaveBeenCalledWith('test/path');
     });
 
@@ -166,6 +177,7 @@ describe('AdapterPatchComponent', () => {
         app: appOriginal,
         fileTreeComponent,
         ignorePatternsComponent,
+        indexProjectionComponent,
         pluginSettingsComponent
       });
 
@@ -174,6 +186,7 @@ describe('AdapterPatchComponent', () => {
       // Call through the patched object to cover the patchHandler lambda
       await mockDataAdapterEx.reconcileDeletion('test/path', 'test/path');
 
+      expect(vi.mocked(indexProjectionComponent.recordDelete)).not.toHaveBeenCalled();
       expect(mockHandleDeletedOrDotFile).not.toHaveBeenCalled();
     });
   });

@@ -9,6 +9,7 @@ import { MonkeyAroundComponent } from 'obsidian-dev-utils/obsidian/components/mo
 
 import type { FileTreeComponent } from '../file-tree-component.ts';
 import type { IgnorePatternsComponent } from '../ignore-patterns-component.ts';
+import type { IndexProjectionComponent } from '../index-projection-component.ts';
 import type { PluginSettingsComponent } from '../plugin-settings-component.ts';
 
 import { CapacitorAdapterPatchComponent } from './capacitor-adapter-patch-component.ts';
@@ -18,6 +19,7 @@ export interface AdapterPatchComponentConstructorParams {
   readonly app: App;
   readonly fileTreeComponent: FileTreeComponent;
   readonly ignorePatternsComponent: IgnorePatternsComponent;
+  readonly indexProjectionComponent: IndexProjectionComponent;
   readonly pluginSettingsComponent: PluginSettingsComponent;
 }
 
@@ -25,12 +27,14 @@ export class AdapterPatchComponent extends MonkeyAroundComponent {
   private readonly app: App;
   private readonly fileTreeComponent: FileTreeComponent;
   private readonly ignorePatternsComponent: IgnorePatternsComponent;
+  private readonly indexProjectionComponent: IndexProjectionComponent;
   private readonly pluginSettingsComponent: PluginSettingsComponent;
 
   public constructor(params: AdapterPatchComponentConstructorParams) {
     super();
     this.app = params.app;
     this.ignorePatternsComponent = params.ignorePatternsComponent;
+    this.indexProjectionComponent = params.indexProjectionComponent;
     this.pluginSettingsComponent = params.pluginSettingsComponent;
     this.fileTreeComponent = params.fileTreeComponent;
   }
@@ -54,6 +58,7 @@ export class AdapterPatchComponent extends MonkeyAroundComponent {
           app: this.app,
           fileTreeComponent: this.fileTreeComponent,
           ignorePatternsComponent: this.ignorePatternsComponent,
+          indexProjectionComponent: this.indexProjectionComponent,
           pluginSettingsComponent: this.pluginSettingsComponent
         })
       );
@@ -64,6 +69,7 @@ export class AdapterPatchComponent extends MonkeyAroundComponent {
           app: this.app,
           fileTreeComponent: this.fileTreeComponent,
           ignorePatternsComponent: this.ignorePatternsComponent,
+          indexProjectionComponent: this.indexProjectionComponent,
           pluginSettingsComponent: this.pluginSettingsComponent
         })
       );
@@ -76,6 +82,7 @@ export class AdapterPatchComponent extends MonkeyAroundComponent {
       return;
     }
 
+    this.indexProjectionComponent.recordDelete(normalizedPath);
     await this.ignorePatternsComponent.handleDeletedOrDotFile(normalizedPath);
   }
 }
