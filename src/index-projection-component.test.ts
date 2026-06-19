@@ -401,6 +401,22 @@ describe('IndexProjectionComponent', () => {
     });
   });
 
+  describe('getHiddenCount', () => {
+    it('returns the number of hidden paths', async () => {
+      const { component } = setup({
+        entries: [
+          { isFolderFlag: false, path: 'drop.md' },
+          { isFolderFlag: false, path: 'keep.md' }
+        ],
+        isIgnored: (path) => path === 'drop.md'
+      });
+
+      await component.applyFull();
+
+      expect(component.getHiddenCount()).toBe(1);
+    });
+  });
+
   describe('recordCreate / recordDelete', () => {
     it('records a created path into the model and removes it on delete', () => {
       const { component } = setup({

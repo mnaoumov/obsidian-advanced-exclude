@@ -12,18 +12,34 @@ import {
   vi
 } from 'vitest';
 
-import type { IgnorePatternsComponent } from './ignore-patterns-component.ts';
+import type { IndexProjectionComponent } from './index-projection-component.ts';
 
 import { RestoreNoticeComponent } from './restore-notice-component.ts';
+
+vi.mock('obsidian-dev-utils/async', () => ({
+  invokeAsyncSafelyAfterDelay: vi.fn((fn: () => Promise<void>) => {
+    fn().catch(() => undefined);
+  })
+}));
 
 const showNoticeMock = vi.fn((_message: DocumentFragment | string, _options?: PluginNoticeComponentShowNoticeOptions): void => {
   // Captured via showNoticeMock.mock.calls.
 });
 
-function createComponent(hasHiddenPaths: boolean): RestoreNoticeComponent {
-  const ignorePatternsComponent = strictProxy<IgnorePatternsComponent>({ hasHiddenPaths });
+interface CreateComponentResult {
+  readonly component: RestoreNoticeComponent;
+  readonly restoreAll: ReturnType<typeof vi.fn>;
+}
+
+function createComponent(hiddenCount: number): CreateComponentResult {
+  const restoreAll = vi.fn().mockResolvedValue(undefined);
+  const indexProjectionComponent = strictProxy<IndexProjectionComponent>({
+    getHiddenCount: vi.fn().mockReturnValue(hiddenCount),
+    restoreAll
+  });
   const pluginNoticeComponent = strictProxy<PluginNoticeComponent>({ showNotice: showNoticeMock });
-  return new RestoreNoticeComponent({ ignorePatternsComponent, pluginNoticeComponent });
+  const component = new RestoreNoticeComponent({ indexProjectionComponent, pluginNoticeComponent });
+  return { component, restoreAll };
 }
 
 function getFragment(message: DocumentFragment | string | undefined): DocumentFragment {
@@ -38,11 +54,21 @@ describe('RestoreNoticeComponent', () => {
     showNoticeMock.mockClear();
   });
 
-  it('should show a permanent restore notice on unload when paths were hidden', () => {
-    const component = createComponent(true);
+  it('should restore inline on unload when the hidden set is small', () => {
+    const { component, restoreAll } = createComponent(5);
     component.load();
     component.unload();
 
+    expect(restoreAll).toHaveBeenCalledTimes(1);
+    expect(showNoticeMock).not.toHaveBeenCalled();
+  });
+
+  it('should show a permanent reload notice on unload when the hidden set is large', () => {
+    const { component, restoreAll } = createComponent(2000);
+    component.load();
+    component.unload();
+
+    expect(restoreAll).not.toHaveBeenCalled();
     expect(showNoticeMock).toHaveBeenCalledTimes(1);
     expect(showNoticeMock).toHaveBeenCalledWith(expect.any(DocumentFragment), { isPermanent: true });
 
@@ -52,11 +78,12 @@ describe('RestoreNoticeComponent', () => {
     expect(fragment.querySelector('button')?.textContent).toBe('Reload');
   });
 
-  it('should not show a notice on unload when nothing was hidden', () => {
-    const component = createComponent(false);
+  it('should do nothing on unload when nothing was hidden', () => {
+    const { component, restoreAll } = createComponent(0);
     component.load();
     component.unload();
 
+    expect(restoreAll).not.toHaveBeenCalled();
     expect(showNoticeMock).not.toHaveBeenCalled();
   });
 
@@ -70,7 +97,7 @@ describe('RestoreNoticeComponent', () => {
     });
 
     try {
-      const component = createComponent(true);
+      const { component } = createComponent(2000);
       component.load();
       component.unload();
 
