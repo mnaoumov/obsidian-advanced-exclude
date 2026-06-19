@@ -400,4 +400,19 @@ describe('IndexProjectionComponent', () => {
       expect(mockAdapter.reconcileDeletion).toHaveBeenCalledExactlyOnceWith('drop.md', 'drop.md');
     });
   });
+
+  describe('recordCreate / recordDelete', () => {
+    it('records a created path into the model and removes it on delete', () => {
+      const { component } = setup({
+        entries: [{ isFolderFlag: false, path: 'a.md' }],
+        isIgnored: () => false
+      });
+
+      component.recordCreate('new/file.md', false);
+      expect(component.model.isKnown('new/file.md')).toBe(true);
+
+      component.recordDelete('new/file.md');
+      expect(component.model.isKnown('new/file.md')).toBe(false);
+    });
+  });
 });

@@ -15,6 +15,7 @@ import {
 
 import type { FileTreeComponent } from '../file-tree-component.ts';
 import type { IgnorePatternsComponent } from '../ignore-patterns-component.ts';
+import type { IndexProjectionComponent } from '../index-projection-component.ts';
 import type { PluginSettingsComponent } from '../plugin-settings-component.ts';
 
 import {
@@ -31,6 +32,7 @@ describe('CapacitorAdapterPatchComponent', () => {
   let app: App;
   let settings: PluginSettings;
   let ignorePatternsComponent: IgnorePatternsComponent;
+  let indexProjectionComponent: IndexProjectionComponent;
   let pluginSettingsComponent: PluginSettingsComponent;
   let fileTreeComponent: FileTreeComponent;
 
@@ -40,6 +42,9 @@ describe('CapacitorAdapterPatchComponent', () => {
 
     ignorePatternsComponent = strictProxy<IgnorePatternsComponent>({
       isIgnored: vi.fn().mockReturnValue(false)
+    });
+    indexProjectionComponent = strictProxy<IndexProjectionComponent>({
+      recordCreate: vi.fn()
     });
     pluginSettingsComponent = strictProxy<PluginSettingsComponent>({
       settings
@@ -72,6 +77,7 @@ describe('CapacitorAdapterPatchComponent', () => {
       app: app.asOriginalType__(),
       fileTreeComponent,
       ignorePatternsComponent,
+      indexProjectionComponent,
       pluginSettingsComponent
     });
 
@@ -88,6 +94,7 @@ describe('CapacitorAdapterPatchComponent', () => {
       app: app.asOriginalType__(),
       fileTreeComponent,
       ignorePatternsComponent,
+      indexProjectionComponent,
       pluginSettingsComponent
     });
 
@@ -111,6 +118,7 @@ describe('CapacitorAdapterPatchComponent', () => {
       app: app.asOriginalType__(),
       fileTreeComponent,
       ignorePatternsComponent,
+      indexProjectionComponent,
       pluginSettingsComponent
     });
     component.load();
@@ -129,6 +137,7 @@ describe('CapacitorAdapterPatchComponent', () => {
       app: app.asOriginalType__(),
       fileTreeComponent,
       ignorePatternsComponent,
+      indexProjectionComponent,
       pluginSettingsComponent
     });
     component.load();

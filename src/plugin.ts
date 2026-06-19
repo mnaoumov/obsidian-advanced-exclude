@@ -80,6 +80,7 @@ export class Plugin extends PluginBase {
         app: this.app,
         fileTreeComponent,
         ignorePatternsComponent,
+        indexProjectionComponent,
         pluginSettingsComponent
       })
     );

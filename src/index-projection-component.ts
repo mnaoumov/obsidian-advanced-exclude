@@ -112,6 +112,22 @@ export class IndexProjectionComponent extends ComponentEx {
   }
 
   /**
+   * Records a path created on disk into the shadow model, so a later config
+   * change accounts for it. The live visibility of the path is handled by the
+   * adapter patch; this only keeps the model in sync.
+   */
+  public recordCreate(normalizedPath: string, isFolderPath: boolean): void {
+    this.vaultModel.setPath(normalizedPath, isFolderPath);
+  }
+
+  /**
+   * Records a path deleted on disk into the shadow model.
+   */
+  public recordDelete(normalizedPath: string): void {
+    this.vaultModel.deletePath(normalizedPath);
+  }
+
+  /**
    * Re-adds every node the projection currently hides (used on unload).
    */
   public async restoreAll(): Promise<void> {

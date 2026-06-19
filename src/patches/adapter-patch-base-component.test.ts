@@ -10,6 +10,7 @@ import {
 
 import type { FileTreeComponent } from '../file-tree-component.ts';
 import type { IgnorePatternsComponent } from '../ignore-patterns-component.ts';
+import type { IndexProjectionComponent } from '../index-projection-component.ts';
 import type { PluginSettingsComponent } from '../plugin-settings-component.ts';
 
 import {
@@ -34,6 +35,7 @@ class TestAdapterPatchBaseComponent extends AdapterPatchBaseComponent {
 describe('AdapterPatchBaseComponent', () => {
   let app: App;
   let ignorePatternsComponent: IgnorePatternsComponent;
+  let indexProjectionComponent: IndexProjectionComponent;
   let pluginSettingsComponent: PluginSettingsComponent;
   let fileTreeComponent: FileTreeComponent;
   let settings: PluginSettings;
@@ -54,11 +56,15 @@ describe('AdapterPatchBaseComponent', () => {
     fileTreeComponent = strictProxy<FileTreeComponent>({
       deleteFromFilesPane: vi.fn()
     });
+    indexProjectionComponent = strictProxy<IndexProjectionComponent>({
+      recordCreate: vi.fn()
+    });
 
     return new TestAdapterPatchBaseComponent({
       app: app.asOriginalType__(),
       fileTreeComponent,
       ignorePatternsComponent,
+      indexProjectionComponent,
       pluginSettingsComponent
     });
   }
@@ -119,6 +125,16 @@ describe('AdapterPatchBaseComponent', () => {
       await wrapper('test/path', 'arg1', 'arg2');
 
       expect(next).toHaveBeenCalledWith('test/path', 'arg1', 'arg2');
+    });
+
+    it('should record the create in the shadow model', async () => {
+      const component = createComponent();
+      const next = vi.fn().mockResolvedValue(undefined);
+
+      const wrapper = component.callGenerateReconcileWrapper(next, true);
+      await wrapper('some/folder');
+
+      expect(vi.mocked(indexProjectionComponent.recordCreate)).toHaveBeenCalledWith('some/folder', true);
     });
   });
 });
