@@ -60,6 +60,15 @@ vi.mock('./file-tree-component.ts', () => {
   return {
     // eslint-disable-next-line prefer-arrow-callback, func-names -- mock must be constructable with `new`
     FileTreeComponent: vi.fn().mockImplementation(function () {
+      return { addToFilesPane: vi.fn(), deleteFromFilesPane: vi.fn() };
+    })
+  };
+});
+
+vi.mock('./index-projection-component.ts', () => {
+  return {
+    // eslint-disable-next-line prefer-arrow-callback, func-names -- mock must be constructable with `new`
+    IndexProjectionComponent: vi.fn().mockImplementation(function () {
       return { update: mockUpdate };
     })
   };
@@ -130,7 +139,7 @@ describe('Plugin', () => {
   });
 
   it('should call addChild the expected number of times', async () => {
-    const EXPECTED_ADD_CHILD_CALLS = 10;
+    const EXPECTED_ADD_CHILD_CALLS = 11;
     let addChildCallCount = 0;
     const appOriginal = app.asOriginalType__();
 
@@ -148,7 +157,7 @@ describe('Plugin', () => {
     vi.mocked(Plugin.prototype.addChild).mockRestore();
   });
 
-  it('should wire onUpdateFileTree callback to fileTreeComponent.update', async () => {
+  it('should wire onUpdateFileTree callback to indexProjectionComponent.update', async () => {
     resetCapturedOnUpdateFileTree();
     mockUpdate.mockClear();
 
@@ -156,7 +165,7 @@ describe('Plugin', () => {
     await plugin.onload();
 
     expect(capturedOnUpdateFileTree).toBeDefined();
-    // Invoke the callback — it should call fileTreeComponent.update()
+    // Invoke the callback — it should call indexProjectionComponent.update()
     if (capturedOnUpdateFileTree) {
       capturedOnUpdateFileTree().catch(() => undefined);
     }

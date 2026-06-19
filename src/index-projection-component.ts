@@ -3,9 +3,11 @@ import type { App } from 'obsidian';
 
 import { getDataAdapterEx } from '@obsidian-typings/obsidian-public-latest/implementations';
 import { ComponentEx } from 'obsidian-dev-utils/obsidian/components/component-ex';
+import { CallbackLayoutReadyComponent } from 'obsidian-dev-utils/obsidian/components/layout-ready-component';
 import { isFolder } from 'obsidian-dev-utils/obsidian/file-system';
 
 import type { IgnorePatternsComponent } from './ignore-patterns-component.ts';
+import type { VaultLoadPatchComponent } from './patches/vault-load-patch-component.ts';
 import type { PluginSettingsComponent } from './plugin-settings-component.ts';
 import type {
   VaultModelEntry,
@@ -22,6 +24,7 @@ export interface IndexProjectionComponentConstructorParams {
   deleteFromFilesPane(this: void, normalizedPath: string): void;
   readonly ignorePatternsComponent: IgnorePatternsComponent;
   readonly pluginSettingsComponent: PluginSettingsComponent;
+  readonly vaultLoadPatch: VaultLoadPatchComponent;
 }
 
 /**
@@ -41,6 +44,8 @@ export class IndexProjectionComponent extends ComponentEx {
   private readonly app: App;
   private readonly deleteFromFilesPane: (normalizedPath: string) => void;
   private readonly pluginSettingsComponent: PluginSettingsComponent;
+  private updateAbortController: AbortController | null = null;
+  private readonly vaultLoadPatch: VaultLoadPatchComponent;
   private readonly vaultModel: VaultModel;
 
   private get excludeMode(): ExcludeMode {
@@ -51,6 +56,7 @@ export class IndexProjectionComponent extends ComponentEx {
     super();
     this.app = params.app;
     this.pluginSettingsComponent = params.pluginSettingsComponent;
+    this.vaultLoadPatch = params.vaultLoadPatch;
     this.addToFilesPane = params.addToFilesPane;
     this.deleteFromFilesPane = params.deleteFromFilesPane;
     this.vaultModel = new VaultModel((normalizedPath, isFolderPath) => params.ignorePatternsComponent.isIgnored(normalizedPath, isFolderPath));
@@ -74,12 +80,31 @@ export class IndexProjectionComponent extends ComponentEx {
   /**
    * Snapshots Obsidian's loaded tree into the model and removes the hidden set.
    */
-  public async applyFull(): Promise<void> {
+  public async applyFull(abortSignal?: AbortSignal): Promise<void> {
     this.rebuildModel();
     const adapter = getDataAdapterEx(this.app);
     for (const target of this.getProjectionTargets()) {
+      if (abortSignal?.aborted) {
+        return;
+      }
       await this.hide(adapter, target);
     }
+  }
+
+  public async onLayoutReady(): Promise<void> {
+    if (!this.vaultLoadPatch.vaultLoadCalled) {
+      await this.update();
+    }
+  }
+
+  public override async onloadAsync(): Promise<void> {
+    await this.update();
+    this.addChild(new CallbackLayoutReadyComponent(this.app, this.onLayoutReady.bind(this)));
+  }
+
+  public override onunload(): void {
+    this.updateAbortController?.abort();
+    super.onunload();
   }
 
   /**
@@ -89,6 +114,21 @@ export class IndexProjectionComponent extends ComponentEx {
     const adapter = getDataAdapterEx(this.app);
     for (const target of this.getProjectionTargets()) {
       await this.show(adapter, target);
+    }
+  }
+
+  /**
+   * Rebuilds the model from Obsidian's loaded tree and projects the hidden set,
+   * aborting any in-flight projection.
+   */
+  public async update(): Promise<void> {
+    this.updateAbortController?.abort();
+    this.updateAbortController = new AbortController();
+    const abortSignal = this.updateAbortController.signal;
+    try {
+      await this.applyFull(abortSignal);
+    } finally {
+      this.updateAbortController = null;
     }
   }
 
