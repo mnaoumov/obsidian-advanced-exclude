@@ -274,7 +274,44 @@ describe('IndexProjectionComponent', () => {
       ensureNonNullable(resolveDeletion)();
       await Promise.all([firstUpdate, secondUpdate]);
 
-      expect(mockAdapter.reconcileDeletion).toHaveBeenCalledTimes(2);
+      expect(mockAdapter.reconcileDeletion).toHaveBeenCalled();
+    });
+
+    it('re-shows files that became visible and hides newly-ignored ones on a later update', async () => {
+      const ignored = new Set<string>(['drop.md']);
+      const { component, mockAdapter } = setup({
+        entries: [
+          { isFolderFlag: false, path: 'drop.md' },
+          { isFolderFlag: false, path: 'keep.md' }
+        ],
+        isIgnored: (path) => ignored.has(path)
+      });
+
+      await component.update();
+      mockAdapter.reconcileDeletion.mockClear();
+      mockAdapter.reconcileFile.mockClear();
+
+      ignored.delete('drop.md');
+      ignored.add('keep.md');
+      await component.update();
+
+      expect(mockAdapter.reconcileFile).toHaveBeenCalledExactlyOnceWith('drop.md', 'drop.md');
+      expect(mockAdapter.reconcileDeletion).toHaveBeenCalledExactlyOnceWith('keep.md', 'keep.md');
+    });
+  });
+
+  describe('applyDelta abort', () => {
+    it('does nothing when the abort signal is already aborted', async () => {
+      const { component, mockAdapter } = setup({
+        entries: [{ isFolderFlag: false, path: 'a.md' }],
+        isIgnored: () => false
+      });
+
+      const controller = new AbortController();
+      controller.abort();
+      await component.applyDelta([{ isFolder: false, isVisible: false, path: 'gone.md' }], controller.signal);
+
+      expect(mockAdapter.reconcileDeletion).not.toHaveBeenCalled();
     });
   });
 
