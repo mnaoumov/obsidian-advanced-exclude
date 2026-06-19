@@ -205,6 +205,47 @@ describe('VaultModel', () => {
     });
   });
 
+  describe('getHideRoots', () => {
+    it('returns only the topmost hidden node of a fully-ignored subtree', () => {
+      const model = build(
+        [
+          { isFolder: true, path: 'a' },
+          { isFolder: false, path: 'a/x.md' },
+          { isFolder: false, path: 'a/y.md' }
+        ],
+        matcher(['a'])
+      );
+
+      expect(model.getHideRoots()).toEqual([{ isFolder: true, path: 'a' }]);
+    });
+
+    it('returns the individually-hidden children of a visible folder', () => {
+      const model = build(
+        [
+          { isFolder: true, path: 'a' },
+          { isFolder: false, path: 'a/keep.md' },
+          { isFolder: false, path: 'a/drop.md' }
+        ],
+        matcher(['a/drop.md'])
+      );
+
+      expect(model.getHideRoots()).toEqual([{ isFolder: false, path: 'a/drop.md' }]);
+    });
+
+    it('returns the ignored folder, not its descendants, under a visible parent (case A)', () => {
+      const model = build(
+        [
+          { isFolder: true, path: 'foo' },
+          { isFolder: true, path: 'foo/bar' },
+          { isFolder: false, path: 'foo/bar/qux.md' }
+        ],
+        matcher(['foo/bar', '!foo/bar/baz'])
+      );
+
+      expect(model.getHideRoots()).toEqual([{ isFolder: true, path: 'foo/bar' }]);
+    });
+  });
+
   describe('getPathsByVisibility', () => {
     it('returns hidden and visible sets excluding the root', () => {
       const model = build(

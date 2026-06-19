@@ -86,6 +86,24 @@ export class VaultModel {
   }
 
   /**
+   * Returns the minimal set of hidden nodes to remove from Obsidian's index: a
+   * hidden node whose parent is still visible. Removing such a node cascades to
+   * its descendants, so descendants of a hidden node are omitted.
+   */
+  public getHideRoots(): VaultModelEntry[] {
+    const result: VaultModelEntry[] = [];
+    for (const node of this.nodes.values()) {
+      if (node === this.root || node.isVisible) {
+        continue;
+      }
+      if (node.parent?.isVisible) {
+        result.push({ isFolder: node.isFolder, path: node.path });
+      }
+    }
+    return result;
+  }
+
+  /**
    * Returns every known path whose current visibility matches `isVisible`.
    */
   public getPathsByVisibility(isVisible: boolean): VaultModelEntry[] {
