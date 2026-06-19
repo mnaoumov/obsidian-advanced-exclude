@@ -8,8 +8,7 @@ import {
 import { invokeAsyncSafelyAfterDelay } from 'obsidian-dev-utils/async';
 import { deepEqual } from 'obsidian-dev-utils/object-utils';
 import { registerAsyncEvent } from 'obsidian-dev-utils/obsidian/components/async-events-component';
-import { ComponentEx } from 'obsidian-dev-utils/obsidian/components/component-ex';
-import { CallbackLayoutReadyComponent } from 'obsidian-dev-utils/obsidian/components/layout-ready-component';
+import { LayoutReadyComponent } from 'obsidian-dev-utils/obsidian/components/layout-ready-component';
 import { ensureMetadataCacheReady } from 'obsidian-dev-utils/obsidian/metadata-cache';
 import { escapeRegExp } from 'obsidian-dev-utils/reg-exp';
 
@@ -51,9 +50,18 @@ interface DbMtimeEntry {
   userIgnoreFiltersStr: string;
 }
 
-export class IgnorePatternsComponent extends ComponentEx {
+export class IgnorePatternsComponent extends LayoutReadyComponent {
+  public get hasHiddenPaths(): boolean {
+    for (const isIgnored of this.fileIgnoreMap.values()) {
+      if (isIgnored) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
   private _db?: IDBDatabase;
-  private readonly app: App;
   private cachedExcludeRegExps: null | RegExp[] = null;
   private cachedGitIgnoreContent = '';
   private cachedIgnoreTester: ignore.Ignore | null = null;
@@ -63,6 +71,7 @@ export class IgnorePatternsComponent extends ComponentEx {
   private readonly onUpdateFileTree: () => Promise<void>;
   private pendingStoreActions: ((store: IDBObjectStore) => void)[] = [];
   private readonly pluginSettingsComponent: PluginSettingsComponent;
+
   private readonly processStoreActionsDebounced = debounce(() => {
     this.processStoreActions();
   }, PROCESS_STORE_ACTIONS_DEBOUNCE_INTERVAL_IN_MILLISECONDS);
@@ -77,8 +86,7 @@ export class IgnorePatternsComponent extends ComponentEx {
   }
 
   public constructor(params: IgnorePatternsComponentConstructorParams) {
-    super();
-    this.app = params.app;
+    super(params.app);
     this.onUpdateFileTree = params.onUpdateFileTree;
     this.pluginSettingsComponent = params.pluginSettingsComponent;
     this.vaultLoadPatch = params.vaultLoadPatch;
@@ -140,20 +148,6 @@ export class IgnorePatternsComponent extends ComponentEx {
     return isIgnoredResult;
   }
 
-  public async onLayoutReady(): Promise<void> {
-    await ensureMetadataCacheReady(this.app);
-
-    this.registerEvent(this.app.vault.on('config-changed', (configKey: string) => {
-      if (configKey === 'userIgnoreFilters') {
-        this.clearCachedExcludeRegExps();
-      }
-    }));
-
-    if (!this.vaultLoadPatch.vaultLoadCalled) {
-      await this.onUpdateFileTree();
-    }
-  }
-
   public override async onloadAsync(): Promise<void> {
     await this.loadDb();
     await this.reload();
@@ -173,8 +167,6 @@ export class IgnorePatternsComponent extends ComponentEx {
         this.hadConfigChanges = true;
       })
     );
-
-    this.addChild(new CallbackLayoutReadyComponent(this.app, this.onLayoutReady.bind(this)));
   }
 
   public async processConfigChanges(): Promise<void> {
@@ -194,6 +186,20 @@ export class IgnorePatternsComponent extends ComponentEx {
     await writeSafe(this.app, OBSIDIAN_IGNORE_FILE, obsidianIgnoreContent);
     await this.pluginSettingsComponent.setProperty('obsidianIgnoreContent', obsidianIgnoreContent);
     this.cachedObsidianIgnoreContent = obsidianIgnoreContent;
+  }
+
+  protected override async onLayoutReady(): Promise<void> {
+    await ensureMetadataCacheReady(this.app);
+
+    this.registerEvent(this.app.vault.on('config-changed', (configKey: string) => {
+      if (configKey === 'userIgnoreFilters') {
+        this.clearCachedExcludeRegExps();
+      }
+    }));
+
+    if (!this.vaultLoadPatch.vaultLoadCalled) {
+      await this.onUpdateFileTree();
+    }
   }
 
   private addStoreAction(storeAction: (store: IDBObjectStore) => void): void {

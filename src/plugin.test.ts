@@ -95,6 +95,10 @@ vi.mock('./plugin-settings-tab.ts', () => ({
   PluginSettingsTab: vi.fn()
 }));
 
+vi.mock('./restore-notice-component.ts', () => ({
+  RestoreNoticeComponent: vi.fn()
+}));
+
 function resetCapturedOnUpdateFileTree(): void {
   capturedOnUpdateFileTree = undefined;
 }
@@ -126,7 +130,7 @@ describe('Plugin', () => {
   });
 
   it('should call addChild the expected number of times', async () => {
-    const EXPECTED_ADD_CHILD_CALLS = 9;
+    const EXPECTED_ADD_CHILD_CALLS = 10;
     let addChildCallCount = 0;
     const appOriginal = app.asOriginalType__();
 

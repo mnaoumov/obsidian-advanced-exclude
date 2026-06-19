@@ -15,6 +15,7 @@ import { FileExplorerViewOnCreatePatchComponent } from './patches/file-explorer-
 import { VaultLoadPatchComponent } from './patches/vault-load-patch-component.ts';
 import { PluginSettingsComponent } from './plugin-settings-component.ts';
 import { PluginSettingsTab } from './plugin-settings-tab.ts';
+import { RestoreNoticeComponent } from './restore-notice-component.ts';
 
 export class Plugin extends PluginBase {
   protected override onloadImpl(): void {
@@ -72,6 +73,13 @@ export class Plugin extends PluginBase {
         fileTreeComponent,
         ignorePatternsComponent,
         pluginSettingsComponent
+      })
+    );
+
+    this.addChild(
+      new RestoreNoticeComponent({
+        ignorePatternsComponent,
+        pluginNoticeComponent: this.pluginNoticeComponent
       })
     );
 

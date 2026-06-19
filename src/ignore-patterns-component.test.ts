@@ -118,6 +118,13 @@ interface UpgradeEvent {
   newVersion: number;
 }
 
+// Exposes the protected onLayoutReady so tests can invoke it directly, as they did before it became protected.
+class TestIgnorePatternsComponent extends IgnorePatternsComponent {
+  public invokeOnLayoutReady(): Promise<void> {
+    return this.onLayoutReady();
+  }
+}
+
 function createApp(): AppOriginal {
   const app = App.createConfigured__({ appId: 'test-app' });
   const appWithConfig = app.asOriginalType__();
@@ -127,8 +134,8 @@ function createApp(): AppOriginal {
   return appWithConfig;
 }
 
-function createComponent(overrides?: CreateComponentOverrides): IgnorePatternsComponent {
-  return new IgnorePatternsComponent({
+function createComponent(overrides?: CreateComponentOverrides): TestIgnorePatternsComponent {
+  return new TestIgnorePatternsComponent({
     app: overrides?.app ?? createApp(),
     onUpdateFileTree: overrides?.onUpdateFileTree ?? vi.fn().mockResolvedValue(undefined),
     pluginSettingsComponent: overrides?.pluginSettingsComponent ?? createPluginSettingsComponent(),
@@ -233,6 +240,31 @@ describe('IgnorePatternsComponent', () => {
       setupIndexedDb();
       const component = createComponent();
       expect(component).toBeInstanceOf(IgnorePatternsComponent);
+    });
+  });
+
+  describe('hasHiddenPaths', () => {
+    it('should be false when no paths have been evaluated', () => {
+      setupIndexedDb();
+      const component = createComponent();
+      expect(component.hasHiddenPaths).toBe(false);
+    });
+
+    it('should be false when every evaluated path is not ignored', async () => {
+      setupIndexedDb();
+      const component = createComponent();
+      await component.loadWithPromises();
+      component.isIgnored('readme.md', false);
+      expect(component.hasHiddenPaths).toBe(false);
+    });
+
+    it('should be true when at least one evaluated path is ignored', async () => {
+      setupIndexedDb();
+      vi.mocked(readSafe).mockResolvedValueOnce('*.log');
+      const component = createComponent();
+      await component.loadWithPromises();
+      component.isIgnored('debug.log', false);
+      expect(component.hasHiddenPaths).toBe(true);
     });
   });
 
@@ -574,7 +606,7 @@ describe('IgnorePatternsComponent', () => {
       setupIndexedDb();
       const component = createComponent();
       await component.loadWithPromises();
-      await component.onLayoutReady();
+      await component.invokeOnLayoutReady();
 
       expect(ensureMetadataCacheReady).toHaveBeenCalled();
     });
@@ -585,7 +617,7 @@ describe('IgnorePatternsComponent', () => {
       const vaultLoadPatch = createVaultLoadPatch(false);
       const component = createComponent({ onUpdateFileTree, vaultLoadPatch });
       await component.loadWithPromises();
-      await component.onLayoutReady();
+      await component.invokeOnLayoutReady();
 
       expect(onUpdateFileTree).toHaveBeenCalled();
     });
@@ -596,7 +628,7 @@ describe('IgnorePatternsComponent', () => {
       const vaultLoadPatch = createVaultLoadPatch(true);
       const component = createComponent({ onUpdateFileTree, vaultLoadPatch });
       await component.loadWithPromises();
-      await component.onLayoutReady();
+      await component.invokeOnLayoutReady();
 
       expect(onUpdateFileTree).not.toHaveBeenCalled();
     });
@@ -607,7 +639,7 @@ describe('IgnorePatternsComponent', () => {
       const vaultOnSpy = vi.spyOn(app.vault, 'on');
       const component = createComponent({ app });
       await component.loadWithPromises();
-      await component.onLayoutReady();
+      await component.invokeOnLayoutReady();
 
       expect(vaultOnSpy).toHaveBeenCalledWith('config-changed', expect.any(Function));
     });
@@ -621,7 +653,7 @@ describe('IgnorePatternsComponent', () => {
       });
       const component = createComponent({ app, pluginSettingsComponent });
       await component.loadWithPromises();
-      await component.onLayoutReady();
+      await component.invokeOnLayoutReady();
 
       const configChangedCall = (vaultOnSpy.mock.calls as MockCallEntry[]).find(([name]) => name === 'config-changed');
       if (configChangedCall) {
@@ -640,7 +672,7 @@ describe('IgnorePatternsComponent', () => {
       const vaultOnSpy = vi.spyOn(app.vault, 'on');
       const component = createComponent({ app });
       await component.loadWithPromises();
-      await component.onLayoutReady();
+      await component.invokeOnLayoutReady();
 
       const configChangedCall = (vaultOnSpy.mock.calls as MockCallEntry[]).find(([name]) => name === 'config-changed');
       if (configChangedCall) {
