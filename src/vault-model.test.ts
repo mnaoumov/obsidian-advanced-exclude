@@ -261,6 +261,28 @@ describe('VaultModel', () => {
     });
   });
 
+  describe('recomputeAll', () => {
+    it('returns the visibility flips deepest-first', () => {
+      const ignored = new Set<string>();
+      const model = build(
+        [
+          { isFolder: true, path: 'a' },
+          { isFolder: false, path: 'a/x.md' }
+        ],
+        (path) => ignored.has(path)
+      );
+
+      ignored.add('a');
+      ignored.add('a/x.md');
+      const changes = model.recomputeAll();
+
+      expect(changes).toEqual([
+        { isFolder: false, isVisible: false, path: 'a/x.md' },
+        { isFolder: true, isVisible: false, path: 'a' }
+      ]);
+    });
+  });
+
   describe('recomputeAll vs incremental', () => {
     it('agree after a sequence of single-path flips', () => {
       const ignored = new Set<string>();

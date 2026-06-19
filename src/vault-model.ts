@@ -150,16 +150,22 @@ export class VaultModel {
   /**
    * Re-evaluates the ignore verdict and visibility for every node (used after a
    * config / pattern change). Processes deepest nodes first so a folder sees its
-   * children's final visibility.
+   * children's final visibility. Returns the visibility flips.
    */
-  public recomputeAll(): void {
+  public recomputeAll(): VisibilityChange[] {
     const sorted = [...this.nodes.values()].sort((a, b) => depth(b.path) - depth(a.path));
     for (const node of sorted) {
       this.evaluateIgnored(node);
     }
+    const changes: VisibilityChange[] = [];
     for (const node of sorted) {
+      const wasVisible = node.isVisible;
       node.isVisible = this.computeVisible(node);
+      if (node.isVisible !== wasVisible && node !== this.root) {
+        changes.push({ isFolder: node.isFolder, isVisible: node.isVisible, path: node.path });
+      }
     }
+    return changes;
   }
 
   /**

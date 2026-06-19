@@ -43,6 +43,7 @@ export class IndexProjectionComponent extends ComponentEx {
   private readonly addToFilesPane: (normalizedPath: string) => void;
   private readonly app: App;
   private readonly deleteFromFilesPane: (normalizedPath: string) => void;
+  private hasBuiltModel = false;
   private readonly pluginSettingsComponent: PluginSettingsComponent;
   private updateAbortController: AbortController | null = null;
   private readonly vaultLoadPatch: VaultLoadPatchComponent;
@@ -66,9 +67,12 @@ export class IndexProjectionComponent extends ComponentEx {
    * Applies the delta produced by an incremental model recompute: hides nodes
    * that flipped hidden and shows nodes that flipped visible.
    */
-  public async applyDelta(changes: readonly VisibilityChange[]): Promise<void> {
+  public async applyDelta(changes: readonly VisibilityChange[], abortSignal?: AbortSignal): Promise<void> {
     const adapter = getDataAdapterEx(this.app);
     for (const change of changes) {
+      if (abortSignal?.aborted) {
+        return;
+      }
       if (change.isVisible) {
         await this.show(adapter, change);
       } else {
@@ -118,15 +122,24 @@ export class IndexProjectionComponent extends ComponentEx {
   }
 
   /**
-   * Rebuilds the model from Obsidian's loaded tree and projects the hidden set,
-   * aborting any in-flight projection.
+   * Refreshes the projection, aborting any in-flight one.
+   *
+   * The first call builds the model from Obsidian's loaded tree and removes the
+   * hidden set. Later calls (e.g. after a pattern change) re-evaluate the
+   * persistent model and apply only the delta — so a file that became visible is
+   * re-added even though it is no longer in Obsidian's filtered index.
    */
   public async update(): Promise<void> {
     this.updateAbortController?.abort();
     this.updateAbortController = new AbortController();
     const abortSignal = this.updateAbortController.signal;
     try {
-      await this.applyFull(abortSignal);
+      if (this.hasBuiltModel) {
+        await this.applyDelta(this.vaultModel.recomputeAll(), abortSignal);
+      } else {
+        this.hasBuiltModel = true;
+        await this.applyFull(abortSignal);
+      }
     } finally {
       this.updateAbortController = null;
     }
