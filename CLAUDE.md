@@ -69,10 +69,10 @@ adapter events sync the model; unload shows a reload notice when paths are
 hidden. The full known-path set is persisted in IndexedDB (`VaultPathStore`) so
 a mid-session disable/enable can re-show files whose pattern changed (Obsidian
 does not re-scan disk then). 190 unit tests, 100% coverage; desktop integration
-6/6. Verified live earlier: ~4.4 s vs ~80–160 s, zero reconcile walk (persist
-adds an IndexedDB load — re-measure). Pending: Android integration needs an
-emulator (unavailable here); re-measure startup with persist; review/merge to
-`master`.
+6/6. Verified live: clean enable ~12 s vs ~80–160 s, zero reconcile walk
+(persist load ~1 ms, missing-scan ~16 ms — negligible; persists only the hidden
+set, not all 90k paths). Pending: Android integration needs an emulator
+(unavailable here); review/merge to `master`.
 
 ## Known Issues
 
