@@ -104,11 +104,12 @@ export class IndexProjectionComponent extends ComponentEx {
       return;
     }
 
+    const loadedPaths = new Set(this.app.vault.getAllLoadedFiles().map((file) => file.path));
     for (const entry of this.vaultModel.getPathsByVisibility(true)) {
       if (abortSignal?.aborted) {
         return;
       }
-      if (this.app.vault.getAbstractFileByPath(entry.path) === null) {
+      if (!loadedPaths.has(entry.path)) {
         await this.show(adapter, entry);
       }
     }
@@ -201,9 +202,10 @@ export class IndexProjectionComponent extends ComponentEx {
       }
       byPath.set(file.path, { isFolder: isFolder(file), path: file.path });
     }
-    const entries = [...byPath.values()];
-    this.vaultModel.rebuild(entries);
-    this.vaultPathStore.save(entries);
+    this.vaultModel.rebuild([...byPath.values()]);
+    // Persist only the hidden set: merged with Obsidian's loaded (visible) tree on
+    // The next build, this reconstructs the full tree without storing all ~90k paths.
+    this.vaultPathStore.save(this.vaultModel.getPathsByVisibility(false));
   }
 
   private async show(adapter: DataAdapterEx, entry: VaultModelEntry): Promise<void> {
