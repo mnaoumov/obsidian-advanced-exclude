@@ -65,11 +65,14 @@ Implemented on branch `feat/in-memory-tree`: `VaultModel` (shadow tree +
 bottom-up visibility) and `IndexProjectionComponent` replace the whole-vault
 reconcile walk — initial load snapshots Obsidian's loaded tree and removes only
 the ignored hide-roots; config changes apply a persistent-model delta; live
-adapter events sync the model; unload restores inline for small hidden sets and
-falls back to the reload notice for large ones. Verified live on the 109 GB /
-~90k-path vault: ~4.4 s vs ~80–160 s, zero reconcile walk. 186 unit tests, 100%
-coverage. Pending: run the desktop/android integration suites, then review/merge
-to `master`.
+adapter events sync the model; unload shows a reload notice when paths are
+hidden. The full known-path set is persisted in IndexedDB (`VaultPathStore`) so
+a mid-session disable/enable can re-show files whose pattern changed (Obsidian
+does not re-scan disk then). 190 unit tests, 100% coverage; desktop integration
+6/6. Verified live earlier: ~4.4 s vs ~80–160 s, zero reconcile walk (persist
+adds an IndexedDB load — re-measure). Pending: Android integration needs an
+emulator (unavailable here); re-measure startup with persist; review/merge to
+`master`.
 
 ## Known Issues
 
