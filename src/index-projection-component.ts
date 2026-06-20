@@ -13,6 +13,7 @@ import type {
   VaultModelEntry,
   VisibilityChange
 } from './vault-model.ts';
+import type { VaultPathStore } from './vault-path-store.ts';
 
 import { ROOT_PATH } from './constants.ts';
 import { ExcludeMode } from './plugin-settings.ts';
@@ -25,6 +26,7 @@ export interface IndexProjectionComponentConstructorParams {
   readonly ignorePatternsComponent: IgnorePatternsComponent;
   readonly pluginSettingsComponent: PluginSettingsComponent;
   readonly vaultLoadPatch: VaultLoadPatchComponent;
+  readonly vaultPathStore: VaultPathStore;
 }
 
 /**
@@ -48,6 +50,7 @@ export class IndexProjectionComponent extends ComponentEx {
   private updateAbortController: AbortController | null = null;
   private readonly vaultLoadPatch: VaultLoadPatchComponent;
   private readonly vaultModel: VaultModel;
+  private readonly vaultPathStore: VaultPathStore;
 
   private get excludeMode(): ExcludeMode {
     return this.pluginSettingsComponent.settings.excludeMode;
@@ -58,6 +61,7 @@ export class IndexProjectionComponent extends ComponentEx {
     this.app = params.app;
     this.pluginSettingsComponent = params.pluginSettingsComponent;
     this.vaultLoadPatch = params.vaultLoadPatch;
+    this.vaultPathStore = params.vaultPathStore;
     this.addToFilesPane = params.addToFilesPane;
     this.deleteFromFilesPane = params.deleteFromFilesPane;
     this.vaultModel = new VaultModel((normalizedPath, isFolderPath) => params.ignorePatternsComponent.isIgnored(normalizedPath, isFolderPath));
@@ -82,16 +86,31 @@ export class IndexProjectionComponent extends ComponentEx {
   }
 
   /**
-   * Snapshots Obsidian's loaded tree into the model and removes the hidden set.
+   * Rebuilds the model from the persisted path set merged with Obsidian's
+   * loaded tree, removes the hidden set, and re-adds any visible path missing
+   * from the index (e.g. one hidden by a prior session before a disable/enable).
    */
   public async applyFull(abortSignal?: AbortSignal): Promise<void> {
-    this.rebuildModel();
+    await this.rebuildModel();
     const adapter = getDataAdapterEx(this.app);
     for (const target of this.getProjectionTargets()) {
       if (abortSignal?.aborted) {
         return;
       }
       await this.hide(adapter, target);
+    }
+
+    if (this.excludeMode !== ExcludeMode.Full) {
+      return;
+    }
+
+    for (const entry of this.vaultModel.getPathsByVisibility(true)) {
+      if (abortSignal?.aborted) {
+        return;
+      }
+      if (this.app.vault.getAbstractFileByPath(entry.path) === null) {
+        await this.show(adapter, entry);
+      }
     }
   }
 
@@ -136,16 +155,6 @@ export class IndexProjectionComponent extends ComponentEx {
   }
 
   /**
-   * Re-adds every node the projection currently hides (used on unload).
-   */
-  public async restoreAll(): Promise<void> {
-    const adapter = getDataAdapterEx(this.app);
-    for (const target of this.getProjectionTargets()) {
-      await this.show(adapter, target);
-    }
-  }
-
-  /**
    * Refreshes the projection, aborting any in-flight one.
    *
    * The first call builds the model from Obsidian's loaded tree and removes the
@@ -181,11 +190,20 @@ export class IndexProjectionComponent extends ComponentEx {
     }
   }
 
-  private rebuildModel(): void {
-    const entries: VaultModelEntry[] = this.app.vault.getAllLoadedFiles()
-      .filter((file) => file.path !== ROOT_PATH)
-      .map((file) => ({ isFolder: isFolder(file), path: file.path }));
+  private async rebuildModel(): Promise<void> {
+    const byPath = new Map<string, VaultModelEntry>();
+    for (const entry of await this.vaultPathStore.load()) {
+      byPath.set(entry.path, entry);
+    }
+    for (const file of this.app.vault.getAllLoadedFiles()) {
+      if (file.path === ROOT_PATH) {
+        continue;
+      }
+      byPath.set(file.path, { isFolder: isFolder(file), path: file.path });
+    }
+    const entries = [...byPath.values()];
     this.vaultModel.rebuild(entries);
+    this.vaultPathStore.save(entries);
   }
 
   private async show(adapter: DataAdapterEx, entry: VaultModelEntry): Promise<void> {

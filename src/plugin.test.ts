@@ -118,6 +118,7 @@ describe('Plugin', () => {
 
   beforeEach(() => {
     app = App.createConfigured__();
+    app.asOriginalType__().appId = 'test-app-id';
     manifest = {
       author: 'test',
       description: 'test',

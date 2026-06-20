@@ -17,6 +17,7 @@ import { VaultLoadPatchComponent } from './patches/vault-load-patch-component.ts
 import { PluginSettingsComponent } from './plugin-settings-component.ts';
 import { PluginSettingsTab } from './plugin-settings-tab.ts';
 import { RestoreNoticeComponent } from './restore-notice-component.ts';
+import { IndexedDbVaultPathStore } from './vault-path-store.ts';
 
 export class Plugin extends PluginBase {
   protected override onloadImpl(): void {
@@ -50,7 +51,8 @@ export class Plugin extends PluginBase {
         deleteFromFilesPane: fileTreeComponent.deleteFromFilesPane.bind(fileTreeComponent),
         ignorePatternsComponent,
         pluginSettingsComponent,
-        vaultLoadPatch
+        vaultLoadPatch,
+        vaultPathStore: new IndexedDbVaultPathStore(this.app.appId)
       })
     );
 
