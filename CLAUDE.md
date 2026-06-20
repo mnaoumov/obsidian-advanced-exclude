@@ -68,11 +68,26 @@ the ignored hide-roots; config changes apply a persistent-model delta; live
 adapter events sync the model; unload shows a reload notice when paths are
 hidden. The full known-path set is persisted in IndexedDB (`VaultPathStore`) so
 a mid-session disable/enable can re-show files whose pattern changed (Obsidian
-does not re-scan disk then). 190 unit tests, 100% coverage; desktop integration
-6/6. Verified live: clean enable ~12 s vs ~80–160 s, zero reconcile walk
+does not re-scan disk then). 200 unit tests, 100% coverage; desktop integration
+9/9. Verified live: clean enable ~12 s vs ~80–160 s, zero reconcile walk
 (persist load ~1 ms, missing-scan ~16 ms — negligible; persists only the hidden
-set, not all 90k paths). Pending: Android integration needs an emulator
-(unavailable here); review/merge to `master`.
+set, not all 90k paths).
+
+`IndexProjectionComponent` exposes `isApplyingProjection` (set for the duration of
+`update()`); the adapter patch's `reconcileDeletion` skips `recordDelete` while it
+is set, so the projection's own hide calls no longer drop the hidden subtree from
+the model. `update()` also persists the hidden set after each `applyDelta`, so a
+later reload reconstructs it. Together these make a same-session un-ignore re-show
+hidden files without a reload.
+
+Added `src/vault-size-scaling.desktop.integration.test.ts`: generates 100/1000/3000-file
+folders and drives the exact live "edit settings to change ignores" flow
+(`editAndSave` → `processConfigChanges`). Asserts the folder collapses to exactly
+one `reconcileDeletion` (its hide-root), all files vanish, and removing the pattern
+re-shows the whole folder — all independent of size, a regression guard for the
+freeze that replaces manual big-vault testing. All three sizes pass on desktop.
+Pending: Android integration needs an emulator (unavailable here); review/merge to
+`master`.
 
 ## Known Issues
 
