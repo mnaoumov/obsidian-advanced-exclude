@@ -80,16 +80,27 @@ the model. `update()` also persists the hidden set after each `applyDelta`, so a
 later reload reconstructs it. Together these make a same-session un-ignore re-show
 hidden files without a reload.
 
-Added `src/vault-size-scaling.desktop.integration.test.ts`: a generic driver that
-generates a vault, drives the exact live "edit settings to change ignores" flow
-(`editAndSave` → `processConfigChanges`), and asserts deletions scoped to the
-ignored paths plus full hide/re-show. Five shapes run: flat 100/1000/3000-file
-folders (one hide-root each), a deep+wide nested tree (breadth 4 × depth 4 ≈ 341
-folders → one hide-root), and 200 independently-ignored sibling folders (one
-hide-root each, proving cost is O(hide-roots), not O(files)). All five pass on
-desktop — a regression guard for the freeze that replaces manual big-vault
-testing. Android integration suite passes on the `obsidian_test` emulator (Appium
-on 127.0.0.1:4723). Pending: review/merge to `master`.
+Scaling is covered at two levels. `src/vault-size-scaling.desktop.integration.test.ts`
+is a generic driver that generates a real vault, drives the exact live "edit
+settings to change ignores" flow (`editAndSave` → `processConfigChanges`), and
+asserts deletions scoped to the ignored paths plus full hide/re-show. Shapes: flat
+1000/5000-file folders (one hide-root each), a deep+wide nested tree (breadth 4 ×
+depth 4 ≈ 341 folders → one hide-root), and 200 independently-ignored sibling
+folders (one hide-root each, proving cost is O(hide-roots), not O(files)). Per-test
+timeouts are sized from the file count (`60 s + 20 ms × files`). Real-Obsidian file
+creation/indexing is the cap here — 10,000 files take ~280 s end to end, so larger
+counts live in the in-memory test below.
+
+`src/vault-model-scaling.no-app.integration.test.ts` exercises `VaultModel`
+directly (no Obsidian, no disk) at 100,000 and 1,000,000 files for a single ignored
+folder (always one hide-root) and 10,000 / 100,000 independently-ignored folders
+(one hide-root each). Bench (`F:\tmp\model-bench.ts`): the live per-change cost
+(`recomputeAll`) is ~40 ms at 100k, ~420 ms at 1M, ~4.5 s at 10M; memory ~390 MB
+per million nodes, so it goes memory-bound (not algorithm-bound) past ~5–10M.
+
+All scaling scenarios pass; the suite replaces manual big-vault testing as the
+freeze regression guard. Android integration suite passes on the `obsidian_test`
+emulator (Appium on 127.0.0.1:4723). Pending: review/merge to `master`.
 
 ## Known Issues
 

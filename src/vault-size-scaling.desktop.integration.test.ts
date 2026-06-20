@@ -42,8 +42,14 @@ interface VaultSizeScenarioResult {
 const PLUGIN_ID = 'advanced-exclude';
 const OBSIDIAN_IGNORE_FILE = '.obsidianignore';
 
-// Flat-folder sizes: prove the hide cost is independent of file count.
-const FLAT_SIZES = [100, 1000, 3000];
+/*
+ * Flat-folder sizes: prove the hide cost is independent of file count. The cap is
+ * how fast Obsidian can create, index, and re-add files, not the plugin — 10,000
+ * files take ~280 s of Obsidian churn end to end, so larger counts are covered in
+ * the in-memory `vault-model-scaling.no-app.integration.test.ts` (up to 1,000,000
+ * nodes) instead, where the algorithm runs without disk or Obsidian.
+ */
+const FLAT_SIZES = [1000, 5000];
 
 // Deep + wide tree under one ignored root: hundreds of nested folders, one hide-root.
 const NESTED_ROOT = 'tree';
@@ -69,10 +75,18 @@ const CREATE_BATCH_SIZE = 50;
 const SETTLE_DELAY_IN_MS = 5000;
 
 /*
- * Per-test timeout: building a vault of thousands of files and folders plus a
- * reload needs well beyond the default 30 s desktop budget.
+ * Setup creates every file, and the re-show pass re-adds every hidden file one by
+ * one, so wall time grows with file count. Size the per-test timeout from the file
+ * count — a fixed base for reloads/settles plus a per-file allowance — rather than
+ * one cap that is either too tight for the big scenarios or too loose for the
+ * small ones.
  */
-const SCENARIO_TIMEOUT_IN_MS = 240_000;
+const BASE_TIMEOUT_IN_MS = 60_000;
+const PER_FILE_TIMEOUT_IN_MS = 20;
+
+function scenarioTimeout(fileCount: number): number {
+  return BASE_TIMEOUT_IN_MS + fileCount * PER_FILE_TIMEOUT_IN_MS;
+}
 
 function settle(settleDelay: number): Promise<void> {
   return new Promise((resolve) => {
@@ -116,18 +130,21 @@ afterEach(async () => {
 
 describe('Vault size scaling — Full mode', () => {
   for (const size of FLAT_SIZES) {
+    const spec = flatSpec(size);
     it(`hides and re-shows a flat ${String(size)}-file folder with a single deletion`, async () => {
-      await assertScenario(flatSpec(size));
-    }, SCENARIO_TIMEOUT_IN_MS);
+      await assertScenario(spec);
+    }, scenarioTimeout(spec.fileCount));
   }
 
+  const nestedSpec = nestedTreeSpec();
   it('hides and re-shows a deep, wide folder tree with a single deletion', async () => {
-    await assertScenario(nestedTreeSpec());
-  }, SCENARIO_TIMEOUT_IN_MS);
+    await assertScenario(nestedSpec);
+  }, scenarioTimeout(nestedSpec.fileCount));
 
+  const manySpec = manyFoldersSpec();
   it('hides and re-shows many independently-ignored folders, one deletion each', async () => {
-    await assertScenario(manyFoldersSpec());
-  }, SCENARIO_TIMEOUT_IN_MS);
+    await assertScenario(manySpec);
+  }, scenarioTimeout(manySpec.fileCount));
 });
 
 async function assertScenario(spec: ScenarioSpec): Promise<void> {
