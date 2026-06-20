@@ -82,6 +82,11 @@ export class AdapterPatchComponent extends MonkeyAroundComponent {
       return;
     }
 
+    // Skip the projection's own hide-driven `reconcileDeletion` calls: they are not real deletions, so recording them would forget the hidden subtree.
+    if (this.indexProjectionComponent.isApplyingProjection) {
+      return;
+    }
+
     this.indexProjectionComponent.recordDelete(normalizedPath);
     await this.ignorePatternsComponent.handleDeletedOrDotFile(normalizedPath);
   }

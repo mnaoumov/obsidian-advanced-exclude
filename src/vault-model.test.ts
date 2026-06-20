@@ -246,6 +246,50 @@ describe('VaultModel', () => {
     });
   });
 
+  describe('isParentVisible', () => {
+    it('returns true for a child of a visible folder', () => {
+      const model = build(
+        [
+          { isFolder: true, path: 'a' },
+          { isFolder: false, path: 'a/drop.md' }
+        ],
+        matcher(['a/drop.md'])
+      );
+
+      expect(model.isParentVisible('a/drop.md')).toBe(true);
+    });
+
+    it('returns false for a descendant of a hidden folder', () => {
+      const model = build(
+        [
+          { isFolder: true, path: 'a' },
+          { isFolder: false, path: 'a/x.md' }
+        ],
+        matcher(['a'])
+      );
+
+      expect(model.isParentVisible('a/x.md')).toBe(false);
+    });
+
+    it('returns true for a top-level node (parent is the always-visible root)', () => {
+      const model = build([{ isFolder: false, path: 'drop.md' }], matcher(['drop.md']));
+
+      expect(model.isParentVisible('drop.md')).toBe(true);
+    });
+
+    it('returns undefined for an unknown path', () => {
+      const model = build([{ isFolder: false, path: 'a.md' }], matcher([]));
+
+      expect(model.isParentVisible('nope.md')).toBeUndefined();
+    });
+
+    it('treats the root (which has no parent) as visible', () => {
+      const model = build([{ isFolder: false, path: 'a.md' }], matcher([]));
+
+      expect(model.isParentVisible('/')).toBe(true);
+    });
+  });
+
   describe('getPathsByVisibility', () => {
     it('returns hidden and visible sets excluding the root', () => {
       const model = build(

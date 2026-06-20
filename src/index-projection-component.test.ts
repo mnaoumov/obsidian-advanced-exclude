@@ -268,6 +268,48 @@ describe('IndexProjectionComponent', () => {
       expect(mockAdapter.reconcileDeletion).not.toHaveBeenCalled();
     });
 
+    it('hides only the hide-root of a newly-ignored subtree, relying on cascade', async () => {
+      const ignored = new Set<string>();
+      const { component, mockAdapter } = setup({
+        entries: [
+          { isFolderFlag: true, path: 'a' },
+          { isFolderFlag: false, path: 'a/x.md' },
+          { isFolderFlag: false, path: 'a/y.md' }
+        ],
+        isIgnored: (path) => ignored.has(path) || [...ignored].some((prefix) => path.startsWith(`${prefix}/`))
+      });
+
+      await component.update();
+      mockAdapter.reconcileDeletion.mockClear();
+
+      ignored.add('a');
+      await component.update();
+
+      // The whole subtree flips hidden, but only the folder is removed — its
+      // Descendants are cascaded by `reconcileDeletion`, not deleted one by one.
+      expect(mockAdapter.reconcileDeletion).toHaveBeenCalledExactlyOnceWith('a', 'a');
+    });
+
+    it('shows a re-included subtree parent-first so folders exist before their files', async () => {
+      const ignored = new Set<string>(['a', 'a/x.md']);
+      const { component, mockAdapter } = setup({
+        entries: [
+          { isFolderFlag: true, path: 'a' },
+          { isFolderFlag: false, path: 'a/x.md' }
+        ],
+        isIgnored: (path) => ignored.has(path)
+      });
+
+      await component.update();
+      mockAdapter.reconcileFile.mockClear();
+
+      ignored.clear();
+      await component.update();
+
+      expect(mockAdapter.reconcileFile).toHaveBeenNthCalledWith(1, 'a', 'a');
+      expect(mockAdapter.reconcileFile).toHaveBeenNthCalledWith(2, 'a/x.md', 'a/x.md');
+    });
+
     it('re-shows files that became visible and hides newly-ignored ones on a later update', async () => {
       const ignored = new Set<string>(['drop.md']);
       const { component, mockAdapter } = setup({
@@ -291,6 +333,25 @@ describe('IndexProjectionComponent', () => {
     });
   });
 
+  describe('isApplyingProjection', () => {
+    it('is true while reconciling and false before and after', async () => {
+      let observedDuringReconcile: boolean | undefined;
+      const { component, mockAdapter } = setup({
+        entries: [{ isFolderFlag: false, path: 'drop.md' }],
+        isIgnored: (path) => path === 'drop.md'
+      });
+      mockAdapter.reconcileDeletion.mockImplementation(() => {
+        observedDuringReconcile = component.isApplyingProjection;
+      });
+
+      expect(component.isApplyingProjection).toBe(false);
+      await component.update();
+
+      expect(observedDuringReconcile).toBe(true);
+      expect(component.isApplyingProjection).toBe(false);
+    });
+  });
+
   describe('applyDelta abort', () => {
     it('does nothing when the abort signal is already aborted', async () => {
       const { component, mockAdapter } = setup({
@@ -303,6 +364,19 @@ describe('IndexProjectionComponent', () => {
       await component.applyDelta([{ isFolder: false, isVisible: false, path: 'gone.md' }], controller.signal);
 
       expect(mockAdapter.reconcileDeletion).not.toHaveBeenCalled();
+    });
+
+    it('shows nothing when the abort signal is already aborted', async () => {
+      const { component, mockAdapter } = setup({
+        entries: [{ isFolderFlag: false, path: 'a.md' }],
+        isIgnored: () => false
+      });
+
+      const controller = new AbortController();
+      controller.abort();
+      await component.applyDelta([{ isFolder: false, isVisible: true, path: 'back.md' }], controller.signal);
+
+      expect(mockAdapter.reconcileFile).not.toHaveBeenCalled();
     });
   });
 
