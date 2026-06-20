@@ -38,12 +38,23 @@ export interface IndexProjectionComponentConstructorParams {
  * metadataCache); in `FilesPane` mode by removing items from the explorer pane.
  */
 export class IndexProjectionComponent extends ComponentEx {
+  /**
+   * Whether the projection is currently issuing its own reconcile calls. The
+   * adapter patch checks this to skip recording the plugin's own hides as real
+   * deletions — otherwise a hide would drop the hidden subtree from the model and
+   * a later in-session un-ignore would have nothing left to re-show.
+   */
+  public get isApplyingProjection(): boolean {
+    return this.applyingProjectionDepth > 0;
+  }
+
   public get model(): VaultModel {
     return this.vaultModel;
   }
 
   private readonly addToFilesPane: (normalizedPath: string) => void;
   private readonly app: App;
+  private applyingProjectionDepth = 0;
   private readonly deleteFromFilesPane: (normalizedPath: string) => void;
   private hasBuiltModel = false;
   private readonly pluginSettingsComponent: PluginSettingsComponent;
@@ -70,18 +81,36 @@ export class IndexProjectionComponent extends ComponentEx {
   /**
    * Applies the delta produced by an incremental model recompute: hides nodes
    * that flipped hidden and shows nodes that flipped visible.
+   *
+   * Shows run first, shallowest-first, so a folder is recreated before any file
+   * it must contain. Hides run after; in `Full` mode only the hide-roots (a
+   * hidden node whose parent is still visible) are removed, because
+   * `reconcileDeletion` cascades the subtree — issuing it per descendant turned a
+   * single folder hide into O(subtree) reconcile ops and froze the app.
    */
   public async applyDelta(changes: readonly VisibilityChange[], abortSignal?: AbortSignal): Promise<void> {
     const adapter = getDataAdapterEx(this.app);
-    for (const change of changes) {
+    const shows = changes.filter((change) => change.isVisible).sort((a, b) => pathDepth(a.path) - pathDepth(b.path));
+    const hides = changes.filter((change) => !change.isVisible);
+
+    for (const change of shows) {
       if (abortSignal?.aborted) {
         return;
       }
-      if (change.isVisible) {
-        await this.show(adapter, change);
-      } else {
-        await this.hide(adapter, change);
+      await this.show(adapter, change);
+    }
+
+    for (const change of hides) {
+      if (abortSignal?.aborted) {
+        return;
       }
+      // In Full mode a hidden node whose parent is also hidden is already removed
+      // By the parent's cascading `reconcileDeletion`; skip it. An unknown parent
+      // (`undefined`) is treated as a hide-root and still removed.
+      if (this.excludeMode === ExcludeMode.Full && this.vaultModel.isParentVisible(change.path) === false) {
+        continue;
+      }
+      await this.hide(adapter, change);
     }
   }
 
@@ -167,14 +196,18 @@ export class IndexProjectionComponent extends ComponentEx {
     this.updateAbortController?.abort();
     this.updateAbortController = new AbortController();
     const abortSignal = this.updateAbortController.signal;
+    this.applyingProjectionDepth++;
     try {
       if (this.hasBuiltModel) {
         await this.applyDelta(this.vaultModel.recomputeAll(), abortSignal);
+        // Persist the post-change hidden set so a later reload (which does not re-scan disk) can reconstruct and re-show it.
+        this.vaultPathStore.save(this.vaultModel.getPathsByVisibility(false));
       } else {
         this.hasBuiltModel = true;
         await this.applyFull(abortSignal);
       }
     } finally {
+      this.applyingProjectionDepth--;
       this.updateAbortController = null;
     }
   }
@@ -215,4 +248,14 @@ export class IndexProjectionComponent extends ComponentEx {
       this.addToFilesPane(entry.path);
     }
   }
+}
+
+function pathDepth(normalizedPath: string): number {
+  let count = 1;
+  for (const char of normalizedPath) {
+    if (char === '/') {
+      count++;
+    }
+  }
+  return count;
 }

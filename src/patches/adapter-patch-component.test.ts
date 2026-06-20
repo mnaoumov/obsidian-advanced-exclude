@@ -65,6 +65,7 @@ describe('AdapterPatchComponent', () => {
   beforeEach(() => {
     ignorePatternsComponent = strictProxy<IgnorePatternsComponent>({});
     indexProjectionComponent = strictProxy<IndexProjectionComponent>({
+      isApplyingProjection: false,
       recordCreate: vi.fn(),
       recordDelete: vi.fn()
     });
@@ -169,6 +170,41 @@ describe('AdapterPatchComponent', () => {
       const app = App.createConfigured__({ adapter: unknownAdapter });
       const appOriginal = app.asOriginalType__();
       Object.defineProperty(appOriginal.workspace, 'layoutReady', { configurable: true, value: false });
+
+      const mockDataAdapterEx = createMockDataAdapterEx();
+      mockGetDataAdapterEx.mockReturnValue(strictProxy(mockDataAdapterEx));
+
+      const patch = new AdapterPatchComponent({
+        app: appOriginal,
+        fileTreeComponent,
+        ignorePatternsComponent,
+        indexProjectionComponent,
+        pluginSettingsComponent
+      });
+
+      patch.load();
+
+      // Call through the patched object to cover the patchHandler lambda
+      await mockDataAdapterEx.reconcileDeletion('test/path', 'test/path');
+
+      expect(vi.mocked(indexProjectionComponent.recordDelete)).not.toHaveBeenCalled();
+      expect(mockHandleDeletedOrDotFile).not.toHaveBeenCalled();
+    });
+
+    it('should not record the deletion while the projection is applying its own hides', async () => {
+      const mockHandleDeletedOrDotFile = vi.fn().mockResolvedValue(undefined);
+      ignorePatternsComponent = strictProxy<IgnorePatternsComponent>({
+        handleDeletedOrDotFile: mockHandleDeletedOrDotFile
+      });
+      indexProjectionComponent = strictProxy<IndexProjectionComponent>({
+        isApplyingProjection: true,
+        recordDelete: vi.fn()
+      });
+
+      const unknownAdapter = strictProxy<DataAdapter>({});
+      const app = App.createConfigured__({ adapter: unknownAdapter });
+      const appOriginal = app.asOriginalType__();
+      Object.defineProperty(appOriginal.workspace, 'layoutReady', { configurable: true, value: true });
 
       const mockDataAdapterEx = createMockDataAdapterEx();
       mockGetDataAdapterEx.mockReturnValue(strictProxy(mockDataAdapterEx));
