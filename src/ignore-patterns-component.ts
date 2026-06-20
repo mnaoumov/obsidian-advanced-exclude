@@ -26,6 +26,7 @@ import {
   statSafe,
   writeSafe
 } from './data-adapter-safe.ts';
+import { getResult } from './indexed-db-utils.ts';
 
 const DB_VERSION = 1;
 const MTIME_STORE_NAME = 'mtime';
@@ -368,20 +369,4 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
     this.fileIgnoreMap.clear();
     mtimeStore.put(currentMtimeEntry, 0);
   }
-}
-
-async function getResult<T>(request: IDBRequest<T>): Promise<T> {
-  if (request.readyState === 'done') {
-    return request.result;
-  }
-
-  return await new Promise<T>((resolve, reject) => {
-    request.addEventListener('success', () => {
-      resolve(request.result);
-    });
-    request.addEventListener('error', () => {
-      const error: Error = request.error ?? new Error('Unknown error');
-      reject(error);
-    });
-  });
 }
