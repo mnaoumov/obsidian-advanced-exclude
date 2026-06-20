@@ -47,7 +47,6 @@ interface SetupParams {
   readonly entries: readonly MockEntry[];
   readonly excludeMode?: ExcludeMode;
   isIgnored(normalizedPath: string): boolean;
-  readonly missingPaths?: readonly string[];
   readonly persistedEntries?: readonly MockEntry[];
   readonly vaultLoadCalled?: boolean;
 }
@@ -61,7 +60,7 @@ interface SetupResult {
 }
 
 function setup(params: SetupParams): SetupResult {
-  const { entries, excludeMode = ExcludeMode.Full, isIgnored, missingPaths = [], persistedEntries = [], vaultLoadCalled = false } = params;
+  const { entries, excludeMode = ExcludeMode.Full, isIgnored, persistedEntries = [], vaultLoadCalled = false } = params;
 
   const mockAdapter: MockAdapter = {
     reconcileDeletion: vi.fn().mockResolvedValue(undefined),
@@ -75,10 +74,8 @@ function setup(params: SetupParams): SetupResult {
   const flagByPath = new Map(entries.map((entry) => [entry.path, entry.isFolderFlag]));
   mockIsFolder.mockImplementation((file) => flagByPath.get((file as TAbstractFile).path) ?? false);
 
-  const missing = new Set(missingPaths);
   const app = strictProxy<App>({
     vault: {
-      getAbstractFileByPath: vi.fn((path: string) => (missing.has(path) ? null : strictProxy<TAbstractFile>({ path }))),
       getAllLoadedFiles: vi.fn().mockReturnValue(loadedFiles)
     },
     workspace: {
@@ -180,7 +177,6 @@ describe('IndexProjectionComponent', () => {
         ],
         // Beta was hidden by a prior session: persisted, not in the loaded index.
         isIgnored: (path) => path === 'gamma.md',
-        missingPaths: ['beta.md'],
         persistedEntries: [{ isFolderFlag: false, path: 'beta.md' }]
       });
 
@@ -329,7 +325,6 @@ describe('IndexProjectionComponent', () => {
         entries: [{ isFolderFlag: false, path: 'alpha.md' }],
         // Nothing ignored, so the hide loop is empty and the abort is hit in the re-add pass.
         isIgnored: () => false,
-        missingPaths: ['beta.md'],
         persistedEntries: [{ isFolderFlag: false, path: 'beta.md' }]
       });
 
