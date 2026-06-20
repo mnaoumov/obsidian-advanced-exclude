@@ -7,7 +7,6 @@ import type {
 import { getDataAdapterEx } from '@obsidian-typings/obsidian-public-latest/implementations';
 import { isFolder } from 'obsidian-dev-utils/obsidian/file-system';
 import { strictProxy } from 'obsidian-dev-utils/strict-proxy';
-import { ensureNonNullable } from 'obsidian-dev-utils/type-guards';
 import {
   beforeEach,
   describe,
@@ -48,6 +47,8 @@ interface SetupParams {
   readonly entries: readonly MockEntry[];
   readonly excludeMode?: ExcludeMode;
   isIgnored(normalizedPath: string): boolean;
+  readonly missingPaths?: readonly string[];
+  readonly persistedEntries?: readonly MockEntry[];
   readonly vaultLoadCalled?: boolean;
 }
 
@@ -56,10 +57,11 @@ interface SetupResult {
   readonly component: IndexProjectionComponent;
   readonly deleteFromFilesPane: ReturnType<typeof vi.fn>;
   readonly mockAdapter: MockAdapter;
+  readonly save: ReturnType<typeof vi.fn>;
 }
 
 function setup(params: SetupParams): SetupResult {
-  const { entries, excludeMode = ExcludeMode.Full, isIgnored, vaultLoadCalled = false } = params;
+  const { entries, excludeMode = ExcludeMode.Full, isIgnored, missingPaths = [], persistedEntries = [], vaultLoadCalled = false } = params;
 
   const mockAdapter: MockAdapter = {
     reconcileDeletion: vi.fn().mockResolvedValue(undefined),
@@ -73,8 +75,10 @@ function setup(params: SetupParams): SetupResult {
   const flagByPath = new Map(entries.map((entry) => [entry.path, entry.isFolderFlag]));
   mockIsFolder.mockImplementation((file) => flagByPath.get((file as TAbstractFile).path) ?? false);
 
+  const missing = new Set(missingPaths);
   const app = strictProxy<App>({
     vault: {
+      getAbstractFileByPath: vi.fn((path: string) => (missing.has(path) ? null : strictProxy<TAbstractFile>({ path }))),
       getAllLoadedFiles: vi.fn().mockReturnValue(loadedFiles)
     },
     workspace: {
@@ -92,6 +96,13 @@ function setup(params: SetupParams): SetupResult {
 
   const vaultLoadPatch = strictProxy<VaultLoadPatchComponent>({ vaultLoadCalled });
 
+  const persisted = persistedEntries.map((entry) => ({ isFolder: entry.isFolderFlag, path: entry.path }));
+  const save = vi.fn();
+  const vaultPathStore = {
+    load: vi.fn().mockResolvedValue(persisted),
+    save
+  };
+
   const addToFilesPane = vi.fn();
   const deleteFromFilesPane = vi.fn();
 
@@ -101,10 +112,11 @@ function setup(params: SetupParams): SetupResult {
     deleteFromFilesPane,
     ignorePatternsComponent,
     pluginSettingsComponent,
-    vaultLoadPatch
+    vaultLoadPatch,
+    vaultPathStore
   });
 
-  return { addToFilesPane, component, deleteFromFilesPane, mockAdapter };
+  return { addToFilesPane, component, deleteFromFilesPane, mockAdapter, save };
 }
 
 describe('IndexProjectionComponent', () => {
@@ -159,6 +171,28 @@ describe('IndexProjectionComponent', () => {
     });
   });
 
+  describe('applyFull persisted restore', () => {
+    it('re-adds a persisted file that is now visible but missing from the index', async () => {
+      const { component, mockAdapter, save } = setup({
+        entries: [
+          { isFolderFlag: false, path: 'alpha.md' },
+          { isFolderFlag: false, path: 'gamma.md' }
+        ],
+        // Beta was hidden by a prior session: persisted, not in the loaded index.
+        isIgnored: (path) => path === 'gamma.md',
+        missingPaths: ['beta.md'],
+        persistedEntries: [{ isFolderFlag: false, path: 'beta.md' }]
+      });
+
+      await component.applyFull();
+
+      // Gamma is now ignored -> removed; beta is visible but missing -> re-added.
+      expect(mockAdapter.reconcileDeletion).toHaveBeenCalledWith('gamma.md', 'gamma.md');
+      expect(mockAdapter.reconcileFile).toHaveBeenCalledWith('beta.md', 'beta.md');
+      expect(save).toHaveBeenCalled();
+    });
+  });
+
   describe('applyFull (FilesPane mode)', () => {
     it('removes every hidden node from the files pane and touches no adapter', async () => {
       const { component, deleteFromFilesPane, mockAdapter } = setup({
@@ -175,39 +209,6 @@ describe('IndexProjectionComponent', () => {
 
       expect(deleteFromFilesPane).toHaveBeenCalledExactlyOnceWith('a/drop.md');
       expect(mockAdapter.reconcileDeletion).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('restoreAll', () => {
-    it('re-adds the hidden roots via reconcileFile in Full mode', async () => {
-      const { component, mockAdapter } = setup({
-        entries: [
-          { isFolderFlag: true, path: 'a' },
-          { isFolderFlag: false, path: 'a/x.md' }
-        ],
-        isIgnored: (path) => path === 'a' || path.startsWith('a/')
-      });
-
-      await component.applyFull();
-      await component.restoreAll();
-
-      expect(mockAdapter.reconcileFile).toHaveBeenCalledExactlyOnceWith('a', 'a');
-    });
-
-    it('re-adds hidden nodes to the files pane in FilesPane mode', async () => {
-      const { addToFilesPane, component } = setup({
-        entries: [
-          { isFolderFlag: true, path: 'a' },
-          { isFolderFlag: false, path: 'a/drop.md' }
-        ],
-        excludeMode: ExcludeMode.FilesPane,
-        isIgnored: (path) => path === 'a/drop.md'
-      });
-
-      await component.applyFull();
-      await component.restoreAll();
-
-      expect(addToFilesPane).toHaveBeenCalledExactlyOnceWith('a/drop.md');
     });
   });
 
@@ -262,19 +263,13 @@ describe('IndexProjectionComponent', () => {
         isIgnored: (path) => path === 'drop.md'
       });
 
-      let resolveDeletion: (() => void) | undefined;
-      mockAdapter.reconcileDeletion.mockReturnValueOnce(
-        new Promise<void>((resolve) => {
-          resolveDeletion = resolve;
-        })
-      );
-
+      // Both calls are in flight at the async model rebuild; the second aborts the
+      // First, so the first never reaches its reconcile step.
       const firstUpdate = component.update();
       const secondUpdate = component.update();
-      ensureNonNullable(resolveDeletion)();
       await Promise.all([firstUpdate, secondUpdate]);
 
-      expect(mockAdapter.reconcileDeletion).toHaveBeenCalled();
+      expect(mockAdapter.reconcileDeletion).not.toHaveBeenCalled();
     });
 
     it('re-shows files that became visible and hides newly-ignored ones on a later update', async () => {
@@ -327,6 +322,22 @@ describe('IndexProjectionComponent', () => {
       await component.applyFull(controller.signal);
 
       expect(mockAdapter.reconcileDeletion).not.toHaveBeenCalled();
+    });
+
+    it('stops the re-add pass when the abort signal is already aborted', async () => {
+      const { component, mockAdapter } = setup({
+        entries: [{ isFolderFlag: false, path: 'alpha.md' }],
+        // Nothing ignored, so the hide loop is empty and the abort is hit in the re-add pass.
+        isIgnored: () => false,
+        missingPaths: ['beta.md'],
+        persistedEntries: [{ isFolderFlag: false, path: 'beta.md' }]
+      });
+
+      const controller = new AbortController();
+      controller.abort();
+      await component.applyFull(controller.signal);
+
+      expect(mockAdapter.reconcileFile).not.toHaveBeenCalled();
     });
   });
 
@@ -385,19 +396,12 @@ describe('IndexProjectionComponent', () => {
         isIgnored: (path) => path === 'drop.md'
       });
 
-      let resolveDeletion: (() => void) | undefined;
-      mockAdapter.reconcileDeletion.mockReturnValueOnce(
-        new Promise<void>((resolve) => {
-          resolveDeletion = resolve;
-        })
-      );
-
+      // The update is in flight at the async model rebuild; unload aborts it before it reconciles.
       const updatePromise = component.update();
       component.onunload();
-      ensureNonNullable(resolveDeletion)();
       await updatePromise;
 
-      expect(mockAdapter.reconcileDeletion).toHaveBeenCalledExactlyOnceWith('drop.md', 'drop.md');
+      expect(mockAdapter.reconcileDeletion).not.toHaveBeenCalled();
     });
   });
 
