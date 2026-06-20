@@ -86,8 +86,8 @@ folders and drives the exact live "edit settings to change ignores" flow
 one `reconcileDeletion` (its hide-root), all files vanish, and removing the pattern
 re-shows the whole folder — all independent of size, a regression guard for the
 freeze that replaces manual big-vault testing. All three sizes pass on desktop.
-Pending: Android integration needs an emulator (unavailable here); review/merge to
-`master`.
+Android integration suite passes on the `obsidian_test` emulator (Appium on
+127.0.0.1:4723). Pending: review/merge to `master`.
 
 ## Known Issues
 
