@@ -80,14 +80,16 @@ the model. `update()` also persists the hidden set after each `applyDelta`, so a
 later reload reconstructs it. Together these make a same-session un-ignore re-show
 hidden files without a reload.
 
-Added `src/vault-size-scaling.desktop.integration.test.ts`: generates 100/1000/3000-file
-folders and drives the exact live "edit settings to change ignores" flow
-(`editAndSave` → `processConfigChanges`). Asserts the folder collapses to exactly
-one `reconcileDeletion` (its hide-root), all files vanish, and removing the pattern
-re-shows the whole folder — all independent of size, a regression guard for the
-freeze that replaces manual big-vault testing. All three sizes pass on desktop.
-Android integration suite passes on the `obsidian_test` emulator (Appium on
-127.0.0.1:4723). Pending: review/merge to `master`.
+Added `src/vault-size-scaling.desktop.integration.test.ts`: a generic driver that
+generates a vault, drives the exact live "edit settings to change ignores" flow
+(`editAndSave` → `processConfigChanges`), and asserts deletions scoped to the
+ignored paths plus full hide/re-show. Five shapes run: flat 100/1000/3000-file
+folders (one hide-root each), a deep+wide nested tree (breadth 4 × depth 4 ≈ 341
+folders → one hide-root), and 200 independently-ignored sibling folders (one
+hide-root each, proving cost is O(hide-roots), not O(files)). All five pass on
+desktop — a regression guard for the freeze that replaces manual big-vault
+testing. Android integration suite passes on the `obsidian_test` emulator (Appium
+on 127.0.0.1:4723). Pending: review/merge to `master`.
 
 ## Known Issues
 
