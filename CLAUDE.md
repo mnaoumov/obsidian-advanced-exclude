@@ -60,7 +60,15 @@ Built on `obsidian-dev-utils`. Patches Obsidian's `FileSystemAdapter` / `Capacit
 
 ## Current Task
 
-None.
+Real-vault-scale (~90k) end-to-end testing, via populate-before-open. The harness
+feature has shipped: `obsidian-integration-testing` (now `^4.3.0`) gained
+`coreSetup({ populate })` + `createSetup({ populate })` so a vault is written with
+`TempVault.populate()` **before** Obsidian opens it — its startup scan indexes
+everything in one pass (no `app:reload`, no per-file `adapter.write`). The plugin
+consumes it via `scripts/vitest-global-setup-performance.ts`
+(`createSetup({ populate })`) + `scripts/helpers/generate-performance-vault.ts` +
+a new `integration-tests:desktop-performance` vitest project running
+`src/vault-real-scale.desktop-performance.integration.test.ts`.
 
 In-memory shadow-tree rewrite (plan: `docs/in-memory-tree-rewrite-plan.md`).
 Implemented on branch `feat/in-memory-tree`: `VaultModel` (shadow tree +
@@ -82,36 +90,49 @@ the model. `update()` also persists the hidden set after each `applyDelta`, so a
 later reload reconstructs it. Together these make a same-session un-ignore re-show
 hidden files without a reload.
 
-Scaling is covered at two levels, because the two costs differ. The plugin's own
-cost (the freeze) is algorithmic and is tested in memory; getting a real Obsidian
-to that many files is bounded by disk/indexing, which caps the end-to-end test far
-lower.
+Scaling is covered at three levels.
 
-`src/vault-size-scaling.desktop.integration.test.ts` (real Obsidian, end to end):
-a generic driver that builds a vault, drives the exact live "edit settings to
-change ignores" flow (`editAndSave` → `processConfigChanges`), and asserts
+`src/vault-size-scaling.desktop.integration.test.ts` (real Obsidian, `Full` mode,
+end to end): a generic driver that builds a vault, drives the live "edit settings
+to change ignores" flow (`editAndSave` → `processConfigChanges`), and asserts
 deletions scoped to the ignored paths plus full hide/re-show. Shapes: flat
 1000/5000-file folders, a deep+wide nested tree (breadth 4 × depth 4 ≈ 341 folders
-→ one hide-root), 200 independently-ignored sibling folders (one hide-root each,
-cost is O(hide-roots) not O(files)), and a 30,000-file real-scale folder generated
-straight to disk via the raw adapter then indexed by an Obsidian reload (hide-only,
-one deletion). Most timeouts are sized from the file count (`60 s + 20 ms × files`).
-30,000 is the practical ceiling (~8.5 min); generating the maintainer's full ~90k
-vault times out (>30 min) — creating that many real files on disk is the wall, not
-the plugin. Larger sizes therefore live in the in-memory test.
+→ one hide-root), and 200 independently-ignored sibling folders (one hide-root
+each, cost is O(hide-roots) not O(files)). Timeouts are sized from the file count
+(`60 s + 20 ms × files`).
 
 `src/vault-model-scaling.no-app.integration.test.ts` (no Obsidian, no disk):
-exercises `VaultModel` directly at 90,000 (the real F:\Obsidian vault size) and
-1,000,000 files for a single ignored folder (always one hide-root) and 10,000 /
-100,000 independently-ignored folders (one hide-root each). Bench: the live
-per-change cost (`recomputeAll`) is ~40 ms at 100k, ~420 ms at 1M, ~4.5 s at 10M;
-memory ~390 MB per million nodes, so it goes memory-bound (not algorithm-bound)
-past ~5–10M. This is where the maintainer's full vault size is actually exercised.
+exercises `VaultModel` directly at 90,000 and 1,000,000 files (single ignored
+folder → one hide-root) and 10,000 / 100,000 independently-ignored folders. Bench:
+`recomputeAll` ~40 ms at 100k, ~420 ms at 1M, ~4.5 s at 10M; ~390 MB/million nodes.
+This proves the **plugin's** hide work is O(N log N) and ~milliseconds at the
+maintainer's full vault size.
 
-All scaling scenarios pass; the suite replaces manual big-vault testing as the
-freeze regression guard. Android integration suite passes on the `obsidian_test`
-emulator (Appium on 127.0.0.1:4723). Pending: review/merge to `master`.
+`src/vault-real-scale.desktop-performance.integration.test.ts` (real Obsidian, the
+`integration-tests:desktop-performance` project, ~90k populated before open): hides
+the whole vault folder in **`FilesPane` mode** and asserts the explorer is cleared
+(~0.8 s at 90k). See Known Issues for why this is `FilesPane`, not `Full`.
 
 ## Known Issues
 
-None.
+- **`Full`-mode hide of a huge folder — Obsidian's O(N²) cascade, now batched
+  around.** Obsidian's `MetadataCache.deletePath` → `updateRelatedLinks` scans
+  **every** file in the vault (`getCachedFiles()`) to find backlinks to the deleted
+  file, run **once per deleted file** → O(N²) (20k 40 s, 90k ~16 min; confirmed the
+  *sole* quadratic by stubbing only `updateRelatedLinks` — the rest of the cascade
+  is ~linear, so a stubbed 90k hide is ~9 s).
+  **Fixed here (Option A):** `IndexProjectionComponent` monkey-patches
+  `updateRelatedLinks` for the duration of a `Full`-mode projection (`beginProjection`
+  /`endProjection` around the existing `applyingProjectionDepth`), collecting the
+  per-file names instead of scanning, then issues **one** call at the end — by then
+  the hidden files are gone from `getCachedFiles()`, so that single scan is cheap.
+  Needs the `src/obsidian-internals.d.ts` augmentation (the public typings mistype
+  `updateRelatedLinks(path: string)`; it really takes `string[]`). Measured: **20k
+  40 s → 1.4 s (28×), 90k ~16 min → 9.3 s (~104×)**, one real call instead of 90k,
+  hide still correct (in-scope index → 0). Guarded by
+  `src/vault-full-hide-diagnostic.desktop-performance.integration.test.ts` (asserts
+  exactly one real call; size via `AE_PERF_VAULT_SIZE`). `FilesPane` mode is still
+  the absolute fastest (DOM `onDelete`, ~0.8 s at 90k). The more general fix (a
+  reverse-index patch in `backlink-cache`, fixing any plugin's bulk delete) is
+  tracked in `obsidian-backlink-cache/CLAUDE.md`. Worth reporting the O(N²) upstream
+  to Obsidian.

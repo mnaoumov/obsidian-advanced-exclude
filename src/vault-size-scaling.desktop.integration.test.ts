@@ -12,14 +12,6 @@ import {
 import type { IgnorePatternsComponent } from './ignore-patterns-component.ts';
 import type { PluginSettingsComponent } from './plugin-settings-component.ts';
 
-interface RealScaleResult {
-  readonly error: null | string;
-  readonly indexedCount: number;
-  readonly inScopeVisibleAfterHide: number;
-  readonly isControlVisible: boolean;
-  readonly reconcileDeletionCount: number;
-}
-
 interface ScenarioSpec {
   // Sibling file outside the ignored scope; must stay visible after the hide.
   readonly controlPath: string;
@@ -49,33 +41,6 @@ interface VaultSizeScenarioResult {
 
 const PLUGIN_ID = 'advanced-exclude';
 const OBSIDIAN_IGNORE_FILE = '.obsidianignore';
-
-/*
- * A large real-Obsidian vault, end to end. Files are written to disk with the raw
- * adapter (no per-file index/event overhead — `create` is far too slow at this
- * size, see the flat cap above), then Obsidian is reloaded so its startup scan
- * indexes them the way it does for a real vault, then the same live "change
- * ignores" flow runs. Hide-only — the O(files) re-show is covered at smaller sizes.
- *
- * 30,000 is the ceiling that completes reliably (~8.5 min); generating the
- * maintainer's full ~90,000-path vault (F:\Obsidian) times out (>30 min — creating
- * that many real files on disk is the wall, not the plugin). The full 90k is
- * exercised at the algorithm level in `vault-model-scaling.no-app.integration.test.ts`.
- */
-const REAL_VAULT_SIZE = 30_000;
-const REAL_VAULT_FOLDER = 'big';
-const REAL_VAULT_FILES_PER_FOLDER = 30;
-const REAL_VAULT_CONTROL = 'keep-real.md';
-// Concurrency for the raw adapter writes that generate the vault.
-const REAL_SCALE_WRITE_BATCH = 500;
-// Generating the files on disk dominates; the rest is reload + index + hide.
-const REAL_SCALE_TIMEOUT_IN_MS = 1_200_000;
-// After scheduling the reload, give Obsidian time to tear down before the next eval reconnects.
-const REAL_SCALE_RELOAD_GRACE_IN_MS = 15_000;
-// Poll interval while waiting for the startup re-scan to finish indexing.
-const REAL_SCALE_INDEX_POLL_IN_MS = 5000;
-// Upper bound on the index wait so a stuck scan fails instead of hanging.
-const REAL_SCALE_INDEX_WAIT_IN_MS = 600_000;
 
 /*
  * Flat-folder sizes: prove the hide cost is independent of file count. The cap is
@@ -180,18 +145,6 @@ describe('Vault size scaling — Full mode', () => {
   it('hides and re-shows many independently-ignored folders, one deletion each', async () => {
     await assertScenario(manySpec);
   }, scenarioTimeout(manySpec.fileCount));
-
-  it(`hides a ~${REAL_VAULT_SIZE.toLocaleString()}-file real-scale vault with a single deletion`, async () => {
-    const result = await runRealScaleScenario();
-
-    expect(result.error).toBeNull();
-    // The reload actually indexed the whole on-disk vault.
-    expect(result.indexedCount).toBeGreaterThanOrEqual(REAL_VAULT_SIZE);
-    // The entire vault folder collapses to one hide-root at ~90k files — the freeze case.
-    expect(result.reconcileDeletionCount).toBe(1);
-    expect(result.inScopeVisibleAfterHide).toBe(0);
-    expect(result.isControlVisible).toBe(true);
-  }, REAL_SCALE_TIMEOUT_IN_MS);
 });
 
 async function assertScenario(spec: ScenarioSpec): Promise<void> {
@@ -433,182 +386,5 @@ function runIgnoreScenario(spec: ScenarioSpec): Promise<VaultSizeScenarioResult>
       }
     },
     vaultPath: getTempVault().path
-  });
-}
-
-async function runRealScaleScenario(): Promise<RealScaleResult> {
-  const vaultPath = getTempVault().path;
-
-  // 1. Generate the vault on disk via the raw adapter — a plain write with no index
-  // Or events, spread across folders like a real vault. The files are not indexed
-  // Yet; the reload below does that in one startup scan.
-  await evalInObsidian({
-    args: {
-      REAL_SCALE_WRITE_BATCH,
-      REAL_VAULT_CONTROL,
-      REAL_VAULT_FILES_PER_FOLDER,
-      REAL_VAULT_FOLDER,
-      REAL_VAULT_SIZE
-    },
-    async fn({
-      app,
-      REAL_SCALE_WRITE_BATCH: batchSize,
-      REAL_VAULT_CONTROL: controlPath,
-      REAL_VAULT_FILES_PER_FOLDER: filesPerFolder,
-      REAL_VAULT_FOLDER: vaultFolder,
-      REAL_VAULT_SIZE: size
-    }) {
-      const adapter = app.vault.adapter;
-      try {
-        await adapter.rmdir(vaultFolder, true);
-      } catch {
-        // Ignore — the folder may not exist yet.
-      }
-      await adapter.write(controlPath, 'control');
-      await adapter.mkdir(vaultFolder);
-
-      let pending: Promise<void>[] = [];
-      let written = 0;
-      let folderIndex = 0;
-      while (written < size) {
-        const folder = `${vaultFolder}/dir-${String(folderIndex)}`;
-        await adapter.mkdir(folder);
-        for (let fileIndex = 0; fileIndex < filesPerFolder && written < size; fileIndex++) {
-          pending.push(adapter.write(`${folder}/file-${String(fileIndex)}.md`, ''));
-          written++;
-          if (pending.length >= batchSize) {
-            await Promise.all(pending);
-            pending = [];
-          }
-        }
-        folderIndex++;
-      }
-      await Promise.all(pending);
-      return { written };
-    },
-    vaultPath
-  });
-
-  // 2. Reload Obsidian so its startup scan indexes the freshly written tree.
-  await evalInObsidian({
-    fn({ app }) {
-      window.setTimeout(() => {
-        app.commands.executeCommandById('app:reload');
-      }, 200);
-      return { reloadScheduled: true };
-    },
-    vaultPath
-  });
-  await waitInNode(REAL_SCALE_RELOAD_GRACE_IN_MS);
-
-  // 3. Wait for indexing, then drive the same live "change ignores" flow at scale.
-  return evalInObsidian({
-    args: {
-      PLUGIN_ID,
-      REAL_SCALE_INDEX_POLL_IN_MS,
-      REAL_SCALE_INDEX_WAIT_IN_MS,
-      REAL_VAULT_CONTROL,
-      REAL_VAULT_FOLDER,
-      REAL_VAULT_SIZE,
-      settle,
-      SETTLE_DELAY_IN_MS
-    },
-    async fn({
-      app,
-      PLUGIN_ID: pluginId,
-      REAL_SCALE_INDEX_POLL_IN_MS: pollMs,
-      REAL_SCALE_INDEX_WAIT_IN_MS: indexWaitMs,
-      REAL_VAULT_CONTROL: controlPath,
-      REAL_VAULT_FOLDER: vaultFolder,
-      REAL_VAULT_SIZE: expectedCount,
-      settle: settleWait,
-      SETTLE_DELAY_IN_MS: settleDelay
-    }) {
-      const scopePrefix = `${vaultFolder}/`;
-      const deadline = Date.now() + indexWaitMs;
-      let indexedCount = 0;
-      while (Date.now() < deadline) {
-        indexedCount = app.vault.getFiles().filter((file) => file.path.startsWith(scopePrefix)).length;
-        if (indexedCount >= expectedCount) {
-          break;
-        }
-        await settleWait(pollMs);
-      }
-      // Let the plugin's post-reload model build settle before changing config.
-      await settleWait(settleDelay);
-
-      const plugin = app.plugins.getPlugin(pluginId);
-      if (!plugin) {
-        return makeResult('Plugin not loaded');
-      }
-
-      const ignorePatternsComponent = findComponent(plugin, 'IgnorePatternsComponent') as IgnorePatternsComponent | undefined;
-      const pluginSettingsComponent = findComponent(plugin, 'PluginSettingsComponent') as PluginSettingsComponent | undefined;
-      if (!ignorePatternsComponent || !pluginSettingsComponent) {
-        return makeResult('Could not locate plugin components');
-      }
-
-      const adapterEx = app.vault.adapter as DataAdapterEx;
-      const originalReconcileDeletion = adapterEx.reconcileDeletion.bind(adapterEx);
-      let reconcileDeletionCount = 0;
-      adapterEx.reconcileDeletion = async (normalizedPath, normalizedNewPath, shouldSkipDeletionTimeout): Promise<void> => {
-        if (normalizedPath.startsWith(vaultFolder)) {
-          reconcileDeletionCount++;
-        }
-        await originalReconcileDeletion(normalizedPath, normalizedNewPath, shouldSkipDeletionTimeout);
-      };
-
-      try {
-        await pluginSettingsComponent.editAndSave((settings) => {
-          settings.obsidianIgnoreContent = `${vaultFolder}/\n`;
-        });
-        await ignorePatternsComponent.processConfigChanges();
-        await settleWait(settleDelay);
-
-        const visible = app.vault.getFiles().map((file) => file.path);
-        return {
-          error: null,
-          indexedCount,
-          inScopeVisibleAfterHide: visible.filter((path) => path.startsWith(scopePrefix)).length,
-          isControlVisible: visible.includes(controlPath),
-          reconcileDeletionCount
-        };
-      } finally {
-        adapterEx.reconcileDeletion = originalReconcileDeletion;
-      }
-
-      function makeResult(error: string): RealScaleResult {
-        return {
-          error,
-          indexedCount,
-          inScopeVisibleAfterHide: -1,
-          isControlVisible: false,
-          reconcileDeletionCount: -1
-        };
-      }
-
-      function findComponent(root: object, className: string): unknown {
-        if (root.constructor.name === className) {
-          return root;
-        }
-        for (const child of (root as TraversableComponent)._children ?? []) {
-          if (typeof child === 'object' && child !== null) {
-            const found = findComponent(child, className);
-            if (found) {
-              return found;
-            }
-          }
-        }
-        return undefined;
-      }
-    },
-    vaultPath
-  });
-}
-
-function waitInNode(ms: number): Promise<void> {
-  return new Promise((resolve) => {
-    // eslint-disable-next-line obsidianmd/prefer-window-timers -- This runs in the Node test process, where `window` does not exist.
-    setTimeout(resolve, ms);
   });
 }
