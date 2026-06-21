@@ -60,6 +60,8 @@ Built on `obsidian-dev-utils`. Patches Obsidian's `FileSystemAdapter` / `Capacit
 
 ## Current Task
 
+None.
+
 In-memory shadow-tree rewrite (plan: `docs/in-memory-tree-rewrite-plan.md`).
 Implemented on branch `feat/in-memory-tree`: `VaultModel` (shadow tree +
 bottom-up visibility) and `IndexProjectionComponent` replace the whole-vault
@@ -80,23 +82,31 @@ the model. `update()` also persists the hidden set after each `applyDelta`, so a
 later reload reconstructs it. Together these make a same-session un-ignore re-show
 hidden files without a reload.
 
-Scaling is covered at two levels. `src/vault-size-scaling.desktop.integration.test.ts`
-is a generic driver that generates a real vault, drives the exact live "edit
-settings to change ignores" flow (`editAndSave` → `processConfigChanges`), and
-asserts deletions scoped to the ignored paths plus full hide/re-show. Shapes: flat
-1000/5000-file folders (one hide-root each), a deep+wide nested tree (breadth 4 ×
-depth 4 ≈ 341 folders → one hide-root), and 200 independently-ignored sibling
-folders (one hide-root each, proving cost is O(hide-roots), not O(files)). Per-test
-timeouts are sized from the file count (`60 s + 20 ms × files`). Real-Obsidian file
-creation/indexing is the cap here — 10,000 files take ~280 s end to end, so larger
-counts live in the in-memory test below.
+Scaling is covered at two levels, because the two costs differ. The plugin's own
+cost (the freeze) is algorithmic and is tested in memory; getting a real Obsidian
+to that many files is bounded by disk/indexing, which caps the end-to-end test far
+lower.
 
-`src/vault-model-scaling.no-app.integration.test.ts` exercises `VaultModel`
-directly (no Obsidian, no disk) at 100,000 and 1,000,000 files for a single ignored
-folder (always one hide-root) and 10,000 / 100,000 independently-ignored folders
-(one hide-root each). Bench (`F:\tmp\model-bench.ts`): the live per-change cost
-(`recomputeAll`) is ~40 ms at 100k, ~420 ms at 1M, ~4.5 s at 10M; memory ~390 MB
-per million nodes, so it goes memory-bound (not algorithm-bound) past ~5–10M.
+`src/vault-size-scaling.desktop.integration.test.ts` (real Obsidian, end to end):
+a generic driver that builds a vault, drives the exact live "edit settings to
+change ignores" flow (`editAndSave` → `processConfigChanges`), and asserts
+deletions scoped to the ignored paths plus full hide/re-show. Shapes: flat
+1000/5000-file folders, a deep+wide nested tree (breadth 4 × depth 4 ≈ 341 folders
+→ one hide-root), 200 independently-ignored sibling folders (one hide-root each,
+cost is O(hide-roots) not O(files)), and a 30,000-file real-scale folder generated
+straight to disk via the raw adapter then indexed by an Obsidian reload (hide-only,
+one deletion). Most timeouts are sized from the file count (`60 s + 20 ms × files`).
+30,000 is the practical ceiling (~8.5 min); generating the maintainer's full ~90k
+vault times out (>30 min) — creating that many real files on disk is the wall, not
+the plugin. Larger sizes therefore live in the in-memory test.
+
+`src/vault-model-scaling.no-app.integration.test.ts` (no Obsidian, no disk):
+exercises `VaultModel` directly at 90,000 (the real F:\Obsidian vault size) and
+1,000,000 files for a single ignored folder (always one hide-root) and 10,000 /
+100,000 independently-ignored folders (one hide-root each). Bench: the live
+per-change cost (`recomputeAll`) is ~40 ms at 100k, ~420 ms at 1M, ~4.5 s at 10M;
+memory ~390 MB per million nodes, so it goes memory-bound (not algorithm-bound)
+past ~5–10M. This is where the maintainer's full vault size is actually exercised.
 
 All scaling scenarios pass; the suite replaces manual big-vault testing as the
 freeze regression guard. Android integration suite passes on the `obsidian_test`
