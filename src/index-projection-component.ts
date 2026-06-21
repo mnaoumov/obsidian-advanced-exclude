@@ -1,5 +1,8 @@
 import type { DataAdapterEx } from '@obsidian-typings/obsidian-public-latest';
-import type { App } from 'obsidian';
+import type {
+  App,
+  MetadataCache
+} from 'obsidian';
 
 import { getDataAdapterEx } from '@obsidian-typings/obsidian-public-latest/implementations';
 import { ComponentEx } from 'obsidian-dev-utils/obsidian/components/component-ex';
@@ -55,8 +58,10 @@ export class IndexProjectionComponent extends ComponentEx {
   private readonly addToFilesPane: (normalizedPath: string) => void;
   private readonly app: App;
   private applyingProjectionDepth = 0;
+  private readonly collectedRelatedLinkNames = new Set<string>();
   private readonly deleteFromFilesPane: (normalizedPath: string) => void;
   private hasBuiltModel = false;
+  private originalUpdateRelatedLinks: MetadataCache['updateRelatedLinks'] | null = null;
   private readonly pluginSettingsComponent: PluginSettingsComponent;
   private updateAbortController: AbortController | null = null;
   private readonly vaultLoadPatch: VaultLoadPatchComponent;
@@ -196,7 +201,7 @@ export class IndexProjectionComponent extends ComponentEx {
     this.updateAbortController?.abort();
     this.updateAbortController = new AbortController();
     const abortSignal = this.updateAbortController.signal;
-    this.applyingProjectionDepth++;
+    this.beginProjection();
     try {
       if (this.hasBuiltModel) {
         await this.applyDelta(this.vaultModel.recomputeAll(), abortSignal);
@@ -207,8 +212,35 @@ export class IndexProjectionComponent extends ComponentEx {
         await this.applyFull(abortSignal);
       }
     } finally {
-      this.applyingProjectionDepth--;
+      this.endProjection();
       this.updateAbortController = null;
+    }
+  }
+
+  private beginProjection(): void {
+    if (this.applyingProjectionDepth === 0) {
+      this.installRelatedLinksBatching();
+    }
+    this.applyingProjectionDepth++;
+  }
+
+  private endProjection(): void {
+    this.applyingProjectionDepth--;
+    if (this.applyingProjectionDepth === 0) {
+      this.flushRelatedLinksBatching();
+    }
+  }
+
+  private flushRelatedLinksBatching(): void {
+    const original = this.originalUpdateRelatedLinks;
+    if (!original) {
+      return;
+    }
+    this.app.metadataCache.updateRelatedLinks = original;
+    this.originalUpdateRelatedLinks = null;
+    if (this.collectedRelatedLinkNames.size > 0) {
+      this.app.metadataCache.updateRelatedLinks([...this.collectedRelatedLinkNames]);
+      this.collectedRelatedLinkNames.clear();
     }
   }
 
@@ -222,6 +254,35 @@ export class IndexProjectionComponent extends ComponentEx {
     } else {
       this.deleteFromFilesPane(entry.path);
     }
+  }
+
+  /**
+   * In `Full` mode the hide issues `reconcileDeletion`, whose internal cascade
+   * calls `MetadataCache.updateRelatedLinks` once per deleted file — and each call
+   * scans every file in the vault, making a folder hide O(N²) (a ~16 min 90k hide).
+   * While the projection runs, collect the names instead of scanning; one pass
+   * afterwards re-resolves them all (by then the hidden files are gone from the
+   * cache, so the single scan is cheap), turning the hide into seconds.
+   */
+  private installRelatedLinksBatching(): void {
+    if (this.excludeMode !== ExcludeMode.Full) {
+      return;
+    }
+    const metadataCache = this.app.metadataCache;
+    // eslint-disable-next-line @typescript-eslint/unbound-method -- captured to restore on the same object later, never called detached.
+    this.originalUpdateRelatedLinks = metadataCache.updateRelatedLinks;
+    const collected = this.collectedRelatedLinkNames;
+    collected.clear();
+    /*
+     * The public typings mistype the param as a single string; the real method
+     * takes an array. Accept both and flatten so the assignment satisfies both
+     * overloads without a runtime branch.
+     */
+    metadataCache.updateRelatedLinks = (namesOrPath: string | string[]): void => {
+      for (const name of [namesOrPath].flat()) {
+        collected.add(name);
+      }
+    };
   }
 
   private async rebuildModel(): Promise<void> {
