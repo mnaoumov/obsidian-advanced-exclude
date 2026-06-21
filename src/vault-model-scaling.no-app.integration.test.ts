@@ -10,14 +10,16 @@ import { VaultModel } from './vault-model.ts';
 
 /*
  * Pure in-memory scaling of the shadow tree — no Obsidian, no disk — so it can go
- * far past what real-vault integration can create and index. The point is the
- * hide cost: a single ignored folder always collapses to one hide-root, and N
- * independently-ignored folders yield exactly N, whatever the file count. The
- * 30 s project timeout doubles as an O(N^2) guard: recomputing a 1,000,000-node
- * tree must finish in well under a second.
+ * far past what real-vault integration can create and index. This is where the
+ * maintainer's real vault size (F:\Obsidian, ~90,000 paths) is actually exercised:
+ * generating 90k real files end to end times out, but the model handles it (and
+ * 1,000,000) in well under a second. The point is the hide cost: a single ignored
+ * folder always collapses to one hide-root, and N independently-ignored folders
+ * yield exactly N, whatever the file count. The 30 s project timeout doubles as an
+ * O(N^2) guard.
  */
 
-const SINGLE_FOLDER_SIZES = [100_000, 1_000_000];
+const SINGLE_FOLDER_SIZES = [90_000, 1_000_000];
 const MANY_FOLDER_COUNTS = [10_000, 100_000];
 const IGNORED_FOLDER = 'big';
 
