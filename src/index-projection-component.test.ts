@@ -54,11 +54,13 @@ interface SetupParams {
 
 interface SetupResult {
   readonly addToFilesPane: ReturnType<typeof vi.fn>;
+  readonly app: App;
   readonly component: IndexProjectionComponent;
   readonly deleteFromFilesPane: ReturnType<typeof vi.fn>;
   fireWorkspaceLayoutReady(): void;
   readonly mockAdapter: MockAdapter;
   readonly save: ReturnType<typeof vi.fn>;
+  readonly updateRelatedLinks: ReturnType<typeof vi.fn>;
 }
 
 function setup(params: SetupParams): SetupResult {
@@ -77,7 +79,11 @@ function setup(params: SetupParams): SetupResult {
   mockIsFolder.mockImplementation((file) => flagByPath.get((file as TAbstractFile).path) ?? false);
 
   let workspaceLayoutReadyCallback: (() => void) | undefined;
+  const updateRelatedLinks = vi.fn();
   const app = strictProxy<App>({
+    metadataCache: {
+      updateRelatedLinks
+    },
     vault: {
       getAllLoadedFiles: vi.fn().mockReturnValue(loadedFiles)
     },
@@ -118,7 +124,7 @@ function setup(params: SetupParams): SetupResult {
     vaultPathStore
   });
 
-  return { addToFilesPane, component, deleteFromFilesPane, fireWorkspaceLayoutReady, mockAdapter, save };
+  return { addToFilesPane, app, component, deleteFromFilesPane, fireWorkspaceLayoutReady, mockAdapter, save, updateRelatedLinks };
 
   function fireWorkspaceLayoutReady(): void {
     workspaceLayoutReadyCallback?.();
@@ -339,6 +345,48 @@ describe('IndexProjectionComponent', () => {
 
       expect(mockAdapter.reconcileFile).toHaveBeenCalledExactlyOnceWith('drop.md', 'drop.md');
       expect(mockAdapter.reconcileDeletion).toHaveBeenCalledExactlyOnceWith('keep.md', 'keep.md');
+    });
+  });
+
+  describe('updateRelatedLinks batching', () => {
+    it('collects the cascade\'s per-file updateRelatedLinks into one call after a Full-mode hide', async () => {
+      const { app, component, mockAdapter, updateRelatedLinks } = setup({
+        entries: [
+          { isFolderFlag: true, path: 'a' },
+          { isFolderFlag: false, path: 'a/x.md' }
+        ],
+        isIgnored: (path) => path === 'a' || path.startsWith('a/')
+      });
+
+      /*
+       * Simulate Obsidian's cascade: a folder reconcileDeletion fires
+       * updateRelatedLinks once per removed descendant (the O(N²) source). While
+       * the projection runs these are collected, not run.
+       */
+      mockAdapter.reconcileDeletion.mockImplementation((path: string) => {
+        app.metadataCache.updateRelatedLinks([path]);
+        app.metadataCache.updateRelatedLinks([`${path}/x.md`]);
+      });
+
+      await component.update();
+
+      /*
+       * One reconcileDeletion (the hide-root), two collected names, one real call
+       * afterwards with their union.
+       */
+      expect(updateRelatedLinks).toHaveBeenCalledExactlyOnceWith(['a', 'a/x.md']);
+    });
+
+    it('does not touch updateRelatedLinks in FilesPane mode', async () => {
+      const { component, updateRelatedLinks } = setup({
+        entries: [{ isFolderFlag: false, path: 'drop.md' }],
+        excludeMode: ExcludeMode.FilesPane,
+        isIgnored: (path) => path === 'drop.md'
+      });
+
+      await component.update();
+
+      expect(updateRelatedLinks).not.toHaveBeenCalled();
     });
   });
 
