@@ -1,6 +1,9 @@
 import type { Plugin } from 'obsidian';
+import type { GenericVoidFunction } from 'obsidian-dev-utils/function';
 import type { PluginSettingsComponentBase } from 'obsidian-dev-utils/obsidian/components/plugin-settings-component';
 
+import { noopAsync } from 'obsidian-dev-utils/function';
+import { castTo } from 'obsidian-dev-utils/object-utils';
 import { strictProxy } from 'obsidian-dev-utils/strict-proxy';
 import { App } from 'obsidian-test-mocks/obsidian';
 import {
@@ -12,82 +15,81 @@ import {
 } from 'vitest';
 
 import type { IgnorePatternsComponent } from './ignore-patterns-component.ts';
-import type { PluginSettings } from './plugin-settings.ts';
 
 import { PluginSettingsTab } from './plugin-settings-tab.ts';
-import { ExcludeMode } from './plugin-settings.ts';
+import {
+  ExcludeMode,
+  PluginSettings
+} from './plugin-settings.ts';
 
+/*
+ * Return-value stub of a dev-utils utility. appendCodeBlock writes into a DOM
+ * fragment that the test does not assert on; the real implementation is exercised
+ * elsewhere.
+ */
 vi.mock('obsidian-dev-utils/html-element', () => ({
   appendCodeBlock: vi.fn()
 }));
 
-interface MockPlugin {
-  app: App;
-}
-
-interface MockPluginSettingsTabBaseParams {
-  readonly plugin: MockPlugin;
-  readonly pluginSettingsComponent: PluginSettingsComponentBase<PluginSettings>;
-}
-
-vi.mock('obsidian-dev-utils/obsidian/plugin/plugin-settings-tab', () => {
-  class MockPluginSettingsTabBase {
-    public app: App;
-    public containerEl: HTMLElement = createDiv();
-    protected readonly pluginSettingsComponent: PluginSettingsComponentBase<PluginSettings>;
-
-    public constructor(params: MockPluginSettingsTabBaseParams) {
-      this.app = params.plugin.app;
-      this.pluginSettingsComponent = params.pluginSettingsComponent;
-    }
-
-    public bind(): void {
-      // No-op for testing
-    }
-
-    public displayLegacy(): void {
-      // No-op for testing
-    }
-
-    public async hideAsync(): Promise<void> {
-      // No-op for testing
-    }
-  }
-
-  return {
-    PluginSettingsTabBase: MockPluginSettingsTabBase,
-    SAVE_TO_FILE_CONTEXT: 'PluginSettingsTab'
-  };
-});
+/*
+ * Return-value stub of a dev-utils utility. The real base's `bind` duck-types every
+ * value component it receives via `getTextBasedComponentValue` -> `isTextBasedComponent`,
+ * which READS `setPlaceholderValue` on the component to decide whether it is text-based.
+ * The obsidian-test-mocks value components are wrapped in a strict proxy that THROWS on
+ * an unmocked property read (a real Obsidian component would yield `undefined` and the
+ * probe would simply move on), so the read blows up before `bind` can continue. Stubbing
+ * the probe's return value to `null` (its real result for a non-text-based component)
+ * lets the REAL base `displayLegacy`/`bind` run end to end over the REAL test-mocks
+ * `Setting` controls. This only neutralizes a dev-utils-internal text-placeholder branch
+ * that is covered by dev-utils' own tests; the lines under test here merely call
+ * `this.bind(...)` and are exercised regardless.
+ */
+vi.mock('obsidian-dev-utils/obsidian/setting-components/text-based-component', () => ({
+  getTextBasedComponentValue: vi.fn(() => null)
+}));
 
 describe('PluginSettingsTab', () => {
   let app: App;
   let ignorePatternsComponent: IgnorePatternsComponent;
   let pluginSettingsComponent: PluginSettingsComponentBase<PluginSettings>;
-  let mockProcessConfigChanges: ReturnType<typeof vi.fn<() => Promise<void>>>;
+  let saveToFile: ReturnType<typeof vi.fn<typeof noopAsync>>;
+  let processConfigChanges: ReturnType<typeof vi.fn<() => Promise<void>>>;
   let tab: PluginSettingsTab;
 
   beforeEach(() => {
     app = App.createConfigured__();
-    mockProcessConfigChanges = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
+    saveToFile = vi.fn<typeof noopAsync>(() => noopAsync());
+    processConfigChanges = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
+
     ignorePatternsComponent = strictProxy<IgnorePatternsComponent>({
-      processConfigChanges: mockProcessConfigChanges
+      processConfigChanges
     });
+
+    const settings = new PluginSettings();
+    settings.excludeMode = ExcludeMode.Full;
     pluginSettingsComponent = strictProxy<PluginSettingsComponentBase<PluginSettings>>({
-      settings: {
-        excludeMode: ExcludeMode.Full,
-        obsidianIgnoreContent: '',
-        shouldIgnoreExcludedFiles: false,
-        shouldIncludeGitIgnorePatterns: true
+      defaultSettings: new PluginSettings(),
+      on: castTo<PluginSettingsComponentBase<PluginSettings>['on']>(vi.fn((_name: string, _callback: GenericVoidFunction) => ({
+        asyncEventSource: {
+          offref: vi.fn()
+        }
+      }))),
+      saveToFile,
+      setProperty: vi.fn(() => Promise.resolve('')),
+      settingsState: {
+        effectiveValues: settings,
+        inputValues: settings,
+        validationMessages: { excludeMode: '', obsidianIgnoreContent: '', shouldIgnoreExcludedFiles: '', shouldIncludeGitIgnorePatterns: '' }
       }
     });
 
-    const mockPlugin = strictProxy<Plugin>({});
-    Object.defineProperty(mockPlugin, 'app', { value: app.asOriginalType__() });
+    const plugin = strictProxy<Plugin>({
+      app: app.asOriginalType__()
+    });
 
     tab = new PluginSettingsTab({
       ignorePatternsComponent,
-      plugin: mockPlugin,
+      plugin,
       pluginSettingsComponent
     });
   });
@@ -105,7 +107,8 @@ describe('PluginSettingsTab', () => {
     it('should call ignorePatternsComponent.processConfigChanges', async () => {
       await tab.hideAsync();
 
-      expect(mockProcessConfigChanges).toHaveBeenCalled();
+      expect(saveToFile).toHaveBeenCalled();
+      expect(processConfigChanges).toHaveBeenCalled();
     });
   });
 });
