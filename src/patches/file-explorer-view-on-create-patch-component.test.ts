@@ -1,4 +1,3 @@
-import type { FileExplorerView } from '@obsidian-typings/obsidian-public-latest';
 import type { TAbstractFile } from 'obsidian';
 
 import {
@@ -12,6 +11,7 @@ import {
   WorkspaceLeaf
 } from 'obsidian-test-mocks/obsidian';
 import {
+  afterEach,
   beforeEach,
   describe,
   expect,
@@ -42,20 +42,7 @@ class MockFileExplorerView extends View {
   }
 }
 
-vi.mock('obsidian-dev-utils/object-utils', () => ({
-  castTo: vi.fn((obj: unknown) => obj),
-  getPrototypeOf: vi.fn((obj: object) => Object.getPrototypeOf(obj))
-}));
-
-vi.mock('obsidian-dev-utils/obsidian/components/layout-ready-component', () => {
-  return {
-    // eslint-disable-next-line prefer-arrow-callback, func-names -- mock must be constructable with `new`
-    CallbackLayoutReadyComponent: vi.fn().mockImplementation(function (_app: unknown, callback: () => void) {
-      return { callback, load: vi.fn() };
-    })
-  };
-});
-
+// Return-value stub of a dev-utils utility — the test controls what counts as a folder.
 vi.mock('obsidian-dev-utils/obsidian/file-system', () => ({
   isFolder: vi.fn().mockReturnValue(false)
 }));
@@ -65,10 +52,16 @@ describe('FileExplorerViewOnCreatePatchComponent', () => {
   let settings: PluginSettings;
   let ignorePatternsComponent: IgnorePatternsComponent;
   let pluginSettingsComponent: PluginSettingsComponent;
+  let triggerWorkspaceLayoutReady: (() => void) | undefined;
 
   beforeEach(() => {
+    vi.useFakeTimers();
     app = App.createConfigured__();
+    triggerWorkspaceLayoutReady = undefined;
     app.asOriginalType__().workspace.getLeavesOfType = vi.fn().mockReturnValue([]);
+    app.asOriginalType__().workspace.onLayoutReady = vi.fn((callback: () => void) => {
+      triggerWorkspaceLayoutReady = callback;
+    });
     settings = new PluginSettings();
 
     ignorePatternsComponent = strictProxy<IgnorePatternsComponent>({
@@ -79,12 +72,35 @@ describe('FileExplorerViewOnCreatePatchComponent', () => {
     });
   });
 
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   function createComponent(): FileExplorerViewOnCreatePatchComponent {
     return new FileExplorerViewOnCreatePatchComponent({
       app: app.asOriginalType__(),
       ignorePatternsComponent,
       pluginSettingsComponent
     });
+  }
+
+  /*
+   * Drives the real layout-ready lifecycle: `load()` eager-loads the real
+   * `CallbackLayoutReadyComponent` child (which registers `workspace.onLayoutReady`);
+   * firing that callback and flushing the `setTimeout(…, 0)` runs the component's
+   * real `onLayoutReady`. `invokeAsyncSafely` calls its function synchronously, so
+   * the patch is registered by the time `runAllTimers` returns.
+   */
+  function loadAndFireLayoutReady(component: FileExplorerViewOnCreatePatchComponent): void {
+    component.load();
+    triggerWorkspaceLayoutReady?.();
+    vi.runAllTimers();
+  }
+
+  function useFileExplorerView(view: View): void {
+    vi.mocked(app.asOriginalType__().workspace.getLeavesOfType).mockReturnValue(
+      castTo<ReturnType<Workspace['getLeavesOfType']>>([strictProxy<WorkspaceLeaf>({ view })])
+    );
   }
 
   describe('onload', () => {
@@ -100,41 +116,30 @@ describe('FileExplorerViewOnCreatePatchComponent', () => {
 
   describe('onLayoutReady', () => {
     it('should not register patch when no file explorer view exists', () => {
-      vi.mocked(app.asOriginalType__().workspace.getLeavesOfType).mockReturnValue([]);
-
       const component = createComponent();
       const registerMethodPatchSpy = vi.spyOn(component, 'registerMethodPatch');
 
-      component.onLayoutReady();
+      loadAndFireLayoutReady(component);
 
       expect(registerMethodPatchSpy).not.toHaveBeenCalled();
     });
 
     it('should register onCreate patch when file explorer view exists', () => {
-      const mockOnCreate = vi.fn();
-      const mockView = strictProxy<FileExplorerView>({
-        onCreate: mockOnCreate
-      });
-      vi.mocked(app.asOriginalType__().workspace.getLeavesOfType).mockReturnValue(
-        castTo<ReturnType<Workspace['getLeavesOfType']>>([strictProxy<WorkspaceLeaf>({ view: mockView })])
-      );
+      useFileExplorerView(new MockFileExplorerView(WorkspaceLeaf.create2__(app).asOriginalType3__()));
 
       const component = createComponent();
-      component.load();
-      component.onLayoutReady();
+      const registerMethodPatchSpy = vi.spyOn(component, 'registerMethodPatch');
 
-      // RegisterMethodPatch was called (1 from onload for CallbackLayoutReadyComponent's addChild,
-      // But registerMethodPatch is on the component itself)
-      expect(component).toBeDefined();
+      loadAndFireLayoutReady(component);
+
+      expect(registerMethodPatchSpy).toHaveBeenCalledOnce();
     });
   });
 
   describe('onCreate', () => {
     function setupOnCreateTest(): MockFileExplorerView {
       const mockView = new MockFileExplorerView(WorkspaceLeaf.create2__(app).asOriginalType3__());
-      vi.mocked(app.asOriginalType__().workspace.getLeavesOfType).mockReturnValue(
-        castTo<ReturnType<Workspace['getLeavesOfType']>>([strictProxy<WorkspaceLeaf>({ view: mockView })])
-      );
+      useFileExplorerView(mockView);
       return mockView;
     }
 
@@ -145,13 +150,12 @@ describe('FileExplorerViewOnCreatePatchComponent', () => {
       const onCreateSpy = vi.spyOn(MockFileExplorerView.prototype, 'onCreate');
 
       const component = createComponent();
-      component.load();
-      component.onLayoutReady();
+      loadAndFireLayoutReady(component);
 
       const file = strictProxy<TAbstractFile>({ path: 'test/file.md' });
       mockView.onCreate(file);
 
-      // In non-FilesPane mode, the original next should be called
+      // In non-FilesPane mode, the original next should be called.
       expect(onCreateSpy).toHaveBeenCalledWith(file);
       onCreateSpy.mockRestore();
     });
@@ -164,8 +168,7 @@ describe('FileExplorerViewOnCreatePatchComponent', () => {
       const onCreateSpy = vi.spyOn(MockFileExplorerView.prototype, 'onCreate');
 
       const component = createComponent();
-      component.load();
-      component.onLayoutReady();
+      loadAndFireLayoutReady(component);
 
       const file = strictProxy<TAbstractFile>({ path: 'test/file.md' });
       mockView.onCreate(file);
@@ -182,13 +185,12 @@ describe('FileExplorerViewOnCreatePatchComponent', () => {
       const onCreateSpy = vi.spyOn(MockFileExplorerView.prototype, 'onCreate');
 
       const component = createComponent();
-      component.load();
-      component.onLayoutReady();
+      loadAndFireLayoutReady(component);
 
       const file = strictProxy<TAbstractFile>({ path: 'ignored/file.md' });
       mockView.onCreate(file);
 
-      // Original onCreate should NOT be called when file is ignored
+      // Original onCreate should NOT be called when file is ignored.
       expect(onCreateSpy).not.toHaveBeenCalled();
       onCreateSpy.mockRestore();
     });

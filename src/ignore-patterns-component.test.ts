@@ -43,12 +43,16 @@ vi.mock('obsidian-dev-utils/obsidian/components/async-events-component', () => (
   registerAsyncEvent: vi.fn()
 }));
 
-vi.mock('obsidian-dev-utils/async', () => ({
-  chain: vi.fn((_chainPromise: Promise<void> | undefined, fn: () => Promise<void> | undefined) => fn() ?? undefined),
-  invokeAsyncSafelyAfterDelay: vi.fn((cb: () => Promise<void>) => {
-    cb().catch(() => undefined);
-  })
-}));
+// Keep the REAL invokeAsyncSafelyAfterDelay (so its genuine dev-utils scheduling/error-handling runs).
+// It is wrapped in a vi.fn pass-through purely so tests can assert it was invoked.
+// The real body is not re-created: vi.fn delegates every call to actual.invokeAsyncSafelyAfterDelay unchanged.
+vi.mock('obsidian-dev-utils/async', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('obsidian-dev-utils/async')>();
+  return {
+    ...actual,
+    invokeAsyncSafelyAfterDelay: vi.fn(actual.invokeAsyncSafelyAfterDelay)
+  };
+});
 
 vi.mock('obsidian-dev-utils/object-utils', () => ({
   deepEqual: vi.fn().mockReturnValue(true)

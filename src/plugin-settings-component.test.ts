@@ -1,4 +1,3 @@
-import type { PluginSettingsComponentBaseConstructorParams } from 'obsidian-dev-utils/obsidian/components/plugin-settings-component';
 import type { DataHandler } from 'obsidian-dev-utils/obsidian/data-handler';
 import type { PluginEventSource } from 'obsidian-dev-utils/obsidian/plugin/plugin-event-source';
 
@@ -6,23 +5,11 @@ import { strictProxy } from 'obsidian-dev-utils/strict-proxy';
 import {
   describe,
   expect,
-  it,
-  vi
+  it
 } from 'vitest';
 
 import { PluginSettingsComponent } from './plugin-settings-component.ts';
 import { PluginSettings } from './plugin-settings.ts';
-
-vi.mock('obsidian-dev-utils/obsidian/components/plugin-settings-component', () => {
-  class MockPluginSettingsComponentBase {
-    public settings: PluginSettings = new PluginSettings();
-
-    public constructor(params: PluginSettingsComponentBaseConstructorParams<PluginSettings>) {
-      expect(params.pluginSettingsClass).toBe(PluginSettings);
-    }
-  }
-  return { PluginSettingsComponentBase: MockPluginSettingsComponentBase };
-});
 
 describe('PluginSettingsComponent', () => {
   it('should pass PluginSettings class to base constructor', () => {
@@ -35,6 +22,8 @@ describe('PluginSettingsComponent', () => {
     });
 
     expect(component).toBeInstanceOf(PluginSettingsComponent);
+    // The real base derives `defaultSettings` from the passed `pluginSettingsClass`.
+    expect(component.defaultSettings).toBeInstanceOf(PluginSettings);
   });
 
   it('should expose settings from base class', () => {

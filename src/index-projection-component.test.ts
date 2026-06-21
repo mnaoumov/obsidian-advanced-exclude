@@ -8,6 +8,7 @@ import { getDataAdapterEx } from '@obsidian-typings/obsidian-public-latest/imple
 import { isFolder } from 'obsidian-dev-utils/obsidian/file-system';
 import { strictProxy } from 'obsidian-dev-utils/strict-proxy';
 import {
+  afterEach,
   beforeEach,
   describe,
   expect,
@@ -55,6 +56,7 @@ interface SetupResult {
   readonly addToFilesPane: ReturnType<typeof vi.fn>;
   readonly component: IndexProjectionComponent;
   readonly deleteFromFilesPane: ReturnType<typeof vi.fn>;
+  fireWorkspaceLayoutReady(): void;
   readonly mockAdapter: MockAdapter;
   readonly save: ReturnType<typeof vi.fn>;
 }
@@ -74,12 +76,15 @@ function setup(params: SetupParams): SetupResult {
   const flagByPath = new Map(entries.map((entry) => [entry.path, entry.isFolderFlag]));
   mockIsFolder.mockImplementation((file) => flagByPath.get((file as TAbstractFile).path) ?? false);
 
+  let workspaceLayoutReadyCallback: (() => void) | undefined;
   const app = strictProxy<App>({
     vault: {
       getAllLoadedFiles: vi.fn().mockReturnValue(loadedFiles)
     },
     workspace: {
-      onLayoutReady: vi.fn()
+      onLayoutReady: vi.fn((callback: () => void) => {
+        workspaceLayoutReadyCallback = callback;
+      })
     }
   });
 
@@ -113,7 +118,11 @@ function setup(params: SetupParams): SetupResult {
     vaultPathStore
   });
 
-  return { addToFilesPane, component, deleteFromFilesPane, mockAdapter, save };
+  return { addToFilesPane, component, deleteFromFilesPane, fireWorkspaceLayoutReady, mockAdapter, save };
+
+  function fireWorkspaceLayoutReady(): void {
+    workspaceLayoutReadyCallback?.();
+  }
 }
 
 describe('IndexProjectionComponent', () => {
@@ -411,6 +420,14 @@ describe('IndexProjectionComponent', () => {
   });
 
   describe('lifecycle', () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
     it('projects on load', async () => {
       const { component, mockAdapter } = setup({
         entries: [{ isFolderFlag: false, path: 'drop.md' }],
@@ -423,39 +440,70 @@ describe('IndexProjectionComponent', () => {
     });
 
     it('projects on layout ready when the vault load was not intercepted', async () => {
-      const { component, mockAdapter } = setup({
+      const ignored = new Set<string>();
+      const { component, fireWorkspaceLayoutReady, mockAdapter } = setup({
         entries: [{ isFolderFlag: false, path: 'drop.md' }],
-        isIgnored: (path) => path === 'drop.md',
+        isIgnored: (path) => ignored.has(path),
         vaultLoadCalled: false
       });
 
-      await component.onLayoutReady();
+      // Loading runs the onloadAsync projection (nothing ignored yet, so no reconcile)
+      // And registers the real layout-ready child; clear so the assertion only sees
+      // The layout-ready projection.
+      await component.loadWithPromises();
+      mockAdapter.reconcileDeletion.mockClear();
+
+      // Flip the file hidden, then fire layout ready: since the vault load was not
+      // Intercepted, onLayoutReady runs a second projection that hides it.
+      ignored.add('drop.md');
+      fireWorkspaceLayoutReady();
+      await vi.runAllTimersAsync();
 
       expect(mockAdapter.reconcileDeletion).toHaveBeenCalledWith('drop.md', 'drop.md');
     });
 
     it('skips projecting on layout ready when the vault load was intercepted', async () => {
-      const { component, mockAdapter } = setup({
+      const ignored = new Set<string>();
+      const { component, fireWorkspaceLayoutReady, mockAdapter } = setup({
         entries: [{ isFolderFlag: false, path: 'drop.md' }],
-        isIgnored: (path) => path === 'drop.md',
+        isIgnored: (path) => ignored.has(path),
         vaultLoadCalled: true
       });
 
-      await component.onLayoutReady();
+      await component.loadWithPromises();
+      mockAdapter.reconcileDeletion.mockClear();
+
+      // Flip the file hidden, but since the vault load was intercepted, onLayoutReady
+      // Skips its projection entirely — no reconcile happens despite the flip.
+      ignored.add('drop.md');
+      fireWorkspaceLayoutReady();
+      await vi.runAllTimersAsync();
 
       expect(mockAdapter.reconcileDeletion).not.toHaveBeenCalled();
     });
   });
 
   describe('onunload', () => {
-    it('is a no-op when no update is in flight', () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('is a no-op when no update is in flight', async () => {
       const { component } = setup({
         entries: [{ isFolderFlag: false, path: 'a.md' }],
         isIgnored: () => false
       });
 
+      // Load fully (no update is left in flight), then unload runs the real onunload.
+      await component.loadWithPromises();
+      await vi.runAllTimersAsync();
+
       expect(() => {
-        component.onunload();
+        component.unload();
       }).not.toThrow();
     });
 
@@ -465,10 +513,12 @@ describe('IndexProjectionComponent', () => {
         isIgnored: (path) => path === 'drop.md'
       });
 
-      // The update is in flight at the async model rebuild; unload aborts it before it reconciles.
-      const updatePromise = component.update();
-      component.onunload();
-      await updatePromise;
+      // The load-time projection is in flight at the async model rebuild (parked on
+      // The persisted-path-store load); unload aborts it before it reconciles.
+      const loadPromise = component.loadWithPromises();
+      component.unload();
+      await loadPromise;
+      await vi.runAllTimersAsync();
 
       expect(mockAdapter.reconcileDeletion).not.toHaveBeenCalled();
     });
