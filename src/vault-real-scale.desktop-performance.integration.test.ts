@@ -40,12 +40,6 @@ const INDEX_WAIT_IN_MS = 300_000;
 const MIN_EXPECTED_FILES = 1000;
 const SCENARIO_TIMEOUT_IN_MS = 480_000;
 
-function settle(ms: number): Promise<void> {
-  return new Promise((resolve) => {
-    window.setTimeout(resolve, ms);
-  });
-}
-
 describe('Real-scale vault — FilesPane mode', () => {
   it('hides the whole pre-populated vault folder from the explorer', async () => {
     const result = await evalInObsidian({
@@ -54,7 +48,6 @@ describe('Real-scale vault — FilesPane mode', () => {
         INDEX_POLL_IN_MS,
         INDEX_WAIT_IN_MS,
         PLUGIN_ID,
-        settle,
         SETTLE_DELAY_IN_MS,
         VAULT_CONTROL,
         VAULT_FOLDER
@@ -65,7 +58,6 @@ describe('Real-scale vault — FilesPane mode', () => {
         INDEX_POLL_IN_MS: pollMs,
         INDEX_WAIT_IN_MS: indexWaitMs,
         PLUGIN_ID: pluginId,
-        settle: settleWait,
         SETTLE_DELAY_IN_MS: settleDelay,
         VAULT_CONTROL: controlPath,
         VAULT_FOLDER: vaultFolder
@@ -79,14 +71,14 @@ describe('Real-scale vault — FilesPane mode', () => {
         const deadline = Date.now() + indexWaitMs;
         let indexedCount = countInScope();
         while (Date.now() < deadline) {
-          await settleWait(pollMs);
+          await sleep(pollMs);
           const next = countInScope();
           if (next === indexedCount) {
             break;
           }
           indexedCount = next;
         }
-        await settleWait(settleDelay);
+        await sleep(settleDelay);
 
         const plugin = app.plugins.getPlugin(pluginId);
         if (!plugin) {
@@ -104,7 +96,7 @@ describe('Real-scale vault — FilesPane mode', () => {
           settings.obsidianIgnoreContent = `${vaultFolder}/\n`;
         });
         await ignorePatternsComponent.processConfigChanges();
-        await settleWait(settleDelay);
+        await sleep(settleDelay);
 
         const fileExplorerView = app.workspace.getLeavesOfType('file-explorer')[0]?.view as FileExplorerView | undefined;
         const explorerPaths = fileExplorerView?.fileItems ? Object.keys(fileExplorerView.fileItems) : [];

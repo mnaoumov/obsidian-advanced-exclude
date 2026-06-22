@@ -88,12 +88,6 @@ function scenarioTimeout(fileCount: number): number {
   return BASE_TIMEOUT_IN_MS + fileCount * PER_FILE_TIMEOUT_IN_MS;
 }
 
-function settle(settleDelay: number): Promise<void> {
-  return new Promise((resolve) => {
-    window.setTimeout(resolve, settleDelay);
-  });
-}
-
 afterEach(async () => {
   const topFolders = [...FLAT_SIZES.map((size) => `bulk-${String(size)}`), NESTED_ROOT, MANY_PARENT];
   const controlFiles = [...FLAT_SIZES.map((size) => `control-${String(size)}.md`), 'control-nested.md', 'control-many.md'];
@@ -239,7 +233,6 @@ function runIgnoreScenario(spec: ScenarioSpec): Promise<VaultSizeScenarioResult>
       CREATE_BATCH_SIZE,
       OBSIDIAN_IGNORE_FILE,
       PLUGIN_ID,
-      settle,
       SETTLE_DELAY_IN_MS,
       spec
     },
@@ -248,7 +241,6 @@ function runIgnoreScenario(spec: ScenarioSpec): Promise<VaultSizeScenarioResult>
       CREATE_BATCH_SIZE: batchSize,
       OBSIDIAN_IGNORE_FILE: ignoreFile,
       PLUGIN_ID: pluginId,
-      settle: settleWait,
       SETTLE_DELAY_IN_MS: settleDelay,
       spec: scenario
     }) {
@@ -278,7 +270,7 @@ function runIgnoreScenario(spec: ScenarioSpec): Promise<VaultSizeScenarioResult>
       }
 
       await app.plugins.enablePluginAndSave(pluginId);
-      await settleWait(settleDelay);
+      await sleep(settleDelay);
 
       const plugin = app.plugins.getPlugin(pluginId);
       if (!plugin) {
@@ -318,7 +310,7 @@ function runIgnoreScenario(spec: ScenarioSpec): Promise<VaultSizeScenarioResult>
           settings.obsidianIgnoreContent = pattern;
         });
         await ignorePatternsComponent.processConfigChanges();
-        await settleWait(settleDelay);
+        await sleep(settleDelay);
 
         const visibleAfterHide = app.vault.getFiles().map((file) => file.path);
         const inScopeVisibleAfterHide = visibleAfterHide.filter((path) => path.startsWith(scopePrefix)).length;
@@ -329,7 +321,7 @@ function runIgnoreScenario(spec: ScenarioSpec): Promise<VaultSizeScenarioResult>
           settings.obsidianIgnoreContent = '';
         });
         await ignorePatternsComponent.processConfigChanges();
-        await settleWait(settleDelay);
+        await sleep(settleDelay);
 
         const inScopeVisibleAfterShow = app.vault.getFiles().map((file) => file.path).filter((path) => path.startsWith(scopePrefix)).length;
 
