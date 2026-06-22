@@ -19,6 +19,7 @@ import {
 import type { IgnorePatternsComponent } from './ignore-patterns-component.ts';
 import type { VaultLoadPatchComponent } from './patches/vault-load-patch-component.ts';
 import type { PluginSettingsComponent } from './plugin-settings-component.ts';
+import type { UpdateProgressNoticeComponent } from './update-progress-notice-component.ts';
 
 import { IndexProjectionComponent } from './index-projection-component.ts';
 import { ExcludeMode } from './plugin-settings.ts';
@@ -114,12 +115,19 @@ function setup(params: SetupParams): SetupResult {
   const addToFilesPane = vi.fn();
   const deleteFromFilesPane = vi.fn();
 
+  const updateProgressNotice = strictProxy<UpdateProgressNoticeComponent>({
+    finish: vi.fn(),
+    report: vi.fn(),
+    start: vi.fn()
+  });
+
   const component = new IndexProjectionComponent({
     addToFilesPane,
     app,
     deleteFromFilesPane,
     ignorePatternsComponent,
     pluginSettingsComponent,
+    updateProgressNotice,
     vaultLoadPatch,
     vaultPathStore
   });
@@ -281,6 +289,30 @@ describe('IndexProjectionComponent', () => {
       await Promise.all([firstUpdate, secondUpdate]);
 
       expect(mockAdapter.reconcileDeletion).not.toHaveBeenCalled();
+    });
+
+    it('skips applying the delta when superseded mid-recompute', async () => {
+      const ignored = new Set<string>();
+      const { component, mockAdapter } = setup({
+        entries: [
+          { isFolderFlag: true, path: 'a' },
+          { isFolderFlag: false, path: 'a/x.md' }
+        ],
+        isIgnored: (path) => ignored.has(path) || [...ignored].some((prefix) => path.startsWith(`${prefix}/`))
+      });
+
+      // Build the model first so a later update takes the incremental delta path.
+      await component.update();
+      mockAdapter.reconcileDeletion.mockClear();
+
+      ignored.add('a');
+      // Two deltas in flight: the second aborts the first after its recompute, so the
+      // First returns without applying — only the second hides the subtree.
+      const firstUpdate = component.update();
+      const secondUpdate = component.update();
+      await Promise.all([firstUpdate, secondUpdate]);
+
+      expect(mockAdapter.reconcileDeletion).toHaveBeenCalledExactlyOnceWith('a', 'a');
     });
 
     it('hides only the hide-root of a newly-ignored subtree, relying on cascade', async () => {

@@ -5,6 +5,7 @@ import type {
 } from 'obsidian';
 
 import { getDataAdapterEx } from '@obsidian-typings/obsidian-public-latest/implementations';
+import { setImmediateAsync } from 'obsidian-dev-utils/async';
 import { ComponentEx } from 'obsidian-dev-utils/obsidian/components/component-ex';
 import { CallbackLayoutReadyComponent } from 'obsidian-dev-utils/obsidian/components/layout-ready-component';
 import { isFolder } from 'obsidian-dev-utils/obsidian/file-system';
@@ -12,8 +13,10 @@ import { isFolder } from 'obsidian-dev-utils/obsidian/file-system';
 import type { IgnorePatternsComponent } from './ignore-patterns-component.ts';
 import type { VaultLoadPatchComponent } from './patches/vault-load-patch-component.ts';
 import type { PluginSettingsComponent } from './plugin-settings-component.ts';
+import type { UpdateProgressNoticeComponent } from './update-progress-notice-component.ts';
 import type {
   VaultModelEntry,
+  VaultModelRecomputeAllOptions,
   VisibilityChange
 } from './vault-model.ts';
 import type { VaultPathStore } from './vault-path-store.ts';
@@ -22,12 +25,24 @@ import { ROOT_PATH } from './constants.ts';
 import { ExcludeMode } from './plugin-settings.ts';
 import { VaultModel } from './vault-model.ts';
 
+/**
+ * Message shown in the progress notice while the projection updates the tree.
+ */
+const UPDATE_PROGRESS_MESSAGE = 'Advanced Exclude: updating file tree…';
+
+/**
+ * Number of reconcile operations between progress-bar updates during the apply
+ * phase (the bar repaints every {@link APPLY_PROGRESS_REPORT_INTERVAL} files).
+ */
+const APPLY_PROGRESS_REPORT_INTERVAL = 50;
+
 export interface IndexProjectionComponentConstructorParams {
   addToFilesPane(this: void, normalizedPath: string): void;
   readonly app: App;
   deleteFromFilesPane(this: void, normalizedPath: string): void;
   readonly ignorePatternsComponent: IgnorePatternsComponent;
   readonly pluginSettingsComponent: PluginSettingsComponent;
+  readonly updateProgressNotice: UpdateProgressNoticeComponent;
   readonly vaultLoadPatch: VaultLoadPatchComponent;
   readonly vaultPathStore: VaultPathStore;
 }
@@ -61,9 +76,14 @@ export class IndexProjectionComponent extends ComponentEx {
   private readonly collectedRelatedLinkNames = new Set<string>();
   private readonly deleteFromFilesPane: (normalizedPath: string) => void;
   private hasBuiltModel = false;
+  // Set while a delta is mid-flight: a superseded/aborted delta leaves the model's
+  // Visibility ahead of Obsidian (the recompute mutated the model but the apply was
+  // Skipped), so the next update must do a full reconcile instead of a stale delta.
+  private needsFullProjection = false;
   private originalUpdateRelatedLinks: MetadataCache['updateRelatedLinks'] | null = null;
   private readonly pluginSettingsComponent: PluginSettingsComponent;
   private updateAbortController: AbortController | null = null;
+  private readonly updateProgressNotice: UpdateProgressNoticeComponent;
   private readonly vaultLoadPatch: VaultLoadPatchComponent;
   private readonly vaultModel: VaultModel;
   private readonly vaultPathStore: VaultPathStore;
@@ -80,6 +100,7 @@ export class IndexProjectionComponent extends ComponentEx {
     this.vaultPathStore = params.vaultPathStore;
     this.addToFilesPane = params.addToFilesPane;
     this.deleteFromFilesPane = params.deleteFromFilesPane;
+    this.updateProgressNotice = params.updateProgressNotice;
     this.vaultModel = new VaultModel((normalizedPath, isFolderPath) => params.ignorePatternsComponent.isIgnored(normalizedPath, isFolderPath));
   }
 
@@ -97,12 +118,15 @@ export class IndexProjectionComponent extends ComponentEx {
     const adapter = getDataAdapterEx(this.app);
     const shows = changes.filter((change) => change.isVisible).sort((a, b) => pathDepth(a.path) - pathDepth(b.path));
     const hides = changes.filter((change) => !change.isVisible);
+    const total = shows.length + hides.length;
+    let processed = 0;
 
     for (const change of shows) {
       if (abortSignal?.aborted) {
         return;
       }
       await this.show(adapter, change);
+      this.reportApplyProgress(++processed, total);
     }
 
     for (const change of hides) {
@@ -113,9 +137,11 @@ export class IndexProjectionComponent extends ComponentEx {
       // By the parent's cascading `reconcileDeletion`; skip it. An unknown parent
       // (`undefined`) is treated as a hide-root and still removed.
       if (this.excludeMode === ExcludeMode.Full && this.vaultModel.isParentVisible(change.path) === false) {
+        this.reportApplyProgress(++processed, total);
         continue;
       }
       await this.hide(adapter, change);
+      this.reportApplyProgress(++processed, total);
     }
   }
 
@@ -125,27 +151,27 @@ export class IndexProjectionComponent extends ComponentEx {
    * from the index (e.g. one hidden by a prior session before a disable/enable).
    */
   public async applyFull(abortSignal?: AbortSignal): Promise<void> {
-    await this.rebuildModel();
+    await this.rebuildModel(abortSignal);
     const adapter = getDataAdapterEx(this.app);
-    for (const target of this.getProjectionTargets()) {
+    const targets = this.getProjectionTargets();
+    const missing = this.getMissingVisiblePaths();
+    const total = targets.length + missing.length;
+    let processed = 0;
+
+    for (const target of targets) {
       if (abortSignal?.aborted) {
         return;
       }
       await this.hide(adapter, target);
+      this.reportApplyProgress(++processed, total);
     }
 
-    if (this.excludeMode !== ExcludeMode.Full) {
-      return;
-    }
-
-    const loadedPaths = new Set(this.app.vault.getAllLoadedFiles().map((file) => file.path));
-    for (const entry of this.vaultModel.getPathsByVisibility(true)) {
+    for (const entry of missing) {
       if (abortSignal?.aborted) {
         return;
       }
-      if (!loadedPaths.has(entry.path)) {
-        await this.show(adapter, entry);
-      }
+      await this.show(adapter, entry);
+      this.reportApplyProgress(++processed, total);
     }
   }
 
@@ -199,21 +225,41 @@ export class IndexProjectionComponent extends ComponentEx {
    */
   public async update(): Promise<void> {
     this.updateAbortController?.abort();
-    this.updateAbortController = new AbortController();
-    const abortSignal = this.updateAbortController.signal;
+    const abortController = new AbortController();
+    this.updateAbortController = abortController;
+    const abortSignal = abortController.signal;
     this.beginProjection();
+    this.updateProgressNotice.start(UPDATE_PROGRESS_MESSAGE);
     try {
-      if (this.hasBuiltModel) {
-        await this.applyDelta(this.vaultModel.recomputeAll(), abortSignal);
-        // Persist the post-change hidden set so a later reload (which does not re-scan disk) can reconstruct and re-show it.
-        this.vaultPathStore.save(this.vaultModel.getPathsByVisibility(false));
-      } else {
+      if (!this.hasBuiltModel || this.needsFullProjection) {
         this.hasBuiltModel = true;
         await this.applyFull(abortSignal);
+      } else {
+        // Pessimistic: assume this delta will be superseded, so a concurrent/next
+        // Update reconciles fully (a superseded delta leaves the model ahead of
+        // Obsidian). Cleared below only once we finish without an abort.
+        this.needsFullProjection = true;
+        const changes = await this.vaultModel.recomputeAll(this.createRecomputeOptions(abortSignal));
+        if (abortSignal.aborted) {
+          return;
+        }
+        await this.applyDelta(changes, abortSignal);
+        // Persist the post-change hidden set so a later reload (which does not re-scan disk) can reconstruct and re-show it.
+        this.vaultPathStore.save(this.vaultModel.getPathsByVisibility(false));
       }
+
+      if (abortSignal.aborted) {
+        return;
+      }
+      this.needsFullProjection = false;
     } finally {
       this.endProjection();
-      this.updateAbortController = null;
+      // Only the current update owns the notice/controller: a superseding update
+      // Already replaced them, so a superseded run must not hide the new notice.
+      if (this.updateAbortController === abortController) {
+        this.updateProgressNotice.finish();
+        this.updateAbortController = null;
+      }
     }
   }
 
@@ -222,6 +268,19 @@ export class IndexProjectionComponent extends ComponentEx {
       this.installRelatedLinksBatching();
     }
     this.applyingProjectionDepth++;
+  }
+
+  private createRecomputeOptions(abortSignal?: AbortSignal): VaultModelRecomputeAllOptions {
+    const options: VaultModelRecomputeAllOptions = {
+      onProgress: (processed, total) => {
+        this.updateProgressNotice.report(processed, total);
+      },
+      // SetImmediate (not requestAnimationFrame) so the recompute keeps progressing
+      // Even when the Obsidian window is unfocused/hidden — rAF is paused there,
+      // Which would stall the update. It still lets the UI paint between chunks.
+      yieldFn: setImmediateAsync
+    };
+    return abortSignal ? { ...options, abortSignal } : options;
   }
 
   private endProjection(): void {
@@ -242,6 +301,19 @@ export class IndexProjectionComponent extends ComponentEx {
       this.app.metadataCache.updateRelatedLinks([...this.collectedRelatedLinkNames]);
       this.collectedRelatedLinkNames.clear();
     }
+  }
+
+  /**
+   * In `Full` mode, the visible paths the model knows about that Obsidian's index
+   * no longer holds (e.g. files a prior session hid before a disable/enable) and
+   * must be re-added. Empty in `FilesPane` mode.
+   */
+  private getMissingVisiblePaths(): VaultModelEntry[] {
+    if (this.excludeMode !== ExcludeMode.Full) {
+      return [];
+    }
+    const loadedPaths = new Set(this.app.vault.getAllLoadedFiles().map((file) => file.path));
+    return this.vaultModel.getPathsByVisibility(true).filter((entry) => !loadedPaths.has(entry.path));
   }
 
   private getProjectionTargets(): VaultModelEntry[] {
@@ -285,7 +357,7 @@ export class IndexProjectionComponent extends ComponentEx {
     };
   }
 
-  private async rebuildModel(): Promise<void> {
+  private async rebuildModel(abortSignal?: AbortSignal): Promise<void> {
     const byPath = new Map<string, VaultModelEntry>();
     for (const entry of await this.vaultPathStore.load()) {
       byPath.set(entry.path, entry);
@@ -296,10 +368,16 @@ export class IndexProjectionComponent extends ComponentEx {
       }
       byPath.set(file.path, { isFolder: isFolder(file), path: file.path });
     }
-    this.vaultModel.rebuild([...byPath.values()]);
+    await this.vaultModel.rebuild([...byPath.values()], this.createRecomputeOptions(abortSignal));
     // Persist only the hidden set: merged with Obsidian's loaded (visible) tree on
     // The next build, this reconstructs the full tree without storing all ~90k paths.
     this.vaultPathStore.save(this.vaultModel.getPathsByVisibility(false));
+  }
+
+  private reportApplyProgress(processed: number, total: number): void {
+    if (processed % APPLY_PROGRESS_REPORT_INTERVAL === 0 || processed === total) {
+      this.updateProgressNotice.report(processed, total);
+    }
   }
 
   private async show(adapter: DataAdapterEx, entry: VaultModelEntry): Promise<void> {

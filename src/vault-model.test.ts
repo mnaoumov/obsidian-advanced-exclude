@@ -1,4 +1,5 @@
 import ignore from 'ignore';
+import { noopAsync } from 'obsidian-dev-utils/function';
 import {
   describe,
   expect,
@@ -306,7 +307,7 @@ describe('VaultModel', () => {
   });
 
   describe('recomputeAll', () => {
-    it('returns the visibility flips deepest-first', () => {
+    it('returns the visibility flips deepest-first', async () => {
       const ignored = new Set<string>();
       const model = build(
         [
@@ -318,17 +319,80 @@ describe('VaultModel', () => {
 
       ignored.add('a');
       ignored.add('a/x.md');
-      const changes = model.recomputeAll();
+      const changes = await model.recomputeAll();
 
       expect(changes).toEqual([
         { isFolder: false, isVisible: false, path: 'a/x.md' },
         { isFolder: true, isVisible: false, path: 'a' }
       ]);
     });
+
+    it('yields and reports progress when a yieldFn is supplied for a large model', async () => {
+      // A model larger than the yield chunk so a chunk boundary is reached.
+      const model = build(largeFolderEntries(6000), () => false);
+
+      const progress: number[][] = [];
+      let yieldCount = 0;
+      await model.recomputeAll({
+        onProgress: (processed, total) => {
+          progress.push([processed, total]);
+        },
+        yieldFn: async () => {
+          yieldCount++;
+          await noopAsync();
+        }
+      });
+
+      expect(yieldCount).toBeGreaterThan(0);
+      expect(progress.length).toBeGreaterThan(0);
+      // The final report covers the whole tree (two visits per node).
+      expect(progress.at(-1)).toEqual([model.size * 2, model.size * 2]);
+    });
+
+    it('stops early when aborted during the ignore-evaluation pass', async () => {
+      let isIgnoredNow = false;
+      const model = build(largeFolderEntries(6000), () => isIgnoredNow);
+      isIgnoredNow = true;
+      const controller = new AbortController();
+
+      const changes = await model.recomputeAll({
+        abortSignal: controller.signal,
+        yieldFn: async () => {
+          controller.abort();
+          await noopAsync();
+        }
+      });
+
+      // Aborted on the first chunk boundary (the ignore-evaluation pass, before any
+      // Visibility flip is collected), so it returns no changes.
+      expect(changes).toEqual([]);
+    });
+
+    it('stops early when aborted during the visibility pass, keeping flips collected so far', async () => {
+      let isIgnoredNow = false;
+      const model = build(largeFolderEntries(6000), () => isIgnoredNow);
+      isIgnoredNow = true;
+      const controller = new AbortController();
+      let yieldCount = 0;
+
+      const changes = await model.recomputeAll({
+        abortSignal: controller.signal,
+        yieldFn: async () => {
+          yieldCount++;
+          // The second boundary falls in the visibility pass.
+          if (yieldCount === 2) {
+            controller.abort();
+          }
+          await noopAsync();
+        }
+      });
+
+      expect(changes.length).toBeGreaterThan(0);
+    });
   });
 
   describe('recomputeAll vs incremental', () => {
-    it('agree after a sequence of single-path flips', () => {
+    it('agree after a sequence of single-path flips', async () => {
       const ignored = new Set<string>();
       const entries: VaultModelEntry[] = [
         { isFolder: true, path: 'a' },
@@ -338,7 +402,7 @@ describe('VaultModel', () => {
         { isFolder: false, path: 'a/z.md' }
       ];
       const incremental = new VaultModel(isIgnored);
-      incremental.rebuild(entries);
+      await incremental.rebuild(entries);
 
       for (const path of ['a/b/x.md', 'a/b/y.md', 'a/z.md']) {
         ignored.add(path);
@@ -346,7 +410,7 @@ describe('VaultModel', () => {
       }
 
       const full = new VaultModel(isIgnored);
-      full.rebuild(entries);
+      await full.rebuild(entries);
 
       for (const entry of entries) {
         expect(incremental.isVisible(entry.path)).toBe(full.isVisible(entry.path));
@@ -361,8 +425,19 @@ describe('VaultModel', () => {
 
 function build(entries: readonly VaultModelEntry[], isIgnored: IsIgnoredFn): VaultModel {
   const model = new VaultModel(isIgnored);
+  // Without a `yieldFn` the async recompute never suspends, so the model is fully
+  // Built synchronously by the time `rebuild` returns its (already resolved) promise.
+  // eslint-disable-next-line @typescript-eslint/no-floating-promises -- settles synchronously without a yieldFn.
   model.rebuild(entries);
   return model;
+}
+
+function largeFolderEntries(count: number): VaultModelEntry[] {
+  const entries: VaultModelEntry[] = [{ isFolder: true, path: 'big' }];
+  for (let index = 0; index < count; index++) {
+    entries.push({ isFolder: false, path: `big/file-${String(index)}.md` });
+  }
+  return entries;
 }
 
 function matcher(patterns: readonly string[]): IsIgnoredFn {
