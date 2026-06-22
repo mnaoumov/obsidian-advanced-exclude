@@ -1,6 +1,7 @@
 import type { PluginSettingsTabBaseConstructorParams } from 'obsidian-dev-utils/obsidian/plugin/plugin-settings-tab';
 
 import { Setting } from 'obsidian';
+import { convertAsyncToSync } from 'obsidian-dev-utils/async';
 import { appendCodeBlock } from 'obsidian-dev-utils/html-element';
 import { PluginSettingsTabBase } from 'obsidian-dev-utils/obsidian/plugin/plugin-settings-tab';
 
@@ -49,6 +50,14 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginSettings> {
         textArea.setPlaceholder('foo/bar/*\n!foo/bar/baz.md');
         textArea.inputEl.addClass('ignore-patterns-control');
         this.bind(textArea, 'obsidianIgnoreContent');
+      })
+      .addButton((button) => {
+        button
+          .setButtonText('Apply')
+          .setCta()
+          .onClick(convertAsyncToSync(async () => {
+            await this.ignorePatternsComponent.processConfigChanges();
+          }));
       });
 
     new Setting(this.containerEl)
