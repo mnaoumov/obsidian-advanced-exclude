@@ -136,3 +136,27 @@ the whole vault folder in **`FilesPane` mode** and asserts the explorer is clear
   reverse-index patch in `backlink-cache`, fixing any plugin's bulk delete) is
   tracked in `obsidian-backlink-cache/CLAUDE.md`. Worth reporting the O(N²) upstream
   to Obsidian.
+
+- **Bulk-hide freeze from OTHER plugins reacting to the per-file delete cascade.**
+  After the `updateRelatedLinks` fix, a `Full`-mode hide of a large folder still froze
+  the UI for minutes — but profiling (CDP, real `F:\Obsidian`, hiding ~943 files) shows
+  it is **not our code** (advanced-exclude ≈ 1% of samples; baseline with only this
+  plugin loaded ≈ 6 s, no freeze). Obsidian's per-file `removeFile` cascade fires a
+  delete/metadata notification per file, and installed plugins react synchronously per
+  file: `consistent-attachments-and-links` (~33–44 s, a vault delete/rename listener that
+  also calls `custom-attachment-location.getAvailablePathForAttachments` per file),
+  `custom-attachment-location` (~22–35 s), and `backlink-cache` (~11–12 s, via its
+  `getFileCache` patch hit from `onDelete`). Findings written to each of those plugins'
+  `CLAUDE.md`. Also note the hides are **synthetic** (file still on disk), so reacting as
+  a real delete is a correctness hazard too. Solution options (shared "bulk in progress"
+  signal for our own plugins; generic event-dispatch suppression for plugins we don't
+  own; `FilesPane` mode as the no-cascade workaround) are written up in
+  `docs/working-with-other-plugins.md`. NOT yet implemented — pending a decision on S1 vs
+  S2.
+
+  Separately, two real issues found in the progress-bar/async work that ARE ours and were
+  fixed earlier (queue-bound + async recompute + apply-phase yields), but note: the
+  cooperative `setImmediate` yield does not reliably repaint the progress bar in a real
+  foreground Obsidian session (bar appears to stick at chunk boundaries); switching the
+  recompute/apply yield to `requestAnimationFrameAsync` is worth trying for the bar's
+  smoothness (rAF pauses only when the window is unfocused, which is not the Apply case).

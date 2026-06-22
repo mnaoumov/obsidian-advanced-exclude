@@ -13,13 +13,16 @@
     "Backlinks",
     "czrc",
     "dblclick",
+    "desync",
     "macrotask",
     "mnaoumov",
     "Naumov",
     "obsidianignore",
     "obsidianmd",
     "offref",
-    "tsbuildinfo"
+    "reimplementation",
+    "tsbuildinfo",
+    "yieldable"
   ],
   "ignoreWords": [],
   "import": [],
