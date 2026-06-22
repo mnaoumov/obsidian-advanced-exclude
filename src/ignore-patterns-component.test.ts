@@ -990,6 +990,24 @@ describe('IgnorePatternsComponent', () => {
 
       expect(filesStore.put.mock.calls.length).toBe(putCallsAfterFirst);
     });
+
+    it('should dedupe queued actions by path so the queue stays bounded', async () => {
+      const { filesStore } = setupIndexedDb();
+      const component = createComponent();
+      await component.loadWithPromises();
+
+      // Queue a put for the path, then a delete for the same path before the
+      // Debounced flush: the delete must overwrite the put (last-write-wins)
+      // Rather than both accumulating, so repeated config changes cannot grow
+      // The queue beyond the number of distinct paths.
+      component.isIgnored('file1.md', false);
+      await component.handleDeletedOrDotFile('file1.md');
+
+      vi.runAllTimers();
+
+      expect(filesStore.put).not.toHaveBeenCalled();
+      expect(filesStore.delete).toHaveBeenCalledExactlyOnceWith('file1.md');
+    });
   });
 
   describe('resetDb', () => {

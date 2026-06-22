@@ -70,7 +70,7 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
   private readonly fileIgnoreMap = new Map<string, boolean>();
   private hadConfigChanges = false;
   private readonly onUpdateFileTree: () => Promise<void>;
-  private pendingStoreActions: ((store: IDBObjectStore) => void)[] = [];
+  private pendingStoreActions = new Map<string, (store: IDBObjectStore) => void>();
   private readonly pluginSettingsComponent: PluginSettingsComponent;
 
   private readonly processStoreActionsDebounced = debounce(() => {
@@ -105,7 +105,7 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
     if (this.fileIgnoreMap.has(normalizedPath)) {
       this.fileIgnoreMap.delete(normalizedPath);
 
-      this.addStoreAction((store) => store.delete(normalizedPath));
+      this.addStoreAction(normalizedPath, (store) => store.delete(normalizedPath));
     }
 
     let shouldRefresh = false;
@@ -139,12 +139,11 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
     const pathsToCheck = isFolder ? [normalizedPath, `${normalizedPath}/`] : [normalizedPath];
     isIgnoredResult = pathsToCheck.some((path) => ignoreTester.ignores(path) || excludeRegExps.some((regExp) => regExp.test(path)));
     this.fileIgnoreMap.set(normalizedPath, isIgnoredResult);
-    this.addStoreAction((store) =>
+    this.addStoreAction(normalizedPath, (store) =>
       store.put({
         isIgnored: isIgnoredResult,
         path: normalizedPath
-      })
-    );
+      }));
 
     return isIgnoredResult;
   }
@@ -203,8 +202,11 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
     }
   }
 
-  private addStoreAction(storeAction: (store: IDBObjectStore) => void): void {
-    this.pendingStoreActions.push(storeAction);
+  private addStoreAction(normalizedPath: string, storeAction: (store: IDBObjectStore) => void): void {
+    // Keyed by path so repeated config changes overwrite rather than append: the
+    // Queue is bounded to the number of distinct paths instead of growing by the
+    // Whole vault on every `processConfigChanges`.
+    this.pendingStoreActions.set(normalizedPath, storeAction);
     this.processStoreActionsDebounced();
   }
 
@@ -307,11 +309,11 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
 
   private processStoreActions(): void {
     const pendingStoreActions = this.pendingStoreActions;
-    this.pendingStoreActions = [];
+    this.pendingStoreActions = new Map();
 
     const transaction = this.db.transaction(FILES_STORE_NAME, 'readwrite');
     const store = transaction.objectStore(FILES_STORE_NAME);
-    for (const action of pendingStoreActions) {
+    for (const action of pendingStoreActions.values()) {
       action(store);
     }
     transaction.commit();
@@ -367,6 +369,9 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
     const filesStore = transaction.objectStore(FILES_STORE_NAME);
     filesStore.clear();
     this.fileIgnoreMap.clear();
+    // Drop any queued writes: they target the store we just cleared and would
+    // Otherwise repopulate it with stale entries.
+    this.pendingStoreActions.clear();
     mtimeStore.put(currentMtimeEntry, 0);
   }
 }
