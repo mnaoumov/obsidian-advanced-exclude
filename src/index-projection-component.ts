@@ -31,10 +31,13 @@ import { VaultModel } from './vault-model.ts';
 const UPDATE_PROGRESS_MESSAGE = 'Advanced Exclude: updating file tree…';
 
 /**
- * Number of reconcile operations between progress-bar updates during the apply
- * phase (the bar repaints every {@link APPLY_PROGRESS_REPORT_INTERVAL} files).
+ * Number of reconcile operations between progress-bar updates and cooperative
+ * yields during the apply phase. The reconcile calls resolve on the microtask
+ * queue, so without periodically yielding a macrotask the whole apply loop would
+ * block the main thread (frozen UI, unpainted bar); this bounds each blocking
+ * span to roughly this many files.
  */
-const APPLY_PROGRESS_REPORT_INTERVAL = 50;
+const APPLY_PROGRESS_REPORT_INTERVAL = 20;
 
 export interface IndexProjectionComponentConstructorParams {
   addToFilesPane(this: void, normalizedPath: string): void;
@@ -126,7 +129,7 @@ export class IndexProjectionComponent extends ComponentEx {
         return;
       }
       await this.show(adapter, change);
-      this.reportApplyProgress(++processed, total);
+      await this.reportApplyProgress(++processed, total);
     }
 
     for (const change of hides) {
@@ -137,11 +140,11 @@ export class IndexProjectionComponent extends ComponentEx {
       // By the parent's cascading `reconcileDeletion`; skip it. An unknown parent
       // (`undefined`) is treated as a hide-root and still removed.
       if (this.excludeMode === ExcludeMode.Full && this.vaultModel.isParentVisible(change.path) === false) {
-        this.reportApplyProgress(++processed, total);
+        await this.reportApplyProgress(++processed, total);
         continue;
       }
       await this.hide(adapter, change);
-      this.reportApplyProgress(++processed, total);
+      await this.reportApplyProgress(++processed, total);
     }
   }
 
@@ -163,7 +166,7 @@ export class IndexProjectionComponent extends ComponentEx {
         return;
       }
       await this.hide(adapter, target);
-      this.reportApplyProgress(++processed, total);
+      await this.reportApplyProgress(++processed, total);
     }
 
     for (const entry of missing) {
@@ -171,7 +174,7 @@ export class IndexProjectionComponent extends ComponentEx {
         return;
       }
       await this.show(adapter, entry);
-      this.reportApplyProgress(++processed, total);
+      await this.reportApplyProgress(++processed, total);
     }
   }
 
@@ -374,9 +377,13 @@ export class IndexProjectionComponent extends ComponentEx {
     this.vaultPathStore.save(this.vaultModel.getPathsByVisibility(false));
   }
 
-  private reportApplyProgress(processed: number, total: number): void {
+  private async reportApplyProgress(processed: number, total: number): Promise<void> {
     if (processed % APPLY_PROGRESS_REPORT_INTERVAL === 0 || processed === total) {
       this.updateProgressNotice.report(processed, total);
+      // Yield a macrotask: the reconcile calls resolve on the microtask queue, so
+      // Without this the apply loop never returns to the event loop and the UI
+      // Freezes (and the progress bar never repaints) for the whole apply.
+      await setImmediateAsync();
     }
   }
 
