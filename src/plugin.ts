@@ -17,6 +17,7 @@ import { VaultLoadPatchComponent } from './patches/vault-load-patch-component.ts
 import { PluginSettingsComponent } from './plugin-settings-component.ts';
 import { PluginSettingsTab } from './plugin-settings-tab.ts';
 import { RestoreNoticeComponent } from './restore-notice-component.ts';
+import { UpdateProgressNoticeComponent } from './update-progress-notice-component.ts';
 import { IndexedDbVaultPathStore } from './vault-path-store.ts';
 
 export class Plugin extends PluginBase {
@@ -44,6 +45,8 @@ export class Plugin extends PluginBase {
       })
     );
 
+    const updateProgressNotice = this.addChild(new UpdateProgressNoticeComponent());
+
     const indexProjectionComponent = this.addChild(
       new IndexProjectionComponent({
         addToFilesPane: fileTreeComponent.addToFilesPane.bind(fileTreeComponent),
@@ -51,6 +54,7 @@ export class Plugin extends PluginBase {
         deleteFromFilesPane: fileTreeComponent.deleteFromFilesPane.bind(fileTreeComponent),
         ignorePatternsComponent,
         pluginSettingsComponent,
+        updateProgressNotice,
         vaultLoadPatch,
         vaultPathStore: new IndexedDbVaultPathStore(this.app.appId)
       })

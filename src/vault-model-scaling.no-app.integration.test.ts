@@ -25,7 +25,7 @@ const IGNORED_FOLDER = 'big';
 
 describe('VaultModel scaling — single ignored folder', () => {
   for (const size of SINGLE_FOLDER_SIZES) {
-    it(`collapses a ${size.toLocaleString()}-file ignored folder to one hide-root`, () => {
+    it(`collapses a ${size.toLocaleString()}-file ignored folder to one hide-root`, async () => {
       const model = new VaultModel((path) => path === IGNORED_FOLDER || path.startsWith(`${IGNORED_FOLDER}/`));
       const entries: VaultModelEntry[] = [{ isFolder: true, path: IGNORED_FOLDER }];
       for (let index = 0; index < size; index++) {
@@ -33,7 +33,7 @@ describe('VaultModel scaling — single ignored folder', () => {
       }
       entries.push({ isFolder: false, path: 'keep.md' });
 
-      model.rebuild(entries);
+      await model.rebuild(entries);
 
       const hideRoots = model.getHideRoots();
       expect(hideRoots).toHaveLength(1);
@@ -48,7 +48,7 @@ describe('VaultModel scaling — single ignored folder', () => {
 
 describe('VaultModel scaling — many independently-ignored folders', () => {
   for (const count of MANY_FOLDER_COUNTS) {
-    it(`yields exactly one hide-root per folder for ${count.toLocaleString()} folders`, () => {
+    it(`yields exactly one hide-root per folder for ${count.toLocaleString()} folders`, async () => {
       const ignoredFolder = /^dir-\d+(?:\/|$)/;
       const model = new VaultModel((path) => ignoredFolder.test(path));
       const entries: VaultModelEntry[] = [];
@@ -57,7 +57,7 @@ describe('VaultModel scaling — many independently-ignored folders', () => {
         entries.push({ isFolder: false, path: `dir-${String(index)}/file.md` });
       }
 
-      model.rebuild(entries);
+      await model.rebuild(entries);
 
       // Each top-level folder is its own hide-root: cost is O(folders), not O(files).
       expect(model.getHideRoots()).toHaveLength(count);
