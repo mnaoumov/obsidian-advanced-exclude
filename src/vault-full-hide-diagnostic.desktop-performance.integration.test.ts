@@ -34,12 +34,6 @@ const INDEX_POLL_IN_MS = 5000;
 const INDEX_WAIT_IN_MS = 300_000;
 const SCENARIO_TIMEOUT_IN_MS = 595_000;
 
-function settle(ms: number): Promise<void> {
-  return new Promise((resolve) => {
-    window.setTimeout(resolve, ms);
-  });
-}
-
 describe('Full-mode hide batches updateRelatedLinks', () => {
   it('issues one real updateRelatedLinks call for the whole folder, not one per file', async () => {
     const result = await evalInObsidian({
@@ -48,7 +42,6 @@ describe('Full-mode hide batches updateRelatedLinks', () => {
         INDEX_POLL_IN_MS,
         INDEX_WAIT_IN_MS,
         PLUGIN_ID,
-        settle,
         SETTLE_DELAY_IN_MS,
         VAULT_FOLDER
       },
@@ -58,7 +51,6 @@ describe('Full-mode hide batches updateRelatedLinks', () => {
         INDEX_POLL_IN_MS: pollMs,
         INDEX_WAIT_IN_MS: indexWaitMs,
         PLUGIN_ID: pluginId,
-        settle: settleWait,
         SETTLE_DELAY_IN_MS: settleDelay,
         VAULT_FOLDER: vaultFolder
       }) {
@@ -67,14 +59,14 @@ describe('Full-mode hide batches updateRelatedLinks', () => {
         const deadline = Date.now() + indexWaitMs;
         let indexedCount = countInScope();
         while (Date.now() < deadline) {
-          await settleWait(pollMs);
+          await sleep(pollMs);
           const next = countInScope();
           if (next === indexedCount) {
             break;
           }
           indexedCount = next;
         }
-        await settleWait(settleDelay);
+        await sleep(settleDelay);
 
         const plugin = app.plugins.getPlugin(pluginId);
         if (!plugin) {

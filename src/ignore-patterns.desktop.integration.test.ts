@@ -32,12 +32,6 @@ const ALL_TEST_FOLDERS = [
   'secret-folder'
 ];
 
-function settle(settleDelay: number): Promise<void> {
-  return new Promise((resolve) => {
-    window.setTimeout(resolve, settleDelay);
-  });
-}
-
 afterEach(async () => {
   await evalInObsidian({
     args: {
@@ -78,10 +72,9 @@ describe('Ignore patterns — Full mode (vault-level exclusion)', () => {
     const result = await evalInObsidian({
       args: {
         PLUGIN_ID,
-        settle,
         SETTLE_DELAY_IN_MS
       },
-      async fn({ app, PLUGIN_ID: pluginId, settle: settleWait, SETTLE_DELAY_IN_MS: settleDelay }) {
+      async fn({ app, PLUGIN_ID: pluginId, SETTLE_DELAY_IN_MS: settleDelay }) {
         const plugin = app.plugins.getPlugin(pluginId);
         if (!plugin) {
           return { error: 'Plugin not loaded' };
@@ -95,7 +88,7 @@ describe('Ignore patterns — Full mode (vault-level exclusion)', () => {
         await app.vault.adapter.write('.obsidianignore', 'secret-*\n');
         await app.plugins.disablePluginAndSave(pluginId);
         await app.plugins.enablePluginAndSave(pluginId);
-        await settleWait(settleDelay);
+        await sleep(settleDelay);
 
         // Now create files that match the ignore pattern — use adapter to bypass plugin filtering
         await app.vault.adapter.write('secret-note.md', 'I should be hidden');
@@ -105,7 +98,7 @@ describe('Ignore patterns — Full mode (vault-level exclusion)', () => {
         // Reload plugin again to process the new files with ignore patterns active
         await app.plugins.disablePluginAndSave(pluginId);
         await app.plugins.enablePluginAndSave(pluginId);
-        await settleWait(settleDelay);
+        await sleep(settleDelay);
 
         // Check which files are visible in the vault
         const allFiles = app.vault.getFiles().map((f) => f.path).sort();
@@ -140,10 +133,9 @@ describe('Ignore patterns — Full mode (vault-level exclusion)', () => {
     const result = await evalInObsidian({
       args: {
         PLUGIN_ID,
-        settle,
         SETTLE_DELAY_IN_MS
       },
-      async fn({ app, PLUGIN_ID: pluginId, settle: settleWait, SETTLE_DELAY_IN_MS: settleDelay }) {
+      async fn({ app, PLUGIN_ID: pluginId, SETTLE_DELAY_IN_MS: settleDelay }) {
         const plugin = app.plugins.getPlugin(pluginId);
         if (!plugin) {
           return { error: 'Plugin not loaded' };
@@ -159,7 +151,7 @@ describe('Ignore patterns — Full mode (vault-level exclusion)', () => {
         // Reload plugin to pick up .gitignore patterns
         await app.plugins.disablePluginAndSave(pluginId);
         await app.plugins.enablePluginAndSave(pluginId);
-        await settleWait(settleDelay);
+        await sleep(settleDelay);
 
         const allFiles = app.vault.getFiles().map((f) => f.path).sort();
 
@@ -182,10 +174,9 @@ describe('Ignore patterns — File explorer exclusion', () => {
     const result = await evalInObsidian({
       args: {
         PLUGIN_ID,
-        settle,
         SETTLE_DELAY_IN_MS
       },
-      async fn({ app, PLUGIN_ID: pluginId, settle: settleWait, SETTLE_DELAY_IN_MS: settleDelay }) {
+      async fn({ app, PLUGIN_ID: pluginId, SETTLE_DELAY_IN_MS: settleDelay }) {
         const plugin = app.plugins.getPlugin(pluginId);
         if (!plugin) {
           return { error: 'Plugin not loaded' };
@@ -201,7 +192,7 @@ describe('Ignore patterns — File explorer exclusion', () => {
         // Reload plugin to apply patterns
         await app.plugins.disablePluginAndSave(pluginId);
         await app.plugins.enablePluginAndSave(pluginId);
-        await settleWait(settleDelay);
+        await sleep(settleDelay);
 
         // Check the file explorer
         const fileExplorerLeaf = app.workspace.getLeavesOfType('file-explorer')[0];
@@ -229,10 +220,9 @@ describe('Ignore patterns — Settings round-trip', () => {
     const result = await evalInObsidian({
       args: {
         PLUGIN_ID,
-        settle,
         SETTLE_DELAY_IN_MS
       },
-      async fn({ app, PLUGIN_ID: pluginId, settle: settleWait, SETTLE_DELAY_IN_MS: settleDelay }) {
+      async fn({ app, PLUGIN_ID: pluginId, SETTLE_DELAY_IN_MS: settleDelay }) {
         const plugin = app.plugins.getPlugin(pluginId);
         if (!plugin) {
           return { error: 'Plugin not loaded' };
@@ -242,7 +232,7 @@ describe('Ignore patterns — Settings round-trip', () => {
         await app.vault.create('alpha.md', 'alpha');
         await app.vault.create('beta.md', 'beta');
         await app.vault.create('gamma.md', 'gamma');
-        await settleWait(settleDelay);
+        await sleep(settleDelay);
 
         const filesBefore = app.vault.getFiles().map((f) => f.path).sort();
 
@@ -250,7 +240,7 @@ describe('Ignore patterns — Settings round-trip', () => {
         await app.vault.adapter.write('.obsidianignore', 'beta*\n');
         await app.plugins.disablePluginAndSave(pluginId);
         await app.plugins.enablePluginAndSave(pluginId);
-        await settleWait(settleDelay);
+        await sleep(settleDelay);
 
         const filesAfterExclude = app.vault.getFiles().map((f) => f.path).sort();
 
@@ -258,7 +248,7 @@ describe('Ignore patterns — Settings round-trip', () => {
         await app.vault.adapter.write('.obsidianignore', 'gamma*\n');
         await app.plugins.disablePluginAndSave(pluginId);
         await app.plugins.enablePluginAndSave(pluginId);
-        await settleWait(settleDelay);
+        await sleep(settleDelay);
 
         const filesAfterChange = app.vault.getFiles().map((f) => f.path).sort();
 
