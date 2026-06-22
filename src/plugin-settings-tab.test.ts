@@ -5,7 +5,10 @@ import type { PluginSettingsComponentBase } from 'obsidian-dev-utils/obsidian/co
 import { noopAsync } from 'obsidian-dev-utils/function';
 import { castTo } from 'obsidian-dev-utils/object-utils';
 import { strictProxy } from 'obsidian-dev-utils/strict-proxy';
-import { App } from 'obsidian-test-mocks/obsidian';
+import {
+  App,
+  ButtonComponent
+} from 'obsidian-test-mocks/obsidian';
 import {
   beforeEach,
   describe,
@@ -100,6 +103,30 @@ describe('PluginSettingsTab', () => {
 
       // Display creates 4 Setting elements as children
       expect(tab.containerEl.children.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('Apply button', () => {
+    it('should call ignorePatternsComponent.processConfigChanges when clicked', async () => {
+      // The test-mock ButtonComponent stores its onClick handler instead of
+      // Wiring a real DOM listener, so capture the handlers by button text.
+      const handlersByText = new Map<string, (evt: MouseEvent) => unknown>();
+      const onClickSpy = vi.spyOn(ButtonComponent.prototype, 'onClick')
+        .mockImplementation(function captureOnClick(this: ButtonComponent, callback): ButtonComponent {
+          handlersByText.set(this.buttonEl.textContent, callback);
+          return this;
+        });
+      tab.displayLegacy();
+      onClickSpy.mockRestore();
+
+      const applyHandler = handlersByText.get('Apply');
+      expect(applyHandler).toBeDefined();
+
+      applyHandler?.(new MouseEvent('click'));
+      // The onClick is wrapped in convertAsyncToSync; let its microtask settle.
+      await noopAsync();
+
+      expect(processConfigChanges).toHaveBeenCalled();
     });
   });
 
