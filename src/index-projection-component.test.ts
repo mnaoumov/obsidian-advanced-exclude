@@ -514,7 +514,11 @@ describe('IndexProjectionComponent', () => {
         isIgnored: (path) => path === 'drop.md'
       });
 
-      await component.loadWithPromises();
+      // The apply phase yields a (faked) macrotask between reconciles, so advance
+      // Timers to let the load-time projection finish.
+      const loadPromise = component.loadWithPromises();
+      await vi.runAllTimersAsync();
+      await loadPromise;
 
       expect(mockAdapter.reconcileDeletion).toHaveBeenCalledWith('drop.md', 'drop.md');
     });
