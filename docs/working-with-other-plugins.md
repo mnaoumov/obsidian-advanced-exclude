@@ -117,7 +117,16 @@ Propose an Obsidian API for bulk index mutation that does not broadcast per-file
 "suspend notifications / bulk apply / resume" bracket), and/or report the per-file O(N)
 behavior of the deletion cascade. Long-term, not actionable now.
 
-### S6 — Direct index mutation: stop calling `reconcileDeletion`/`reconcileFile` (recommended)
+### S6 — Direct index mutation: stop calling `reconcileDeletion`/`reconcileFile` (IMPLEMENTED)
+
+> **Status: shipped.** `Full`-mode hide/show is now done by `ManualIndexHider`
+> (`src/manual-index-hider.ts`), wired into `IndexProjectionComponent`. A hide mutates
+> `vault.fileMap`/`fileCache`/`resolvedLinks`/`unresolvedLinks` directly and fires no events;
+> the file explorer is driven explicitly. Validated end to end in real Obsidian
+> (`vault-size-scaling` / `ignore-patterns` / `manual-index-hide` desktop integration). Two
+> items from the plan are intentionally deferred (see "Resolved during implementation" below):
+> the single coalesced graph/backlinks refresh, and the show-path `mtime`/`size` staleness
+> check. The design as built is described next.
 
 Instead of asking Obsidian to reconcile (which runs `removeFile → onDelete → …`, fires the
 public `delete`/`create` events, and runs `updateRelatedLinks`), **mutate the few internal
@@ -195,34 +204,40 @@ cascade.
 - **Now (zero code):** document/recommend **S0 (`Files Pane` mode)** for large vaults and
   for anyone using Sync/Publish — it touches only the Files-pane DOM, so it has no freeze,
   no Sync hazard, and no Publish hazard.
-- **The real fix: S6 — direct index mutation, stop calling `reconcileDeletion`/
+- **The real fix (now shipped): S6 — direct index mutation, no `reconcileDeletion`/
   `reconcileFile`.** This is the only option that fixes *all* of the problems at once for
   plugins we don't own: the freeze (no `removeFile`/`onDelete` cascade → no third-party
   reaction, including `backlink-cache`'s internal `getFileCache` hook), the
   synthetic-deletion correctness hazard, and **Obsidian Sync** data-loss risk (no events →
   Sync never sees a deletion). It supersedes S2 (which can't stop the internal `getFileCache`
-  path) and S1 (which only helps our own plugins). Cost: a careful, test-guarded
-  reimplementation of the minimal hide/show index mutations.
+  path) and S1 (which only helps our own plugins). Implemented as `ManualIndexHider` +
+  `IndexProjectionComponent`.
 - **S1** is still worth doing for our own plugins as defense-in-depth and because those
   plugins are independently slow on real bulk deletes (see their `CLAUDE.md`), but it is no
   longer the primary fix.
 - **Publish** is unaffected by S2/S6 (it reads the index). Only `Files Pane` mode (S0) or
   view-layer filtering (S4) protects it.
 
-## Open questions to decide before implementing S6
+## Resolved during implementation
 
-1. The exact minimal removal set for HIDE that makes a file vanish from *every* consumer
-   (Files pane, `getFiles`, `metadataCache`, `getBacklinksForFile`, search, graph, tag
-   pane, quick switcher, canvas). Drive this from integration assertions, not guesses.
-2. The SHOW path is snapshot-restore (capture cache on hide, re-insert on show), with an
-   `mtime`/`size` check that falls back to a suppressed `reconcileFile` re-parse only when
-   the file changed while hidden or no snapshot exists. Confirm the restore re-inserts into
-   every map Obsidian reads, and that the fallback `reconcileFile` (when used) does not
-   re-introduce the internal `onCreate → getFileCache` cost.
-3. The single coalesced refresh to emit at `endProjection` so graph/backlinks/search
-   reflect the final state once, without per-file fan-out.
-4. Whether to keep the existing `updateRelatedLinks` batching (it becomes unnecessary if we
-   never call `reconcileDeletion`).
-5. Version-fragility guardrails: which `obsidian-typings` augmentations are needed, and what
-   the integration test must assert so a future Obsidian update that changes these internals
-   fails loudly.
+1. **Minimal removal set for HIDE.** Per path: `delete vault.fileMap[path]` and splice it from
+   its parent's `children`; `delete fileCache[path]`, `delete resolvedLinks[path]`,
+   `delete unresolvedLinks[path]`. The linked `metadataCache[hash]` is **left in place** — with
+   `fileCache[path]` gone there is no path→hash mapping, so `getFileCache(path)` returns `null`;
+   restoring `fileCache[path]` on show re-points to the still-present hash entry, which is how
+   show needs no re-parse. Integration assertions confirm a hidden path is absent from
+   `getAbstractFileByPath`/`getFiles`/`getCache` and its inbound links demote to unresolved.
+2. **SHOW path.** Snapshot-restore re-inserts the captured `fileMap`/`fileCache`/`resolvedLinks`/
+   `unresolvedLinks` verbatim and re-promotes the demoted inbound links; the explorer is driven
+   by `addToFilesPane` (`onCreate`). A path with **no** snapshot (hidden by a prior session,
+   never loaded) falls back to `reconcileFile`. The `mtime`/`size` staleness check is **deferred**
+   — a file edited on disk *while hidden* would restore a stale snapshot until its next real
+   change; rare, tracked as a follow-up.
+3. **Coalesced graph/backlinks refresh — deferred.** The link graph is kept *correct* by the
+   batched inbound demote, but no single end-of-projection refresh is emitted, so open
+   Graph/Backlinks views may render stale until the next interaction. Follow-up.
+4. **`updateRelatedLinks` batching — removed.** With no `reconcileDeletion` there is no per-file
+   `updateRelatedLinks` cascade to coalesce.
+5. **Version-fragility guardrails.** The internals are typed via `@obsidian-typings` (`fileMap`,
+   `fileCache`, `resolvedLinks`, `unresolvedLinks`); the desktop integration tests assert the
+   hide/show behavior against a real vault, so an Obsidian change to these internals fails loudly.
