@@ -60,6 +60,17 @@ Built on `obsidian-dev-utils`. Patches Obsidian's `FileSystemAdapter` / `Capacit
 
 ## Current Task
 
+**S6 (direct index mutation) shipped.** `Full`-mode hide/show no longer calls
+`reconcileDeletion`/`reconcileFile`. `ManualIndexHider` (`src/manual-index-hider.ts`)
+removes files from the index directly and fires no events; `IndexProjectionComponent`
+batches the whole hidden set into one event-free pass and drives the file explorer
+explicitly. This removes the multi-minute bulk-hide freeze, the synthetic-deletion hazard,
+and the Obsidian Sync data-loss path. Validated end to end in real Obsidian
+(`ignore-patterns` + `vault-size-scaling` desktop integration); full unit suite + 100%
+coverage. See `docs/working-with-other-plugins.md` (S6) and the Known Issues. Deferred
+follow-ups: a coalesced graph/backlinks refresh, and the show-path `mtime` staleness check.
+The historical context below predates S6 — read it with that in mind.
+
 Real-vault-scale (~90k) end-to-end testing, via populate-before-open. The harness
 feature has shipped: `obsidian-integration-testing` (now `^4.3.0`) gained
 `coreSetup({ populate })` + `createSetup({ populate })` so a vault is written with
@@ -84,11 +95,13 @@ does not re-scan disk then). 200 unit tests, 100% coverage; desktop integration
 set, not all 90k paths).
 
 `IndexProjectionComponent` exposes `isApplyingProjection` (set for the duration of
-`update()`); the adapter patch's `reconcileDeletion` skips `recordDelete` while it
-is set, so the projection's own hide calls no longer drop the hidden subtree from
-the model. `update()` also persists the hidden set after each `applyDelta`, so a
-later reload reconstructs it. Together these make a same-session un-ignore re-show
-hidden files without a reload.
+`update()`); the adapter patch's `reconcileDeletion` skips `recordDelete` while it is set
+(under S6 this is dormant — the projection no longer issues `reconcileDeletion`, so it only
+guards against a concurrent *real* delete during a projection). `update()` persists the
+hidden set after each `applyDelta`, so a later reload reconstructs it. Under S6 the same
+hidden set is also snapshotted in memory by `ManualIndexHider`, so a same-session un-ignore
+re-shows hidden files instantly from the snapshot (no reload, no re-parse); a path with no
+snapshot (hidden by a prior session) falls back to `reconcileFile`.
 
 Scaling is covered at three levels.
 
@@ -111,50 +124,42 @@ maintainer's full vault size.
 `src/vault-real-scale.desktop-performance.integration.test.ts` (real Obsidian, the
 `integration-tests:desktop-performance` project, ~90k populated before open): hides
 the whole vault folder in **`FilesPane` mode** and asserts the explorer is cleared
-(~0.8 s at 90k). See Known Issues for why this is `FilesPane`, not `Full`.
+(~0.8 s at 90k). `FilesPane` is used here because it is the fastest mode (pure DOM); since
+S6, `Full` mode also hides without the freeze, but `FilesPane` remains the cheapest at 90k.
 
 ## Known Issues
 
-- **`Full`-mode hide of a huge folder — Obsidian's O(N²) cascade, now batched
-  around.** Obsidian's `MetadataCache.deletePath` → `updateRelatedLinks` scans
-  **every** file in the vault (`getCachedFiles()`) to find backlinks to the deleted
-  file, run **once per deleted file** → O(N²) (20k 40 s, 90k ~16 min; confirmed the
-  *sole* quadratic by stubbing only `updateRelatedLinks` — the rest of the cascade
-  is ~linear, so a stubbed 90k hide is ~9 s).
-  **Fixed here (Option A):** `IndexProjectionComponent` monkey-patches
-  `updateRelatedLinks` for the duration of a `Full`-mode projection (`beginProjection`
-  /`endProjection` around the existing `applyingProjectionDepth`), collecting the
-  per-file names instead of scanning, then issues **one** call at the end — by then
-  the hidden files are gone from `getCachedFiles()`, so that single scan is cheap.
-  Needs the `src/obsidian-internals.d.ts` augmentation (the public typings mistype
-  `updateRelatedLinks(path: string)`; it really takes `string[]`). Measured: **20k
-  40 s → 1.4 s (28×), 90k ~16 min → 9.3 s (~104×)**, one real call instead of 90k,
-  hide still correct (in-scope index → 0). Guarded by
-  `src/vault-full-hide-diagnostic.desktop-performance.integration.test.ts` (asserts
-  exactly one real call; size via `AE_PERF_VAULT_SIZE`). `FilesPane` mode is still
-  the absolute fastest (DOM `onDelete`, ~0.8 s at 90k). The more general fix (a
-  reverse-index patch in `backlink-cache`, fixing any plugin's bulk delete) is
-  tracked in `obsidian-backlink-cache/CLAUDE.md`. Worth reporting the O(N²) upstream
-  to Obsidian.
+- **`Full`-mode bulk-hide freeze — RESOLVED by S6 (direct index mutation).** A
+  `Full`-mode hide now removes files from the index directly via `ManualIndexHider`
+  (`src/manual-index-hider.ts`), wired into `IndexProjectionComponent`. It calls neither
+  `reconcileDeletion` nor `reconcileFile`, so it fires **no** `vault`/`metadataCache`
+  events — which removes both freeze sources at once:
+  - Obsidian's own O(N²): the `MetadataCache.deletePath` → `updateRelatedLinks`
+    whole-vault scan (once per deleted file: 20k 40 s, 90k ~16 min) no longer runs at all
+    (no `reconcileDeletion`). The earlier "Option A" batching (monkey-patching
+    `updateRelatedLinks` to one flush) is therefore **removed** as unnecessary. Guarded by
+    `src/vault-full-hide-diagnostic.desktop-performance.integration.test.ts`, now asserting
+    **zero** real `updateRelatedLinks` calls for a whole-folder hide.
+  - Third-party reactions: profiling (CDP, real `F:\Obsidian`, ~943 files) showed the
+    multi-minute freeze was **other plugins** reacting to the per-file `removeFile →
+    onDelete`/`delete` cascade — `consistent-attachments-and-links` (~33–44 s),
+    `custom-attachment-location` (~22–35 s), `backlink-cache` (~11–12 s via its internal
+    `getFileCache` hook). With no cascade, none of them run. It also removes the
+    synthetic-deletion correctness hazard (the file is still on disk) and the Obsidian Sync
+    data-loss path (`onFileRemove` never sees a hide). Design + the full root-cause
+    breakdown: `docs/working-with-other-plugins.md` (S6); Sync/Publish:
+    `docs/sync-and-publish.md`.
 
-- **Bulk-hide freeze from OTHER plugins reacting to the per-file delete cascade.**
-  After the `updateRelatedLinks` fix, a `Full`-mode hide of a large folder still froze
-  the UI for minutes — but profiling (CDP, real `F:\Obsidian`, hiding ~943 files) shows
-  it is **not our code** (advanced-exclude ≈ 1% of samples; baseline with only this
-  plugin loaded ≈ 6 s, no freeze). Obsidian's per-file `removeFile` cascade fires a
-  delete/metadata notification per file, and installed plugins react synchronously per
-  file: `consistent-attachments-and-links` (~33–44 s, a vault delete/rename listener that
-  also calls `custom-attachment-location.getAvailablePathForAttachments` per file),
-  `custom-attachment-location` (~22–35 s), and `backlink-cache` (~11–12 s, via its
-  `getFileCache` patch hit from `onDelete`). Findings written to each of those plugins'
-  `CLAUDE.md`. Also note the hides are **synthetic** (file still on disk), so reacting as
-  a real delete is a correctness hazard too. Solution options (shared "bulk in progress"
-  signal for our own plugins; generic event-dispatch suppression for plugins we don't
-  own; `FilesPane` mode as the no-cascade workaround) are written up in
-  `docs/working-with-other-plugins.md`. NOT yet implemented — pending a decision on S1 vs
-  S2.
+  `FilesPane` mode remains the absolute fastest (pure DOM `onDelete`, ~0.8 s at 90k) and is
+  the only mode that is also Publish-safe (it never mutates the index). Two S6 follow-ups
+  are deferred (tracked in `docs/working-with-other-plugins.md`): a single coalesced
+  graph/backlinks refresh at end-of-projection, and the show-path `mtime`/`size` staleness
+  check (a file edited on disk while hidden restores a stale snapshot until its next real
+  change). The per-plugin performance findings still stand (each is independently slow on
+  *real* bulk deletes) and remain in each plugin's `CLAUDE.md`.
 
-  Separately, two real issues found in the progress-bar/async work that ARE ours and were
+- **Progress-bar smoothness (still open, ours).** Two real issues found in the
+  progress-bar/async work that ARE ours and were
   fixed earlier (queue-bound + async recompute + apply-phase yields), but note: the
   cooperative `setImmediate` yield does not reliably repaint the progress bar in a real
   foreground Obsidian session (bar appears to stick at chunk boundaries); switching the

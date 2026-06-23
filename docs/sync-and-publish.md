@@ -19,7 +19,13 @@ it detects a file was **deleted from disk**. Two consequences matter here:
 Anything that reacts to delete events, or enumerates files from the index, can therefore be
 fooled into thinking a hidden file was deleted.
 
-## Obsidian Sync — HIGH RISK (potential data loss). Event-driven
+> **Update (S6 shipped):** `Full` mode no longer calls `reconcileDeletion` — it removes files
+> from the index directly via `ManualIndexHider`, firing **no** `vault`/`metadataCache` events.
+> So the Sync data-loss path below (driven by the `delete` event) **no longer triggers**: Sync's
+> `onFileRemove` is never called for a hide. The analysis below documents the original risk and
+> why event-free hiding resolves it. Publish (index-driven) is still affected — see its section.
+
+## Obsidian Sync — was HIGH RISK (data loss), now neutralized by S6. Event-driven
 
 Observed wiring (core `sync` plugin instance): `boundOnFileAdd` / `boundOnFileRemove` /
 `boundOnFileRename` (vault event listeners), methods `onFileRemove`, `onFileRename`,
@@ -36,12 +42,12 @@ exists on the local disk. That is potential **data loss** on the cloud and other
   actually delete data remotely. Verify only on a throwaway test vault with Sync (hide a
   file on device A, confirm whether it disappears from device B / the web).
 - Sync is currently **disabled** in `F:\Obsidian`.
-- **Mitigation that works:** the event-suppression fix (S2 in
-  `working-with-other-plugins.md`) — withholding the per-file `delete`/`create`/`rename`
-  events during the projection — would prevent Sync's `onFileRemove` from ever seeing the
-  synthetic deletes. This is a strong additional reason to implement S2.
-- **Mitigation available today:** `Files Pane` exclude mode does not remove from the index
-  and fires no delete events, so Sync is unaffected.
+- **Fix (shipped): S6 — event-free index mutation.** Because a `Full`-mode hide no longer
+  fires any `delete` event, Sync's `onFileRemove` never runs for a hide, so it cannot record
+  or propagate a synthetic deletion. This supersedes the earlier S2 (event-suppression)
+  proposal, which would have withheld the events; S6 simply never produces them.
+- **Also safe:** `Files Pane` exclude mode does not remove from the index and fires no delete
+  events either.
 
 ## Obsidian Publish — MEDIUM RISK (wrong publish/unpublish). Index-driven
 
@@ -66,10 +72,10 @@ Observed wiring (core `publish` plugin instance, **enabled** here): `scanForChan
 
 ## Summary
 
-| Feature          | Driven by     | Affected by `Full` mode? | Fixed by event-suppression (S2)? | Safe in `Files Pane` mode? |
-|------------------|---------------|--------------------------|----------------------------------|----------------------------|
-| Obsidian Sync    | vault events  | Yes — possible data loss | **Yes**                          | **Yes**                    |
-| Obsidian Publish | metadataCache | Yes — wrong (un)publish  | No (index-driven)                | **Yes**                    |
+| Feature          | Driven by     | `Full`-mode risk (pre-S6)    | Fixed by S6 (event-free hide)?  | Safe in `Files Pane` mode? |
+|------------------|---------------|------------------------------|---------------------------------|----------------------------|
+| Obsidian Sync    | vault events  | Data loss (synthetic delete) | **Yes** — no delete events fire | **Yes**                    |
+| Obsidian Publish | metadataCache | Wrong (un)publish            | No — Publish reads the index    | **Yes**                    |
 
 `Files Pane` mode is the safe option for both (it touches only the Files-pane DOM). It is
 also the no-freeze option (see `working-with-other-plugins.md`). The trade-off is that it
@@ -77,7 +83,9 @@ does not hide from Backlinks/Graph/Search.
 
 ## Action items
 
-- [ ] Verify the Sync deletion-propagation inference on a throwaway synced vault (do NOT
-      test on a real vault).
-- [ ] Decide whether `Full` mode should warn when Sync and/or Publish is enabled.
-- [ ] Implement S2 (protects Sync); document `Files Pane` mode as the Sync/Publish-safe mode.
+- **Done (S6):** Sync is protected from the synthetic-deletion data-loss path — the
+  event-free hide fires no `delete` event, so Sync's `onFileRemove` never runs for a hide.
+- [ ] Optionally still verify on a throwaway synced vault that an S6 hide propagates **no**
+      deletion to other devices (confirm the fix empirically; do NOT test on a real vault).
+- [ ] Decide whether `Full` mode should warn when **Publish** is enabled (still index-driven:
+      a hidden file cannot be published, and hiding a published file reads as a removal).

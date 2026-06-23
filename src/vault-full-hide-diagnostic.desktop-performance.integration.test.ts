@@ -12,14 +12,14 @@ import type { PluginSettingsComponent } from './plugin-settings-component.ts';
 import { ExcludeMode } from './plugin-settings.ts';
 
 /*
- * Regression guard for the Full-mode hide O(N²) fix: Obsidian calls
- * `MetadataCache.updateRelatedLinks` once per deleted file during the
- * `reconcileDeletion` cascade, and each call scans the whole vault. The plugin
- * batches these — suppressing the per-file calls during the bulk hide and issuing
- * one call at the end — turning a ~16 min 90k hide into ~9 s. This test wraps
- * `updateRelatedLinks` with a counting pass-through and asserts the cascade
- * produced exactly one real call (the batched flush), not one per file. Size is
- * `AE_PERF_VAULT_SIZE` (default 90k); see scripts/helpers/generate-performance-vault.ts.
+ * Regression guard for the Full-mode hide (S6, direct index mutation): the hide no
+ * longer calls `reconcileDeletion`, so Obsidian's per-file `updateRelatedLinks`
+ * cascade — which scanned the whole vault once per deleted file (the original O(N²),
+ * ~16 min at 90k) — never runs at all. This test wraps `updateRelatedLinks` with a
+ * counter and asserts a whole-folder hide produces **zero** real calls (not "one
+ * batched call", not "one per file"), proving the cascade is gone. If anyone
+ * reintroduces a reconcile-based hide, this fails. Size is `AE_PERF_VAULT_SIZE`
+ * (default 90k); see scripts/helpers/generate-performance-vault.ts.
  */
 
 interface TraversableComponent {
@@ -34,8 +34,8 @@ const INDEX_POLL_IN_MS = 5000;
 const INDEX_WAIT_IN_MS = 300_000;
 const SCENARIO_TIMEOUT_IN_MS = 595_000;
 
-describe('Full-mode hide batches updateRelatedLinks', () => {
-  it('issues one real updateRelatedLinks call for the whole folder, not one per file', async () => {
+describe('Full-mode hide fires no updateRelatedLinks cascade', () => {
+  it('issues zero real updateRelatedLinks calls for a whole-folder hide', async () => {
     const result = await evalInObsidian({
       args: {
         fullMode: ExcludeMode.Full,
@@ -80,9 +80,9 @@ describe('Full-mode hide batches updateRelatedLinks', () => {
         }
 
         /*
-         * Count real updateRelatedLinks calls. The plugin's batching replaces the
-         * method during the hide with a collector, then restores this wrapper and
-         * calls it once with the union — so a batched hide lands here exactly once.
+         * Count real updateRelatedLinks calls. S6 removes files from the index
+         * directly (no reconcileDeletion), so nothing inside the hide reaches this
+         * wrapper — a correct hide leaves the counter at zero.
          */
         const metadataCache = app.metadataCache;
         const originalUpdateRelatedLinks = metadataCache.updateRelatedLinks.bind(metadataCache);
@@ -136,7 +136,7 @@ describe('Full-mode hide batches updateRelatedLinks', () => {
     expect(result.indexedCount).toBeGreaterThan(0);
     // Full mode removed the ignored subtree from Obsidian's index.
     expect(result.remainingInScope).toBe(0);
-    // The cascade's per-file calls were batched into exactly one real call.
-    expect(result.realUpdateRelatedLinksCalls).toBe(1);
+    // S6 hides without reconcileDeletion, so the updateRelatedLinks cascade never fires.
+    expect(result.realUpdateRelatedLinksCalls).toBe(0);
   }, SCENARIO_TIMEOUT_IN_MS);
 });
