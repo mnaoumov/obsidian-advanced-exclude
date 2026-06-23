@@ -82,7 +82,8 @@ export class AdapterPatchComponent extends MonkeyAroundComponent {
       return;
     }
 
-    // Skip the projection's own hide-driven `reconcileDeletion` calls: they are not real deletions, so recording them would forget the hidden subtree.
+    // While a projection is applying, ignore reconcileDeletion: it is not a real on-disk
+    // Deletion to record, and recording it would forget paths the projection is managing.
     if (this.indexProjectionComponent.isApplyingProjection) {
       return;
     }
