@@ -1,8 +1,5 @@
 import type { DataAdapterEx } from '@obsidian-typings/obsidian-public-latest';
-import type {
-  App,
-  MetadataCache
-} from 'obsidian';
+import type { App } from 'obsidian';
 
 import { getDataAdapterEx } from '@obsidian-typings/obsidian-public-latest/implementations';
 import { setImmediateAsync } from 'obsidian-dev-utils/async';
@@ -11,6 +8,7 @@ import { CallbackLayoutReadyComponent } from 'obsidian-dev-utils/obsidian/compon
 import { isFolder } from 'obsidian-dev-utils/obsidian/file-system';
 
 import type { IgnorePatternsComponent } from './ignore-patterns-component.ts';
+import type { ManualIndexHider } from './manual-index-hider.ts';
 import type { VaultLoadPatchComponent } from './patches/vault-load-patch-component.ts';
 import type { PluginSettingsComponent } from './plugin-settings-component.ts';
 import type { UpdateProgressNoticeComponent } from './update-progress-notice-component.ts';
@@ -31,11 +29,10 @@ import { VaultModel } from './vault-model.ts';
 const UPDATE_PROGRESS_MESSAGE = 'Advanced Exclude: updating file tree…';
 
 /**
- * Number of reconcile operations between progress-bar updates and cooperative
- * yields during the apply phase. The reconcile calls resolve on the microtask
- * queue, so without periodically yielding a macrotask the whole apply loop would
- * block the main thread (frozen UI, unpainted bar); this bounds each blocking
- * span to roughly this many files.
+ * Number of paths processed between progress-bar updates and cooperative yields
+ * during the apply phase. Without periodically yielding a macrotask the whole
+ * apply loop would block the main thread (frozen UI, unpainted bar); this bounds
+ * each blocking span to roughly this many files.
  */
 const APPLY_PROGRESS_REPORT_INTERVAL = 20;
 
@@ -44,6 +41,7 @@ export interface IndexProjectionComponentConstructorParams {
   readonly app: App;
   deleteFromFilesPane(this: void, normalizedPath: string): void;
   readonly ignorePatternsComponent: IgnorePatternsComponent;
+  readonly manualIndexHider: ManualIndexHider;
   readonly pluginSettingsComponent: PluginSettingsComponent;
   readonly updateProgressNotice: UpdateProgressNoticeComponent;
   readonly vaultLoadPatch: VaultLoadPatchComponent;
@@ -54,16 +52,17 @@ export interface IndexProjectionComponentConstructorParams {
  * Projects the {@link VaultModel}'s visibility onto Obsidian's index.
  *
  * Instead of re-reconciling the whole vault, it snapshots Obsidian's already
- * loaded tree into the model and removes only the hidden set: in `Full` mode via
- * `reconcileDeletion` (which cascades a folder's subtree and unloads it from
- * metadataCache); in `FilesPane` mode by removing items from the explorer pane.
+ * loaded tree into the model and removes only the hidden set. In `Full` mode it
+ * removes files from the index via {@link ManualIndexHider} — a direct mutation
+ * that fires **no** vault/metadataCache events, so a bulk hide no longer triggers
+ * Obsidian's per-file `removeFile` cascade (the source of the multi-minute freeze
+ * and the Sync data-loss hazard); the file explorer is driven explicitly. In
+ * `FilesPane` mode it only removes items from the explorer pane.
  */
 export class IndexProjectionComponent extends ComponentEx {
   /**
-   * Whether the projection is currently issuing its own reconcile calls. The
-   * adapter patch checks this to skip recording the plugin's own hides as real
-   * deletions — otherwise a hide would drop the hidden subtree from the model and
-   * a later in-session un-ignore would have nothing left to re-show.
+   * Whether the projection is currently applying. The adapter patch checks this to
+   * skip recording a concurrent real deletion as the projection's own work.
    */
   public get isApplyingProjection(): boolean {
     return this.applyingProjectionDepth > 0;
@@ -76,14 +75,13 @@ export class IndexProjectionComponent extends ComponentEx {
   private readonly addToFilesPane: (normalizedPath: string) => void;
   private readonly app: App;
   private applyingProjectionDepth = 0;
-  private readonly collectedRelatedLinkNames = new Set<string>();
   private readonly deleteFromFilesPane: (normalizedPath: string) => void;
   private hasBuiltModel = false;
+  private readonly manualIndexHider: ManualIndexHider;
   // Set while a delta is mid-flight: a superseded/aborted delta leaves the model's
   // Visibility ahead of Obsidian (the recompute mutated the model but the apply was
   // Skipped), so the next update must do a full reconcile instead of a stale delta.
   private needsFullProjection = false;
-  private originalUpdateRelatedLinks: MetadataCache['updateRelatedLinks'] | null = null;
   private readonly pluginSettingsComponent: PluginSettingsComponent;
   private updateAbortController: AbortController | null = null;
   private readonly updateProgressNotice: UpdateProgressNoticeComponent;
@@ -103,24 +101,24 @@ export class IndexProjectionComponent extends ComponentEx {
     this.vaultPathStore = params.vaultPathStore;
     this.addToFilesPane = params.addToFilesPane;
     this.deleteFromFilesPane = params.deleteFromFilesPane;
+    this.manualIndexHider = params.manualIndexHider;
     this.updateProgressNotice = params.updateProgressNotice;
     this.vaultModel = new VaultModel((normalizedPath, isFolderPath) => params.ignorePatternsComponent.isIgnored(normalizedPath, isFolderPath));
   }
 
   /**
-   * Applies the delta produced by an incremental model recompute: hides nodes
-   * that flipped hidden and shows nodes that flipped visible.
+   * Applies the delta produced by an incremental model recompute: shows nodes that
+   * flipped visible and hides nodes that flipped hidden.
    *
-   * Shows run first, shallowest-first, so a folder is recreated before any file
-   * it must contain. Hides run after; in `Full` mode only the hide-roots (a
-   * hidden node whose parent is still visible) are removed, because
-   * `reconcileDeletion` cascades the subtree — issuing it per descendant turned a
-   * single folder hide into O(subtree) reconcile ops and froze the app.
+   * Shows run first, shallowest-first, so a folder is recreated before any file it
+   * must contain. Hides run after, deepest-first: each hidden path is removed from
+   * the explorer (while it is still in the index), then the whole hidden set is
+   * removed from the index in one batched, event-free pass.
    */
   public async applyDelta(changes: readonly VisibilityChange[], abortSignal?: AbortSignal): Promise<void> {
     const adapter = getDataAdapterEx(this.app);
     const shows = changes.filter((change) => change.isVisible).sort((a, b) => pathDepth(a.path) - pathDepth(b.path));
-    const hides = changes.filter((change) => !change.isVisible);
+    const hides = changes.filter((change) => !change.isVisible).sort((a, b) => pathDepth(b.path) - pathDepth(a.path));
     const total = shows.length + hides.length;
     let processed = 0;
 
@@ -132,42 +130,41 @@ export class IndexProjectionComponent extends ComponentEx {
       await this.reportApplyProgress(++processed, total);
     }
 
+    const hiddenPaths: string[] = [];
     for (const change of hides) {
       if (abortSignal?.aborted) {
         return;
       }
-      // In Full mode a hidden node whose parent is also hidden is already removed
-      // By the parent's cascading `reconcileDeletion`; skip it. An unknown parent
-      // (`undefined`) is treated as a hide-root and still removed.
-      if (this.excludeMode === ExcludeMode.Full && this.vaultModel.isParentVisible(change.path) === false) {
-        await this.reportApplyProgress(++processed, total);
-        continue;
-      }
-      await this.hide(adapter, change);
+      this.deleteFromFilesPane(change.path);
+      hiddenPaths.push(change.path);
       await this.reportApplyProgress(++processed, total);
     }
+    this.hideFromIndex(hiddenPaths);
   }
 
   /**
-   * Rebuilds the model from the persisted path set merged with Obsidian's
-   * loaded tree, removes the hidden set, and re-adds any visible path missing
-   * from the index (e.g. one hidden by a prior session before a disable/enable).
+   * Rebuilds the model from the persisted path set merged with Obsidian's loaded
+   * tree, removes the hidden set, and re-adds any visible path missing from the
+   * index (e.g. one hidden by a prior session before a disable/enable).
    */
   public async applyFull(abortSignal?: AbortSignal): Promise<void> {
     await this.rebuildModel(abortSignal);
     const adapter = getDataAdapterEx(this.app);
-    const targets = this.getProjectionTargets();
+    const targets = this.vaultModel.getPathsByVisibility(false).sort((a, b) => pathDepth(b.path) - pathDepth(a.path));
     const missing = this.getMissingVisiblePaths();
     const total = targets.length + missing.length;
     let processed = 0;
 
+    const hiddenPaths: string[] = [];
     for (const target of targets) {
       if (abortSignal?.aborted) {
         return;
       }
-      await this.hide(adapter, target);
+      this.deleteFromFilesPane(target.path);
+      hiddenPaths.push(target.path);
       await this.reportApplyProgress(++processed, total);
     }
+    this.hideFromIndex(hiddenPaths);
 
     for (const entry of missing) {
       if (abortSignal?.aborted) {
@@ -267,9 +264,6 @@ export class IndexProjectionComponent extends ComponentEx {
   }
 
   private beginProjection(): void {
-    if (this.applyingProjectionDepth === 0) {
-      this.installRelatedLinksBatching();
-    }
     this.applyingProjectionDepth++;
   }
 
@@ -288,22 +282,6 @@ export class IndexProjectionComponent extends ComponentEx {
 
   private endProjection(): void {
     this.applyingProjectionDepth--;
-    if (this.applyingProjectionDepth === 0) {
-      this.flushRelatedLinksBatching();
-    }
-  }
-
-  private flushRelatedLinksBatching(): void {
-    const original = this.originalUpdateRelatedLinks;
-    if (!original) {
-      return;
-    }
-    this.app.metadataCache.updateRelatedLinks = original;
-    this.originalUpdateRelatedLinks = null;
-    if (this.collectedRelatedLinkNames.size > 0) {
-      this.app.metadataCache.updateRelatedLinks([...this.collectedRelatedLinkNames]);
-      this.collectedRelatedLinkNames.clear();
-    }
   }
 
   /**
@@ -319,45 +297,15 @@ export class IndexProjectionComponent extends ComponentEx {
     return this.vaultModel.getPathsByVisibility(true).filter((entry) => !loadedPaths.has(entry.path));
   }
 
-  private getProjectionTargets(): VaultModelEntry[] {
-    return this.excludeMode === ExcludeMode.Full ? this.vaultModel.getHideRoots() : this.vaultModel.getPathsByVisibility(false);
-  }
-
-  private async hide(adapter: DataAdapterEx, entry: VaultModelEntry): Promise<void> {
-    if (this.excludeMode === ExcludeMode.Full) {
-      await adapter.reconcileDeletion(entry.path, entry.path);
-    } else {
-      this.deleteFromFilesPane(entry.path);
-    }
-  }
-
   /**
-   * In `Full` mode the hide issues `reconcileDeletion`, whose internal cascade
-   * calls `MetadataCache.updateRelatedLinks` once per deleted file — and each call
-   * scans every file in the vault, making a folder hide O(N²) (a ~16 min 90k hide).
-   * While the projection runs, collect the names instead of scanning; one pass
-   * afterwards re-resolves them all (by then the hidden files are gone from the
-   * cache, so the single scan is cheap), turning the hide into seconds.
+   * In `Full` mode, removes the whole hidden set from Obsidian's index in one
+   * batched, event-free pass (snapshotting each path so it can be restored without
+   * a re-parse). No-op in `FilesPane` mode, where hiding is purely the explorer.
    */
-  private installRelatedLinksBatching(): void {
-    if (this.excludeMode !== ExcludeMode.Full) {
-      return;
+  private hideFromIndex(normalizedPaths: readonly string[]): void {
+    if (this.excludeMode === ExcludeMode.Full && normalizedPaths.length > 0) {
+      this.manualIndexHider.hide(normalizedPaths);
     }
-    const metadataCache = this.app.metadataCache;
-    // eslint-disable-next-line @typescript-eslint/unbound-method -- captured to restore on the same object later, never called detached.
-    this.originalUpdateRelatedLinks = metadataCache.updateRelatedLinks;
-    const collected = this.collectedRelatedLinkNames;
-    collected.clear();
-    /*
-     * The public typings mistype the param as a single string; the real method
-     * takes an array. Accept both and flatten so the assignment satisfies both
-     * overloads without a runtime branch.
-     */
-    metadataCache.updateRelatedLinks = (namesOrPath: string | string[]): void => {
-      for (const name of [namesOrPath].flat()) {
-        collected.add(name);
-      }
-    };
   }
 
   private async rebuildModel(abortSignal?: AbortSignal): Promise<void> {
@@ -380,15 +328,26 @@ export class IndexProjectionComponent extends ComponentEx {
   private async reportApplyProgress(processed: number, total: number): Promise<void> {
     if (processed % APPLY_PROGRESS_REPORT_INTERVAL === 0 || processed === total) {
       this.updateProgressNotice.report(processed, total);
-      // Yield a macrotask: the reconcile calls resolve on the microtask queue, so
-      // Without this the apply loop never returns to the event loop and the UI
-      // Freezes (and the progress bar never repaints) for the whole apply.
+      // Yield a macrotask so the apply loop returns to the event loop — otherwise
+      // The UI freezes (and the progress bar never repaints) for the whole apply.
       await setImmediateAsync();
     }
   }
 
+  /**
+   * In `Full` mode, restores a path that was hidden this session from its snapshot
+   * (no re-parse) and drives the explorer; a path with no snapshot (e.g. hidden by
+   * a prior session and never loaded) is re-parsed via `reconcileFile`, which fires
+   * its own create event that updates the explorer. In `FilesPane` mode the show is
+   * purely the explorer.
+   */
   private async show(adapter: DataAdapterEx, entry: VaultModelEntry): Promise<void> {
-    if (this.excludeMode === ExcludeMode.Full) {
+    if (this.excludeMode !== ExcludeMode.Full) {
+      this.addToFilesPane(entry.path);
+      return;
+    }
+    const withoutSnapshot = this.manualIndexHider.show([entry.path]);
+    if (withoutSnapshot.length > 0) {
       await adapter.reconcileFile(entry.path, entry.path);
     } else {
       this.addToFilesPane(entry.path);

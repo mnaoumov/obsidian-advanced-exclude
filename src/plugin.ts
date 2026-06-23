@@ -11,6 +11,7 @@ import { PluginEventSourceImpl } from 'obsidian-dev-utils/obsidian/plugin/plugin
 import { FileTreeComponent } from './file-tree-component.ts';
 import { IgnorePatternsComponent } from './ignore-patterns-component.ts';
 import { IndexProjectionComponent } from './index-projection-component.ts';
+import { ManualIndexHider } from './manual-index-hider.ts';
 import { AdapterPatchComponent } from './patches/adapter-patch-component.ts';
 import { FileExplorerViewOnCreatePatchComponent } from './patches/file-explorer-view-on-create-patch-component.ts';
 import { VaultLoadPatchComponent } from './patches/vault-load-patch-component.ts';
@@ -53,6 +54,7 @@ export class Plugin extends PluginBase {
         app: this.app,
         deleteFromFilesPane: fileTreeComponent.deleteFromFilesPane.bind(fileTreeComponent),
         ignorePatternsComponent,
+        manualIndexHider: new ManualIndexHider(this.app),
         pluginSettingsComponent,
         updateProgressNotice,
         vaultLoadPatch,
