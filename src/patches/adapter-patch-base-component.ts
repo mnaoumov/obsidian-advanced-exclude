@@ -1,4 +1,3 @@
-import type { DataAdapterEx } from '@obsidian-typings/obsidian-public-latest';
 import type { App } from 'obsidian';
 
 import { MonkeyAroundComponent } from 'obsidian-dev-utils/obsidian/components/monkey-around-component';
