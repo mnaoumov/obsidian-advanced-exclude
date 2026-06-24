@@ -7,7 +7,7 @@ import type {
 
 import { AdapterPatchBaseComponent } from './adapter-patch-base-component.ts';
 
-export type CapacitorAdapterReconcileFileCreationFn = CapacitorAdapter['reconcileFileCreation'];
+type CapacitorAdapterReconcileFileCreationFn = CapacitorAdapter['reconcileFileCreation'];
 
 interface CapacitorAdapterPatchComponentConstructorParams extends AdapterPatchBaseComponentConstructorParams {
   readonly adapter: CapacitorAdapter;

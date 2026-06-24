@@ -15,7 +15,7 @@ import type { PluginSettingsComponent } from '../plugin-settings-component.ts';
 import { CapacitorAdapterPatchComponent } from './capacitor-adapter-patch-component.ts';
 import { FileSystemAdapterPatchComponent } from './file-system-adapter-patch-component.ts';
 
-export interface AdapterPatchComponentConstructorParams {
+interface AdapterPatchComponentConstructorParams {
   readonly app: App;
   readonly fileTreeComponent: FileTreeComponent;
   readonly ignorePatternsComponent: IgnorePatternsComponent;
@@ -76,7 +76,7 @@ export class AdapterPatchComponent extends MonkeyAroundComponent {
     }
   }
 
-  protected async reconcileDeletion(fallback: () => Promise<void>, normalizedPath: string): Promise<void> {
+  private async reconcileDeletion(fallback: () => Promise<void>, normalizedPath: string): Promise<void> {
     await fallback();
     if (!this.app.workspace.layoutReady) {
       return;

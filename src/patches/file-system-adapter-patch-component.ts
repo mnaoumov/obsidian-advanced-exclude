@@ -7,7 +7,7 @@ import type {
 
 import { AdapterPatchBaseComponent } from './adapter-patch-base-component.ts';
 
-export type FileSystemAdapterReconcileFileCreationFn = FileSystemAdapter['reconcileFileCreation'];
+type FileSystemAdapterReconcileFileCreationFn = FileSystemAdapter['reconcileFileCreation'];
 
 interface FileSystemAdapterPatchComponentConstructorParams extends AdapterPatchBaseComponentConstructorParams {
   readonly adapter: FileSystemAdapter;

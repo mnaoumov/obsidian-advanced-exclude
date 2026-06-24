@@ -36,7 +36,7 @@ const UPDATE_PROGRESS_MESSAGE = 'Advanced Exclude: updating file tree…';
  */
 const APPLY_PROGRESS_REPORT_INTERVAL = 20;
 
-export interface IndexProjectionComponentConstructorParams {
+interface IndexProjectionComponentConstructorParams {
   addToFilesPane(this: void, normalizedPath: string): void;
   readonly app: App;
   deleteFromFilesPane(this: void, normalizedPath: string): void;

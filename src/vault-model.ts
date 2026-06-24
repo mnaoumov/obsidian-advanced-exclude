@@ -19,7 +19,7 @@ export interface VaultModelEntry {
 /**
  * Options for {@link VaultModel.rebuild}; identical to {@link VaultModelRecomputeAllOptions}.
  */
-export type VaultModelRebuildOptions = VaultModelRecomputeAllOptions;
+type VaultModelRebuildOptions = VaultModelRecomputeAllOptions;
 
 /**
  * Options for {@link VaultModel.recomputeAll} / {@link VaultModel.rebuild}.

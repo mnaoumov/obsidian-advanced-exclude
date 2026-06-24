@@ -17,8 +17,8 @@ export interface AdapterPatchBaseComponentConstructorParams {
   readonly indexProjectionComponent: IndexProjectionComponent;
   readonly pluginSettingsComponent: PluginSettingsComponent;
 }
-export type DataAdapterReconcileDeletionFn = DataAdapterEx['reconcileDeletion'];
-export type DataAdapterReconcileFolderCreationFn = DataAdapterEx['reconcileFolderCreation'];
+type DataAdapterReconcileDeletionFn = DataAdapterEx['reconcileDeletion'];
+type DataAdapterReconcileFolderCreationFn = DataAdapterEx['reconcileFolderCreation'];
 export type GenericReconcileFn = (normalizedPath: string, ...args: unknown[]) => Promise<void>;
 
 export class AdapterPatchBaseComponent extends MonkeyAroundComponent {
