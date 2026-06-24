@@ -3,7 +3,7 @@ import type { App } from 'obsidian';
 
 import { ComponentEx } from 'obsidian-dev-utils/obsidian/components/component-ex';
 
-export interface FileTreeComponentConstructorParams {
+interface FileTreeComponentConstructorParams {
   readonly app: App;
 }
 

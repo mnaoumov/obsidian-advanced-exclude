@@ -4,7 +4,7 @@ import { ComponentEx } from 'obsidian-dev-utils/obsidian/components/component-ex
 
 import type { IndexProjectionComponent } from './index-projection-component.ts';
 
-export interface RestoreNoticeComponentConstructorParams {
+interface RestoreNoticeComponentConstructorParams {
   readonly indexProjectionComponent: IndexProjectionComponent;
   readonly pluginNoticeComponent: PluginNoticeComponent;
 }
