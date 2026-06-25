@@ -17,6 +17,7 @@ import { FileExplorerViewOnCreatePatchComponent } from './patches/file-explorer-
 import { VaultLoadPatchComponent } from './patches/vault-load-patch-component.ts';
 import { PluginSettingsComponent } from './plugin-settings-component.ts';
 import { PluginSettingsTab } from './plugin-settings-tab.ts';
+import { PublishCompatibilityWarningComponent } from './publish-compatibility-warning-component.ts';
 import { RestoreNoticeComponent } from './restore-notice-component.ts';
 import { UpdateProgressNoticeComponent } from './update-progress-notice-component.ts';
 import { IndexedDbVaultPathStore } from './vault-path-store.ts';
@@ -97,6 +98,16 @@ export class Plugin extends PluginBase {
       new RestoreNoticeComponent({
         indexProjectionComponent,
         pluginNoticeComponent: this.pluginNoticeComponent
+      })
+    );
+
+    this.addChild(
+      new PublishCompatibilityWarningComponent({
+        app: this.app,
+        ignorePatternsComponent,
+        pluginId: this.manifest.id,
+        pluginName: this.manifest.name,
+        pluginSettingsComponent
       })
     );
 
