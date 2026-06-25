@@ -344,6 +344,12 @@ export class IndexProjectionComponent extends ComponentEx {
     }
     const withoutSnapshot = this.manualIndexHider.show([entry.path]);
     if (withoutSnapshot.length > 0) {
+      // The prior session's hide removed the path from `vault.fileMap`/`metadataCache`
+      // But left the adapter's own stat record intact, so `reconcileFile` would compare
+      // Disk against that stale record, see no change, and re-add nothing. Drop the
+      // Record first so `reconcileFile` treats the still-on-disk file as new.
+      // eslint-disable-next-line @typescript-eslint/no-dynamic-delete -- invalidate the adapter's stale stat record so the re-parse re-adds the file.
+      delete adapter.files[entry.path];
       await adapter.reconcileFile(entry.path, entry.path);
     } else {
       this.addToFilesPane(entry.path);

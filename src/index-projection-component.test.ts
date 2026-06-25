@@ -40,6 +40,7 @@ const mockGetDataAdapterEx = vi.mocked(getDataAdapterEx);
 const mockIsFolder = vi.mocked(isFolder);
 
 interface MockAdapter {
+  files: DataAdapterEx['files'];
   reconcileFile: ReturnType<typeof vi.fn>;
 }
 
@@ -89,7 +90,14 @@ function hiddenPaths(manualIndexHider: MockManualIndexHider): string[] {
 function setup(params: SetupParams): SetupResult {
   const { entries, excludeMode = ExcludeMode.Full, isIgnored, persistedEntries = [], vaultLoadCalled = false } = params;
 
+  // Mirror the real adapter: its internal stat record lists every path on disk —
+  // The loaded entries plus any persisted (prior-session-hidden, still-on-disk) paths.
+  const files: DataAdapterEx['files'] = {};
+  for (const entry of [...entries, ...persistedEntries]) {
+    files[entry.path] = strictProxy<DataAdapterEx['files'][string]>({});
+  }
   const mockAdapter: MockAdapter = {
+    files,
     reconcileFile: vi.fn().mockResolvedValue(undefined)
   };
   const dataAdapterEx = strictProxy<DataAdapterEx>({});
@@ -237,6 +245,24 @@ describe('IndexProjectionComponent', () => {
       expect(hiddenPaths(manualIndexHider)).toEqual(['gamma.md']);
       expect(mockAdapter.reconcileFile).toHaveBeenCalledWith('beta.md', 'beta.md');
       expect(save).toHaveBeenCalled();
+    });
+
+    it('invalidates the adapter stat record before the re-parse so a snapshot-less file is re-added', async () => {
+      const { component, manualIndexHider, mockAdapter } = setup({
+        entries: [{ isFolderFlag: false, path: 'alpha.md' }],
+        isIgnored: () => false,
+        persistedEntries: [{ isFolderFlag: false, path: 'beta.md' }]
+      });
+      manualIndexHider.show.mockReturnValue(['beta.md']);
+      // The adapter still holds a stale record for beta from the prior-session hide;
+      // Without dropping it first, `reconcileFile` would see no change and re-add nothing.
+      expect('beta.md' in mockAdapter.files).toBe(true);
+
+      await component.applyFull();
+
+      expect(mockAdapter.reconcileFile).toHaveBeenCalledWith('beta.md', 'beta.md');
+      // The stale record was dropped so the re-parse treats the on-disk file as new.
+      expect('beta.md' in mockAdapter.files).toBe(false);
     });
   });
 
