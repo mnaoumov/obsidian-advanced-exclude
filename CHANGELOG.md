@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## 3.0.0
+
+- perf: improve performance
+- refactor: new template
+
 ## 2.1.5
 
 - chore: update template
