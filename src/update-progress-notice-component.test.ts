@@ -1,4 +1,10 @@
+import type {
+  PluginNoticeComponent,
+  PluginNoticeComponentShowNoticeOptions
+} from 'obsidian-dev-utils/obsidian/components/plugin-notice-component';
+
 import { Notice } from 'obsidian';
+import { strictProxy } from 'obsidian-dev-utils/strict-proxy';
 import {
   afterEach,
   describe,
@@ -9,6 +15,13 @@ import {
 
 import { UpdateProgressNoticeComponent } from './update-progress-notice-component.ts';
 
+const showNoticeMock = vi.fn((message: DocumentFragment | string, _options?: PluginNoticeComponentShowNoticeOptions): Notice => new Notice(message, 0));
+
+function createComponent(): UpdateProgressNoticeComponent {
+  const pluginNoticeComponent = strictProxy<PluginNoticeComponent>({ showNotice: showNoticeMock });
+  return new UpdateProgressNoticeComponent(pluginNoticeComponent);
+}
+
 describe('UpdateProgressNoticeComponent', () => {
   afterEach(() => {
     vi.restoreAllMocks();
@@ -16,7 +29,7 @@ describe('UpdateProgressNoticeComponent', () => {
 
   it('start shows a notice whose fragment carries the message and a progress bar', () => {
     const createFragmentSpy = vi.spyOn(window, 'createFragment');
-    const component = new UpdateProgressNoticeComponent();
+    const component = createComponent();
 
     component.start('Working…');
 
@@ -27,7 +40,7 @@ describe('UpdateProgressNoticeComponent', () => {
 
   it('report updates the progress bar value and max', () => {
     const createFragmentSpy = vi.spyOn(window, 'createFragment');
-    const component = new UpdateProgressNoticeComponent();
+    const component = createComponent();
     component.start('Working…');
     const progressEl = getFragment(createFragmentSpy.mock.results[0]?.value).querySelector('progress');
 
@@ -38,7 +51,7 @@ describe('UpdateProgressNoticeComponent', () => {
   });
 
   it('report is a no-op when no notice is showing', () => {
-    const component = new UpdateProgressNoticeComponent();
+    const component = createComponent();
 
     expect(() => {
       component.report(1, 2);
@@ -47,7 +60,7 @@ describe('UpdateProgressNoticeComponent', () => {
 
   it('finish hides the notice', () => {
     const hideSpy = vi.spyOn(Notice.prototype, 'hide');
-    const component = new UpdateProgressNoticeComponent();
+    const component = createComponent();
     component.start('Working…');
 
     component.finish();
@@ -57,7 +70,7 @@ describe('UpdateProgressNoticeComponent', () => {
 
   it('start replaces an already-showing notice', () => {
     const hideSpy = vi.spyOn(Notice.prototype, 'hide');
-    const component = new UpdateProgressNoticeComponent();
+    const component = createComponent();
     component.start('First');
 
     component.start('Second');
@@ -67,7 +80,7 @@ describe('UpdateProgressNoticeComponent', () => {
 
   it('hides the notice on unload', () => {
     const hideSpy = vi.spyOn(Notice.prototype, 'hide');
-    const component = new UpdateProgressNoticeComponent();
+    const component = createComponent();
     component.load();
     component.start('Working…');
 

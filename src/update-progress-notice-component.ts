@@ -1,3 +1,5 @@
+import type { PluginNoticeComponent } from 'obsidian-dev-utils/obsidian/components/plugin-notice-component';
+
 import { Notice } from 'obsidian';
 import { ComponentEx } from 'obsidian-dev-utils/obsidian/components/component-ex';
 
@@ -12,6 +14,10 @@ import { ComponentEx } from 'obsidian-dev-utils/obsidian/components/component-ex
 export class UpdateProgressNoticeComponent extends ComponentEx {
   private notice: Notice | null = null;
   private progressEl: HTMLProgressElement | null = null;
+
+  public constructor(private readonly pluginNoticeComponent: PluginNoticeComponent) {
+    super();
+  }
 
   /**
    * Hides the notice, if any.
@@ -49,6 +55,6 @@ export class UpdateProgressNoticeComponent extends ComponentEx {
       f.createEl('br');
       this.progressEl = f.createEl('progress');
     });
-    this.notice = new Notice(fragment, 0);
+    this.notice = this.pluginNoticeComponent.showNotice(fragment, { isPermanent: true });
   }
 }
