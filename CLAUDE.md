@@ -93,9 +93,10 @@ batches the whole hidden set into one event-free pass and drives the file explor
 explicitly. This removes the multi-minute bulk-hide freeze, the synthetic-deletion hazard,
 and the Obsidian Sync data-loss path. Validated end to end in real Obsidian
 (`ignore-patterns` + `vault-size-scaling` desktop integration); full unit suite + 100%
-coverage. See `docs/working-with-other-plugins.md` (S6) and the Known Issues. Deferred
-follow-ups: a coalesced graph/backlinks refresh, and the show-path `mtime` staleness check.
-The historical context below predates S6 — read it with that in mind.
+coverage. See `docs/working-with-other-plugins.md` (S6) and the Known Issues. The show-path
+`mtime`/`size` staleness check is now implemented (`invalidateStaleSnapshot` +
+`ManualIndexHider.dropStaleSnapshot`); the one remaining deferred follow-up is a coalesced
+graph/backlinks refresh. The historical context below predates S6 — read it with that in mind.
 
 Real-vault-scale (~90k) end-to-end testing, via populate-before-open. The harness
 feature has shipped: `obsidian-integration-testing` (now `^4.3.0`) gained
@@ -180,11 +181,13 @@ S6, `Full` mode also hides without the freeze, but `FilesPane` remains the cheap
     `docs/sync-and-publish.md`.
 
   `FilesPane` mode remains the absolute fastest (pure DOM `onDelete`, ~0.8 s at 90k) and is
-  the only mode that is also Publish-safe (it never mutates the index). Two S6 follow-ups
-  are deferred (tracked in `docs/working-with-other-plugins.md`): a single coalesced
-  graph/backlinks refresh at end-of-projection, and the show-path `mtime`/`size` staleness
-  check (a file edited on disk while hidden restores a stale snapshot until its next real
-  change). The per-plugin performance findings still stand (each is independently slow on
+  the only mode that is also Publish-safe (it never mutates the index). The show-path
+  `mtime`/`size` staleness check is now implemented (`invalidateStaleSnapshot` +
+  `ManualIndexHider.dropStaleSnapshot`): a file edited on disk while hidden is detected by a
+  stat comparison on show and re-parsed instead of restoring a stale snapshot. One S6
+  follow-up remains deferred (tracked in `docs/working-with-other-plugins.md`): a single
+  coalesced graph/backlinks refresh at end-of-projection. The per-plugin performance
+  findings still stand (each is independently slow on
   *real* bulk deletes) and remain in each plugin's `CLAUDE.md`.
 
 - **Progress-bar smoothness — RESOLVED (yield switched to rAF; verified live).** Two

@@ -7,6 +7,15 @@ import type {
 
 import { TFile } from 'obsidian';
 
+/**
+ * The on-disk `mtime`/`size` captured when a file was hidden, used to detect whether
+ * the file changed on disk while hidden (making its snapshot stale).
+ */
+export interface SnapshotStat {
+  readonly mtime: number;
+  readonly size: number;
+}
+
 type FileCacheValue = MetadataCache['fileCache'][string];
 
 /**
@@ -17,9 +26,11 @@ interface HiddenSnapshot {
   fileCache?: FileCacheValue;
   readonly inboundDemotions: InboundDemotion[];
   readonly isFile: boolean;
+  mtime?: number;
   readonly node: TAbstractFile;
   readonly parent: null | TFolder;
   resolvedLinks?: LinkMap;
+  size?: number;
   unresolvedLinks?: LinkMap;
 }
 
@@ -57,6 +68,34 @@ export class ManualIndexHider {
   }
 
   /**
+   * Discards the snapshot for `normalizedPath` because it is stale (the file changed on
+   * disk while hidden), re-promoting its demoted inbound links but **not** re-inserting the
+   * stale cached content. A following {@link show} then reports the path as having no
+   * snapshot, so the caller re-parses it from disk. No-op if no snapshot is held.
+   */
+  public dropStaleSnapshot(normalizedPath: string): void {
+    const snapshot = this.snapshots.get(normalizedPath);
+    if (!snapshot) {
+      return;
+    }
+    this.promoteInboundLinks(normalizedPath, snapshot.inboundDemotions);
+    this.snapshots.delete(normalizedPath);
+  }
+
+  /**
+   * The on-disk `mtime`/`size` captured when `normalizedPath` was hidden, or `null` if no
+   * file snapshot is held for it (folders carry no stat). The caller compares this against
+   * the file's current disk stat to detect a stale snapshot.
+   */
+  public getSnapshotStat(normalizedPath: string): null | SnapshotStat {
+    const snapshot = this.snapshots.get(normalizedPath);
+    if (snapshot?.mtime === undefined || snapshot.size === undefined) {
+      return null;
+    }
+    return { mtime: snapshot.mtime, size: snapshot.size };
+  }
+
+  /**
    * Whether a snapshot is held for `normalizedPath` (i.e. it was hidden by {@link hide} and
    * not yet shown). The caller uses this to decide whether a show can restore cheaply.
    */
@@ -79,7 +118,9 @@ export class ManualIndexHider {
       }
       const isFile = node instanceof TFile;
       const snapshot: HiddenSnapshot = { inboundDemotions: [], isFile, node, parent: node.parent };
-      if (isFile) {
+      if (node instanceof TFile) {
+        snapshot.mtime = node.stat.mtime;
+        snapshot.size = node.stat.size;
         const fileCache = metadataCache.fileCache[path];
         const resolvedLinks = metadataCache.resolvedLinks[path];
         const unresolvedLinks = metadataCache.unresolvedLinks[path];

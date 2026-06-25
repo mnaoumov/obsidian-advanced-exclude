@@ -230,9 +230,13 @@ cascade.
 2. **SHOW path.** Snapshot-restore re-inserts the captured `fileMap`/`fileCache`/`resolvedLinks`/
    `unresolvedLinks` verbatim and re-promotes the demoted inbound links; the explorer is driven
    by `addToFilesPane` (`onCreate`). A path with **no** snapshot (hidden by a prior session,
-   never loaded) falls back to `reconcileFile`. The `mtime`/`size` staleness check is **deferred**
-   — a file edited on disk *while hidden* would restore a stale snapshot until its next real
-   change; rare, tracked as a follow-up.
+   never loaded) falls back to `reconcileFile`. The `mtime`/`size` staleness check is **now
+   implemented**: `hide` captures the file's `stat.mtime`/`size` in the snapshot, and on show
+   `IndexProjectionComponent.invalidateStaleSnapshot` `stat`s the file on disk and, if either
+   differs (it was edited on disk while hidden), calls `ManualIndexHider.dropStaleSnapshot` —
+   which re-promotes the inbound demotions but discards the stale cached content, so the show
+   falls through to the same proven `reconcileFile` re-parse as the no-snapshot case. The
+   common case (file untouched while hidden) keeps its snapshot and restores instantly.
 3. **Coalesced graph/backlinks refresh — deferred.** The link graph is kept *correct* by the
    batched inbound demote, but no single end-of-projection refresh is emitted, so open
    Graph/Backlinks views may render stale until the next interaction. Follow-up.
