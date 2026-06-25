@@ -316,6 +316,27 @@ export class IndexProjectionComponent extends ComponentEx {
     }
   }
 
+  /**
+   * If a file's snapshot is stale — its `mtime`/`size` on disk no longer match what was
+   * captured when it was hidden (it was edited on disk while hidden) — discards the snapshot
+   * so the show falls through to a `reconcileFile` re-parse with fresh content instead of
+   * restoring the stale cache. The common case (file untouched while hidden) keeps its
+   * snapshot and restores instantly.
+   */
+  private async invalidateStaleSnapshot(adapter: DataAdapterEx, entry: VaultModelEntry): Promise<void> {
+    if (entry.isFolder || !this.manualIndexHider.hasSnapshot(entry.path)) {
+      return;
+    }
+    const snapshotStat = this.manualIndexHider.getSnapshotStat(entry.path);
+    if (!snapshotStat) {
+      return;
+    }
+    const diskStat = await adapter.stat(entry.path);
+    if (diskStat && (diskStat.mtime !== snapshotStat.mtime || diskStat.size !== snapshotStat.size)) {
+      this.manualIndexHider.dropStaleSnapshot(entry.path);
+    }
+  }
+
   private async rebuildModel(abortSignal?: AbortSignal): Promise<void> {
     const byPath = new Map<string, VaultModelEntry>();
     for (const entry of await this.vaultPathStore.load()) {
@@ -354,6 +375,7 @@ export class IndexProjectionComponent extends ComponentEx {
       this.addToFilesPane(entry.path);
       return;
     }
+    await this.invalidateStaleSnapshot(adapter, entry);
     const withoutSnapshot = this.manualIndexHider.show([entry.path]);
     if (withoutSnapshot.length > 0) {
       // The prior session's hide removed the path from `vault.fileMap`/`metadataCache`

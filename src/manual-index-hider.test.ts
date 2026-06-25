@@ -167,6 +167,50 @@ describe('ManualIndexHider', () => {
       expect(result).toEqual(['never-hidden.md']);
     });
   });
+
+  describe('getSnapshotStat', () => {
+    it('returns the mtime/size captured when the file was hidden', () => {
+      const file = fixture.fileMap['a.md'];
+      if (file instanceof TFile) {
+        file.stat.mtime = 1700;
+        file.stat.size = 42;
+      }
+      hider.hide(['a.md']);
+
+      expect(hider.getSnapshotStat('a.md')).toEqual({ mtime: 1700, size: 42 });
+    });
+
+    it('returns null for a path that was never hidden', () => {
+      expect(hider.getSnapshotStat('a.md')).toBeNull();
+    });
+
+    it('returns null for a hidden folder, which carries no stat', () => {
+      hider.hide(['f']);
+
+      expect(hider.getSnapshotStat('f')).toBeNull();
+    });
+  });
+
+  describe('dropStaleSnapshot', () => {
+    it('discards the snapshot and re-promotes inbound links, so a later show re-parses', () => {
+      hider.hide(['a.md']);
+      hider.dropStaleSnapshot('a.md');
+
+      expect(hider.hasSnapshot('a.md')).toBe(false);
+      // Inbound links are promoted back (the file is returning), but the cache is not restored.
+      expect(fixture.resolvedLinks['linker.md']?.['a.md']).toBe(2);
+      expect(fixture.unresolvedLinks['linker.md']?.['a.md']).toBeUndefined();
+      expect(fixture.fileMap['a.md']).toBeUndefined();
+      expect(hider.show(['a.md'])).toEqual(['a.md']);
+    });
+
+    it('is a no-op when no snapshot is held', () => {
+      hider.dropStaleSnapshot('never-hidden.md');
+
+      expect(hider.hasSnapshot('never-hidden.md')).toBe(false);
+      expect(fixture.resolvedLinks['linker.md']?.['a.md']).toBe(2);
+    });
+  });
 });
 
 function childrenPaths(folderPath: string): string[] {

@@ -19,7 +19,10 @@ import {
 } from 'vitest';
 
 import type { IgnorePatternsComponent } from './ignore-patterns-component.ts';
-import type { ManualIndexHider } from './manual-index-hider.ts';
+import type {
+  ManualIndexHider,
+  SnapshotStat
+} from './manual-index-hider.ts';
 import type { VaultLoadPatchComponent } from './patches/vault-load-patch-component.ts';
 import type { PluginSettingsComponent } from './plugin-settings-component.ts';
 import type { UpdateProgressNoticeComponent } from './update-progress-notice-component.ts';
@@ -39,9 +42,14 @@ vi.mock('obsidian-dev-utils/obsidian/file-system', () => ({
 const mockGetDataAdapterEx = vi.mocked(getDataAdapterEx);
 const mockIsFolder = vi.mocked(isFolder);
 
+// The disk stat a fresh (non-stale) snapshot matches: getSnapshotStat and adapter.stat
+// Both return this by default, so the staleness check finds the snapshot up to date.
+const FRESH_STAT = { mtime: 1000, size: 50 };
+
 interface MockAdapter {
   files: DataAdapterEx['files'];
   reconcileFile: ReturnType<typeof vi.fn>;
+  stat: ReturnType<typeof vi.fn>;
 }
 
 interface MockEntry {
@@ -50,6 +58,9 @@ interface MockEntry {
 }
 
 interface MockManualIndexHider {
+  dropStaleSnapshot: Mock<(normalizedPath: string) => void>;
+  getSnapshotStat: Mock<(normalizedPath: string) => null | SnapshotStat>;
+  hasSnapshot: Mock<(normalizedPath: string) => boolean>;
   hide: Mock<(normalizedPaths: readonly string[]) => void>;
   show: Mock<(normalizedPaths: readonly string[]) => string[]>;
 }
@@ -98,7 +109,8 @@ function setup(params: SetupParams): SetupResult {
   }
   const mockAdapter: MockAdapter = {
     files,
-    reconcileFile: vi.fn().mockResolvedValue(undefined)
+    reconcileFile: vi.fn().mockResolvedValue(undefined),
+    stat: vi.fn().mockResolvedValue(FRESH_STAT)
   };
   const dataAdapterEx = strictProxy<DataAdapterEx>({});
   Object.assign(dataAdapterEx, mockAdapter);
@@ -142,7 +154,12 @@ function setup(params: SetupParams): SetupResult {
 
   // Snapshot-backed restore is the default (show finds a snapshot, returns no
   // Re-parse paths); tests that exercise the re-parse fallback override `show`.
+  // The default snapshot is fresh: getSnapshotStat matches the adapter's disk stat,
+  // So the staleness check leaves the snapshot in place.
   const manualIndexHider: MockManualIndexHider = {
+    dropStaleSnapshot: vi.fn<(normalizedPath: string) => void>(),
+    getSnapshotStat: vi.fn<(normalizedPath: string) => null | SnapshotStat>().mockReturnValue(FRESH_STAT),
+    hasSnapshot: vi.fn<(normalizedPath: string) => boolean>().mockReturnValue(true),
     hide: vi.fn<(normalizedPaths: readonly string[]) => void>(),
     show: vi.fn<(normalizedPaths: readonly string[]) => string[]>().mockReturnValue([])
   };
@@ -158,7 +175,13 @@ function setup(params: SetupParams): SetupResult {
     app,
     deleteFromFilesPane,
     ignorePatternsComponent,
-    manualIndexHider: strictProxy<ManualIndexHider>({ hide: manualIndexHider.hide, show: manualIndexHider.show }),
+    manualIndexHider: strictProxy<ManualIndexHider>({
+      dropStaleSnapshot: manualIndexHider.dropStaleSnapshot,
+      getSnapshotStat: manualIndexHider.getSnapshotStat,
+      hasSnapshot: manualIndexHider.hasSnapshot,
+      hide: manualIndexHider.hide,
+      show: manualIndexHider.show
+    }),
     pluginSettingsComponent,
     updateProgressNotice,
     vaultLoadPatch,
@@ -352,6 +375,83 @@ describe('IndexProjectionComponent', () => {
       expect(addToFilesPane).toHaveBeenCalledExactlyOnceWith('back.md');
       expect(manualIndexHider.hide).not.toHaveBeenCalled();
       expect(manualIndexHider.show).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('stale snapshot invalidation (Full mode show)', () => {
+    function showBack(): ReturnType<typeof setup> {
+      return setup({ entries: [{ isFolderFlag: false, path: 'a.md' }], isIgnored: () => false });
+    }
+
+    it('restores from the snapshot when the file is unchanged on disk', async () => {
+      const { addToFilesPane, component, manualIndexHider, mockAdapter } = showBack();
+
+      await component.applyDelta([{ isFolder: false, isVisible: true, path: 'back.md' }]);
+
+      expect(mockAdapter.stat).toHaveBeenCalledExactlyOnceWith('back.md');
+      expect(manualIndexHider.dropStaleSnapshot).not.toHaveBeenCalled();
+      expect(addToFilesPane).toHaveBeenCalledExactlyOnceWith('back.md');
+    });
+
+    it('drops the snapshot and re-parses when the mtime changed while hidden', async () => {
+      const { component, manualIndexHider, mockAdapter } = showBack();
+      mockAdapter.stat.mockResolvedValue({ mtime: 2000, size: 50 });
+      manualIndexHider.show.mockReturnValue(['back.md']);
+
+      await component.applyDelta([{ isFolder: false, isVisible: true, path: 'back.md' }]);
+
+      expect(manualIndexHider.dropStaleSnapshot).toHaveBeenCalledExactlyOnceWith('back.md');
+      expect(mockAdapter.reconcileFile).toHaveBeenCalledExactlyOnceWith('back.md', 'back.md');
+    });
+
+    it('drops the snapshot when only the size changed while hidden', async () => {
+      const { component, manualIndexHider, mockAdapter } = showBack();
+      mockAdapter.stat.mockResolvedValue({ mtime: 1000, size: 99 });
+      manualIndexHider.show.mockReturnValue(['back.md']);
+
+      await component.applyDelta([{ isFolder: false, isVisible: true, path: 'back.md' }]);
+
+      expect(manualIndexHider.dropStaleSnapshot).toHaveBeenCalledExactlyOnceWith('back.md');
+    });
+
+    it('does not stat or drop when the path is a folder', async () => {
+      const { addToFilesPane, component, manualIndexHider, mockAdapter } = showBack();
+
+      await component.applyDelta([{ isFolder: true, isVisible: true, path: 'folder' }]);
+
+      expect(mockAdapter.stat).not.toHaveBeenCalled();
+      expect(manualIndexHider.hasSnapshot).not.toHaveBeenCalled();
+      expect(addToFilesPane).toHaveBeenCalledExactlyOnceWith('folder');
+    });
+
+    it('does not stat when no snapshot is held (prior-session hide)', async () => {
+      const { component, manualIndexHider, mockAdapter } = showBack();
+      manualIndexHider.hasSnapshot.mockReturnValue(false);
+
+      await component.applyDelta([{ isFolder: false, isVisible: true, path: 'back.md' }]);
+
+      expect(manualIndexHider.getSnapshotStat).not.toHaveBeenCalled();
+      expect(mockAdapter.stat).not.toHaveBeenCalled();
+    });
+
+    it('does not stat when the snapshot carries no captured stat', async () => {
+      const { component, manualIndexHider, mockAdapter } = showBack();
+      manualIndexHider.getSnapshotStat.mockReturnValue(null);
+
+      await component.applyDelta([{ isFolder: false, isVisible: true, path: 'back.md' }]);
+
+      expect(mockAdapter.stat).not.toHaveBeenCalled();
+      expect(manualIndexHider.dropStaleSnapshot).not.toHaveBeenCalled();
+    });
+
+    it('keeps the snapshot when the file is gone from disk (stat returns null)', async () => {
+      const { addToFilesPane, component, manualIndexHider, mockAdapter } = showBack();
+      mockAdapter.stat.mockResolvedValue(null);
+
+      await component.applyDelta([{ isFolder: false, isVisible: true, path: 'back.md' }]);
+
+      expect(manualIndexHider.dropStaleSnapshot).not.toHaveBeenCalled();
+      expect(addToFilesPane).toHaveBeenCalledExactlyOnceWith('back.md');
     });
   });
 
