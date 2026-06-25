@@ -106,7 +106,7 @@ export class Plugin extends PluginBase {
         app: this.app,
         ignorePatternsComponent,
         pluginId: this.manifest.id,
-        pluginName: this.manifest.name,
+        pluginNoticeComponent: this.pluginNoticeComponent,
         pluginSettingsComponent
       })
     );
