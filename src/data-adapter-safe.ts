@@ -9,30 +9,6 @@ import {
   FileSystemAdapter
 } from 'obsidian';
 
-export async function existsSafe(app: App, path: string): Promise<boolean> {
-  const adapter = getDataAdapterEx(app);
-  const fullPath = adapter.getFullPath(path);
-
-  if (adapter instanceof FileSystemAdapter) {
-    try {
-      await adapter.fsPromises.access(fullPath);
-      return true;
-    } catch {
-      return false;
-    }
-  }
-  if (adapter instanceof CapacitorAdapter) {
-    try {
-      await adapter.fs.stat(fullPath);
-      return true;
-    } catch {
-      return false;
-    }
-  }
-
-  throw new Error('Unknown adapter');
-}
-
 export async function readSafe(app: App, path: string): Promise<string> {
   if (!await existsSafe(app, path)) {
     return '';
@@ -91,6 +67,30 @@ export async function writeSafe(app: App, path: string, content: string): Promis
   if (adapter instanceof CapacitorAdapter) {
     await adapter.fs.write(fullPath, content);
     return;
+  }
+
+  throw new Error('Unknown adapter');
+}
+
+async function existsSafe(app: App, path: string): Promise<boolean> {
+  const adapter = getDataAdapterEx(app);
+  const fullPath = adapter.getFullPath(path);
+
+  if (adapter instanceof FileSystemAdapter) {
+    try {
+      await adapter.fsPromises.access(fullPath);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  if (adapter instanceof CapacitorAdapter) {
+    try {
+      await adapter.fs.stat(fullPath);
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   throw new Error('Unknown adapter');

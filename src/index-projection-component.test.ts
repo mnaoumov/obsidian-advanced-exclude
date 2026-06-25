@@ -6,6 +6,7 @@ import type {
 import type { Mock } from 'vitest';
 
 import { getDataAdapterEx } from '@obsidian-typings/obsidian-public-latest/implementations';
+import { castTo } from 'obsidian-dev-utils/object-utils';
 import { isFolder } from 'obsidian-dev-utils/obsidian/file-system';
 import { strictProxy } from 'obsidian-dev-utils/strict-proxy';
 import {
@@ -22,6 +23,7 @@ import type { ManualIndexHider } from './manual-index-hider.ts';
 import type { VaultLoadPatchComponent } from './patches/vault-load-patch-component.ts';
 import type { PluginSettingsComponent } from './plugin-settings-component.ts';
 import type { UpdateProgressNoticeComponent } from './update-progress-notice-component.ts';
+import type { VaultModel } from './vault-model.ts';
 
 import { IndexProjectionComponent } from './index-projection-component.ts';
 import { ExcludeMode } from './plugin-settings.ts';
@@ -68,6 +70,10 @@ interface SetupResult {
   readonly manualIndexHider: MockManualIndexHider;
   readonly mockAdapter: MockAdapter;
   readonly save: ReturnType<typeof vi.fn>;
+}
+
+interface TestableIndexProjectionComponent {
+  readonly vaultModel: VaultModel;
 }
 
 /**
@@ -180,7 +186,7 @@ describe('IndexProjectionComponent', () => {
 
       expect(hiddenPaths(manualIndexHider)).toEqual(['a', 'a/x.md', 'a/y.md']);
       expect(deleteFromFilesPane.mock.calls.map((call) => call[0]).sort()).toEqual(['a', 'a/x.md', 'a/y.md']);
-      expect(component.model.isKnown('a/x.md')).toBe(true);
+      expect(castTo<TestableIndexProjectionComponent>(component).vaultModel.isVisible('a/x.md')).not.toBeUndefined();
     });
 
     it('removes an individually-ignored file from a visible folder', async () => {
@@ -636,10 +642,10 @@ describe('IndexProjectionComponent', () => {
       });
 
       component.recordCreate('new/file.md', false);
-      expect(component.model.isKnown('new/file.md')).toBe(true);
+      expect(castTo<TestableIndexProjectionComponent>(component).vaultModel.isVisible('new/file.md')).not.toBeUndefined();
 
       component.recordDelete('new/file.md');
-      expect(component.model.isKnown('new/file.md')).toBe(false);
+      expect(castTo<TestableIndexProjectionComponent>(component).vaultModel.isVisible('new/file.md')).toBeUndefined();
     });
   });
 });

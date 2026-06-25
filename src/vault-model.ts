@@ -91,10 +91,6 @@ interface VaultModelNode {
  * reachable.
  */
 export class VaultModel {
-  public get size(): number {
-    return this.nodes.size;
-  }
-
   private readonly isIgnored: IsIgnoredFn;
   private readonly nodes = new Map<string, VaultModelNode>();
   private readonly root: VaultModelNode;
@@ -161,10 +157,6 @@ export class VaultModel {
       }
     }
     return result;
-  }
-
-  public isKnown(normalizedPath: string): boolean {
-    return this.nodes.has(normalizedPath);
   }
 
   /**

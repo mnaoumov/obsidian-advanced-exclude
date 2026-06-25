@@ -52,16 +52,6 @@ interface IgnorePatternsComponentConstructorParams {
 }
 
 export class IgnorePatternsComponent extends LayoutReadyComponent {
-  public get hasHiddenPaths(): boolean {
-    for (const isIgnored of this.fileIgnoreMap.values()) {
-      if (isIgnored) {
-        return true;
-      }
-    }
-
-    return false;
-  }
-
   private _db?: IDBDatabase;
   private cachedExcludeRegExps: null | RegExp[] = null;
   private cachedGitIgnoreContent = '';
