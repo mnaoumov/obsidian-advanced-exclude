@@ -60,6 +60,10 @@ Built on `obsidian-dev-utils`. Patches Obsidian's `FileSystemAdapter` / `Capacit
 
 ## Current Task
 
+None.
+
+## Design & History (S6, publish-compatibility, in-memory tree rewrite)
+
 **Publish-compatibility warning shipped.** `src/publish-compatibility-warning-component.ts`
 (a `LayoutReadyComponent`, wired in `plugin.ts`) warns when Obsidian Publish is enabled
 while `excludeMode === Full` (the only unsafe combo; `Files Pane` mode is Publish-safe). The
