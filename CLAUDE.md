@@ -101,14 +101,17 @@ guards against a concurrent *real* delete during a projection). `update()` persi
 hidden set after each `applyDelta`, so a later reload reconstructs it. Under S6 the same
 hidden set is also snapshotted in memory by `ManualIndexHider`, so a same-session un-ignore
 re-shows hidden files instantly from the snapshot (no reload, no re-parse); a path with no
-snapshot (hidden by a prior session) falls back to `reconcileFile`.
+snapshot (hidden by a prior session) falls back to `reconcileFile`. That fallback must first
+`delete adapter.files[path]`: `ManualIndexHider.hide` leaves the adapter's own stat record
+intact, so without dropping it `reconcileFile` compares disk against the stale record, sees
+no change, and re-adds nothing (the file would stay hidden forever).
 
 Scaling is covered at three levels.
 
 `src/vault-size-scaling.desktop.integration.test.ts` (real Obsidian, `Full` mode,
 end to end): a generic driver that builds a vault, drives the live "edit settings
-to change ignores" flow (`editAndSave` → `processConfigChanges`), and asserts
-deletions scoped to the ignored paths plus full hide/re-show. Shapes: flat
+to change ignores" flow (`editAndSave` → `processConfigChanges`), and asserts the
+event-free hide (zero in-scope `reconcileDeletion`) plus full hide/re-show. Shapes: flat
 1000/5000-file folders, a deep+wide nested tree (breadth 4 × depth 4 ≈ 341 folders
 → one hide-root), and 200 independently-ignored sibling folders (one hide-root
 each, cost is O(hide-roots) not O(files)). Timeouts are sized from the file count
