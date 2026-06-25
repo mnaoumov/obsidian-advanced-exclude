@@ -33,13 +33,6 @@ const MTIME_STORE_NAME = 'mtime';
 const FILES_STORE_NAME = 'files';
 const PROCESS_STORE_ACTIONS_DEBOUNCE_INTERVAL_IN_MILLISECONDS = 5000;
 
-export interface IgnorePatternsComponentConstructorParams {
-  readonly app: App;
-  onUpdateFileTree(this: void): Promise<void>;
-  readonly pluginSettingsComponent: PluginSettingsComponent;
-  readonly vaultLoadPatch: VaultLoadPatchComponent;
-}
-
 interface DbFileEntry {
   isIgnored: boolean;
   path: string;
@@ -49,6 +42,13 @@ interface DbMtimeEntry {
   gitIgnoreMtime: number;
   obsidianIgnoreMtime: number;
   userIgnoreFiltersStr: string;
+}
+
+interface IgnorePatternsComponentConstructorParams {
+  readonly app: App;
+  onUpdateFileTree(this: void): Promise<void>;
+  readonly pluginSettingsComponent: PluginSettingsComponent;
+  readonly vaultLoadPatch: VaultLoadPatchComponent;
 }
 
 export class IgnorePatternsComponent extends LayoutReadyComponent {
@@ -91,14 +91,6 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
     this.onUpdateFileTree = params.onUpdateFileTree;
     this.pluginSettingsComponent = params.pluginSettingsComponent;
     this.vaultLoadPatch = params.vaultLoadPatch;
-  }
-
-  public clearCachedExcludeRegExps(): void {
-    this.cachedExcludeRegExps = null;
-    if (this.pluginSettingsComponent.settings.shouldIgnoreExcludedFiles) {
-      this.fileIgnoreMap.clear();
-      invokeAsyncSafelyAfterDelay(() => this.processConfigChanges());
-    }
   }
 
   public async handleDeletedOrDotFile(normalizedPath: string): Promise<void> {
@@ -178,16 +170,6 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
     await this.onUpdateFileTree();
   }
 
-  public async writeObsidianIgnore(obsidianIgnoreContent: string): Promise<void> {
-    if (this.cachedObsidianIgnoreContent === obsidianIgnoreContent) {
-      return;
-    }
-
-    await writeSafe(this.app, OBSIDIAN_IGNORE_FILE, obsidianIgnoreContent);
-    await this.pluginSettingsComponent.setProperty('obsidianIgnoreContent', obsidianIgnoreContent);
-    this.cachedObsidianIgnoreContent = obsidianIgnoreContent;
-  }
-
   protected override async onLayoutReady(): Promise<void> {
     await ensureMetadataCacheReady(this.app);
 
@@ -208,6 +190,14 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
     // Whole vault on every `processConfigChanges`.
     this.pendingStoreActions.set(normalizedPath, storeAction);
     this.processStoreActionsDebounced();
+  }
+
+  private clearCachedExcludeRegExps(): void {
+    this.cachedExcludeRegExps = null;
+    if (this.pluginSettingsComponent.settings.shouldIgnoreExcludedFiles) {
+      this.fileIgnoreMap.clear();
+      invokeAsyncSafelyAfterDelay(() => this.processConfigChanges());
+    }
   }
 
   private async getCurrentMtimeEntry(): Promise<DbMtimeEntry> {
@@ -373,5 +363,15 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
     // Otherwise repopulate it with stale entries.
     this.pendingStoreActions.clear();
     mtimeStore.put(currentMtimeEntry, 0);
+  }
+
+  private async writeObsidianIgnore(obsidianIgnoreContent: string): Promise<void> {
+    if (this.cachedObsidianIgnoreContent === obsidianIgnoreContent) {
+      return;
+    }
+
+    await writeSafe(this.app, OBSIDIAN_IGNORE_FILE, obsidianIgnoreContent);
+    await this.pluginSettingsComponent.setProperty('obsidianIgnoreContent', obsidianIgnoreContent);
+    this.cachedObsidianIgnoreContent = obsidianIgnoreContent;
   }
 }
