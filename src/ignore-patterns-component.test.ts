@@ -4,7 +4,10 @@ import type {
 } from 'obsidian';
 
 import { invokeAsyncSafelyAfterDelay } from 'obsidian-dev-utils/async';
-import { deepEqual } from 'obsidian-dev-utils/object-utils';
+import {
+  castTo,
+  deepEqual
+} from 'obsidian-dev-utils/object-utils';
 import { registerAsyncEvent } from 'obsidian-dev-utils/obsidian/components/async-events-component';
 import { ensureMetadataCacheReady } from 'obsidian-dev-utils/obsidian/metadata-cache';
 import { strictProxy } from 'obsidian-dev-utils/strict-proxy';
@@ -54,7 +57,8 @@ vi.mock('obsidian-dev-utils/async', async (importOriginal) => {
   };
 });
 
-vi.mock('obsidian-dev-utils/object-utils', () => ({
+vi.mock('obsidian-dev-utils/object-utils', async (importOriginal) => ({
+  ...await importOriginal<typeof import('obsidian-dev-utils/object-utils')>(),
   deepEqual: vi.fn().mockReturnValue(true)
 }));
 
@@ -116,6 +120,11 @@ interface SetupIndexedDbResult {
   readonly mockDb: IDBDatabase;
   readonly mtimeStore: MockIDBObjectStore;
   readonly openFn: ReturnType<typeof vi.fn>;
+}
+
+interface TestableIgnorePatternsComponent {
+  clearCachedExcludeRegExps(): void;
+  writeObsidianIgnore(obsidianIgnoreContent: string): Promise<void>;
 }
 
 interface UpgradeEvent {
@@ -426,7 +435,7 @@ describe('IgnorePatternsComponent', () => {
       const component = createComponent({ pluginSettingsComponent });
       await component.loadWithPromises();
 
-      component.clearCachedExcludeRegExps();
+      castTo<TestableIgnorePatternsComponent>(component).clearCachedExcludeRegExps();
       // No error means it cleared successfully
       expect(invokeAsyncSafelyAfterDelay).not.toHaveBeenCalled();
     });
@@ -440,7 +449,7 @@ describe('IgnorePatternsComponent', () => {
       await component.loadWithPromises();
 
       vi.mocked(invokeAsyncSafelyAfterDelay).mockClear();
-      component.clearCachedExcludeRegExps();
+      castTo<TestableIgnorePatternsComponent>(component).clearCachedExcludeRegExps();
 
       expect(invokeAsyncSafelyAfterDelay).toHaveBeenCalled();
     });
@@ -572,7 +581,7 @@ describe('IgnorePatternsComponent', () => {
       await component.loadWithPromises();
 
       vi.mocked(writeSafe).mockClear();
-      await component.writeObsidianIgnore('existing-content');
+      await castTo<TestableIgnorePatternsComponent>(component).writeObsidianIgnore('existing-content');
 
       expect(writeSafe).not.toHaveBeenCalled();
     });
@@ -584,7 +593,7 @@ describe('IgnorePatternsComponent', () => {
       const component = createComponent({ pluginSettingsComponent });
       await component.loadWithPromises();
 
-      await component.writeObsidianIgnore('new-content');
+      await castTo<TestableIgnorePatternsComponent>(component).writeObsidianIgnore('new-content');
 
       expect(writeSafe).toHaveBeenCalled();
       expect(pluginSettingsComponent.setProperty).toHaveBeenCalledWith('obsidianIgnoreContent', 'new-content');
@@ -597,9 +606,9 @@ describe('IgnorePatternsComponent', () => {
       await component.loadWithPromises();
 
       vi.mocked(writeSafe).mockClear();
-      await component.writeObsidianIgnore('new-content');
+      await castTo<TestableIgnorePatternsComponent>(component).writeObsidianIgnore('new-content');
       vi.mocked(writeSafe).mockClear();
-      await component.writeObsidianIgnore('new-content');
+      await castTo<TestableIgnorePatternsComponent>(component).writeObsidianIgnore('new-content');
 
       expect(writeSafe).not.toHaveBeenCalled();
     });

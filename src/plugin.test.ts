@@ -15,9 +15,11 @@ import {
   vi
 } from 'vitest';
 
-import type { IgnorePatternsComponentConstructorParams } from './ignore-patterns-component.ts';
+import type { IgnorePatternsComponent } from './ignore-patterns-component.ts';
 
 import { Plugin } from './plugin.ts';
+
+type IgnorePatternsComponentConstructorParams = ConstructorParameters<typeof IgnorePatternsComponent>[0];
 
 /*
  * The real `PluginBase` (from `obsidian-dev-utils`) drives the lifecycle here —
