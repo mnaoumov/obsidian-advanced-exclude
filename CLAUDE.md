@@ -60,7 +60,18 @@ Built on `obsidian-dev-utils`. Patches Obsidian's `FileSystemAdapter` / `Capacit
 
 ## Current Task
 
-None.
+**Pending dev-utils release — simplify the projection yield.** `obsidian-dev-utils`
+commit `fa07bc1e` ("feat: add fallback to requestAnimationFrameAsync") moved the
+rAF-vs-timeout race into `requestAnimationFrameAsync(fallbackTimeoutInMilliseconds = 100)`
+itself — identical default to the plugin's local `yieldToPaint()`. It is committed in
+dev-utils but **not yet published** (npm latest `80.1.0` predates it; the maintainer will
+release a new version). Once a dev-utils version containing `fa07bc1e` is published and
+installed: bump the plugin's `obsidian-dev-utils` dependency, then in
+`src/index-projection-component.ts` delete `yieldToPaint()` and `BACKGROUND_YIELD_FALLBACK_MS`
+and call `requestAnimationFrameAsync()` directly at both yield points (recompute `yieldFn`
+and `reportApplyProgress`); keep the "keeps progressing when the window is hidden" test (it
+still passes against the library's built-in fallback). Do NOT refactor before then — the
+no-arg call against the current `80.1.0` has no fallback, so the hidden-window test would hang.
 
 ## Design & History (S6, publish-compatibility, in-memory tree rewrite)
 
