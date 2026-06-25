@@ -16,7 +16,6 @@ import {
 } from 'vitest';
 
 import {
-  existsSafe,
   readSafe,
   statSafe,
   writeSafe
@@ -64,27 +63,13 @@ describe('data-adapter-safe', () => {
       mockApp = strictProxy<AppOriginal>({ vault: { adapter: adapter.asOriginalType__() } });
     });
 
-    describe('existsSafe', () => {
-      it('should return true when file exists', async () => {
-        mockFsPromises.access.mockResolvedValue(undefined);
-        const result = await existsSafe(mockApp, 'test.md');
-        expect(result).toBe(true);
-        expect(mockFsPromises.access).toHaveBeenCalledWith('/vault/test.md');
-      });
-
-      it('should return false when file does not exist', async () => {
-        mockFsPromises.access.mockRejectedValue(new Error('ENOENT'));
-        const result = await existsSafe(mockApp, 'missing.md');
-        expect(result).toBe(false);
-      });
-    });
-
     describe('readSafe', () => {
       it('should return file content when file exists', async () => {
         mockFsPromises.access.mockResolvedValue(undefined);
         mockFsPromises.readFile.mockResolvedValue('hello world');
         const result = await readSafe(mockApp, 'test.md');
         expect(result).toBe('hello world');
+        expect(mockFsPromises.access).toHaveBeenCalledWith('/vault/test.md');
         expect(mockFsPromises.readFile).toHaveBeenCalledWith('/vault/test.md', 'utf8');
       });
 
@@ -165,20 +150,6 @@ describe('data-adapter-safe', () => {
       mockApp = strictProxy<AppOriginal>({ vault: { adapter: adapter.asOriginalType__() } });
     });
 
-    describe('existsSafe', () => {
-      it('should return true when file exists', async () => {
-        mockFs.stat.mockResolvedValue({});
-        const result = await existsSafe(mockApp, 'test.md');
-        expect(result).toBe(true);
-      });
-
-      it('should return false when file does not exist', async () => {
-        mockFs.stat.mockRejectedValue(new Error('not found'));
-        const result = await existsSafe(mockApp, 'missing.md');
-        expect(result).toBe(false);
-      });
-    });
-
     describe('readSafe', () => {
       it('should return file content when file exists', async () => {
         mockFs.stat.mockResolvedValue({});
@@ -254,10 +225,6 @@ describe('data-adapter-safe', () => {
       });
       mockGetDataAdapterEx.mockReturnValue(unknownAdapter);
       mockApp = strictProxy<AppOriginal>({ vault: { adapter: unknownAdapter } });
-    });
-
-    it('existsSafe should throw for unknown adapter', async () => {
-      await expect(existsSafe(mockApp, 'test.md')).rejects.toThrow('Unknown adapter');
     });
 
     it('readSafe should throw for unknown adapter after existsSafe throws', async () => {

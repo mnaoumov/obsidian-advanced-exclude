@@ -68,10 +68,6 @@ export class IndexProjectionComponent extends ComponentEx {
     return this.applyingProjectionDepth > 0;
   }
 
-  public get model(): VaultModel {
-    return this.vaultModel;
-  }
-
   private readonly addToFilesPane: (normalizedPath: string) => void;
   private readonly app: App;
   private applyingProjectionDepth = 0;

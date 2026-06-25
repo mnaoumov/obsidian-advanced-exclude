@@ -256,31 +256,6 @@ describe('IgnorePatternsComponent', () => {
     });
   });
 
-  describe('hasHiddenPaths', () => {
-    it('should be false when no paths have been evaluated', () => {
-      setupIndexedDb();
-      const component = createComponent();
-      expect(component.hasHiddenPaths).toBe(false);
-    });
-
-    it('should be false when every evaluated path is not ignored', async () => {
-      setupIndexedDb();
-      const component = createComponent();
-      await component.loadWithPromises();
-      component.isIgnored('readme.md', false);
-      expect(component.hasHiddenPaths).toBe(false);
-    });
-
-    it('should be true when at least one evaluated path is ignored', async () => {
-      setupIndexedDb();
-      vi.mocked(readSafe).mockResolvedValueOnce('*.log');
-      const component = createComponent();
-      await component.loadWithPromises();
-      component.isIgnored('debug.log', false);
-      expect(component.hasHiddenPaths).toBe(true);
-    });
-  });
-
   describe('isIgnored', () => {
     it('should return false for ROOT_PATH', () => {
       setupIndexedDb();

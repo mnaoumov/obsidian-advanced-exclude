@@ -26,7 +26,7 @@ describe('VaultModel', () => {
 
       expect(model.isVisible('a.md')).toBe(false);
       expect(model.isVisible('b.md')).toBe(true);
-      expect(model.size).toBe(3); // Root + two files
+      expect(nodeCount(model)).toBe(3); // Root + two files
     });
 
     it('keeps a folder that tests ignored but has a re-included descendant (negation case D)', () => {
@@ -153,7 +153,7 @@ describe('VaultModel', () => {
       expect(model.isVisible('a/b')).toBe(false);
 
       const changes = model.setPath('a/b/new.md', false);
-      expect(model.isKnown('a/b/new.md')).toBe(true);
+      expect(model.isVisible('a/b/new.md')).not.toBeUndefined();
       expect(changes).toEqual([
         { isFolder: false, isVisible: true, path: 'a/b/new.md' },
         { isFolder: true, isVisible: true, path: 'a/b' },
@@ -177,7 +177,7 @@ describe('VaultModel', () => {
       expect(model.isVisible('a/b')).toBe(true);
 
       const changes = model.deletePath('a/b/only.md');
-      expect(model.isKnown('a/b/only.md')).toBe(false);
+      expect(model.isVisible('a/b/only.md')).toBeUndefined();
       expect(changes).toEqual([
         { isFolder: true, isVisible: false, path: 'a/b' },
         { isFolder: true, isVisible: false, path: 'a' }
@@ -195,9 +195,9 @@ describe('VaultModel', () => {
       );
 
       model.deletePath('a');
-      expect(model.isKnown('a')).toBe(false);
-      expect(model.isKnown('a/x.md')).toBe(false);
-      expect(model.isKnown('a/y.md')).toBe(false);
+      expect(model.isVisible('a')).toBeUndefined();
+      expect(model.isVisible('a/x.md')).toBeUndefined();
+      expect(model.isVisible('a/y.md')).toBeUndefined();
     });
 
     it('ignores deletion of an unknown path', () => {
@@ -346,7 +346,7 @@ describe('VaultModel', () => {
       expect(yieldCount).toBeGreaterThan(0);
       expect(progress.length).toBeGreaterThan(0);
       // The final report covers the whole tree (two visits per node).
-      expect(progress.at(-1)).toEqual([model.size * 2, model.size * 2]);
+      expect(progress.at(-1)).toEqual([nodeCount(model) * 2, nodeCount(model) * 2]);
     });
 
     it('stops early when aborted during the ignore-evaluation pass', async () => {
@@ -446,4 +446,9 @@ function matcher(patterns: readonly string[]): IsIgnoredFn {
     const pathsToCheck = isFolder ? [normalizedPath, `${normalizedPath}/`] : [normalizedPath];
     return pathsToCheck.some((path) => ig.ignores(path));
   };
+}
+
+function nodeCount(model: VaultModel): number {
+  // `getPathsByVisibility` reports every node except the root, so add the root back.
+  return model.getPathsByVisibility(true).length + model.getPathsByVisibility(false).length + 1;
 }
