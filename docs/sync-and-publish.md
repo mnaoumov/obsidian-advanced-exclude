@@ -69,6 +69,15 @@ Observed wiring (core `publish` plugin instance, **enabled** here): `scanForChan
 - **Mitigations:** do not hide (in `Full` mode) files you intend to keep published; use
   `Files Pane` mode for the publish-relevant subset (it leaves the index intact); or the
   view-layer-filtering approach (S4) would avoid index mutation entirely.
+- **Shipped: a runtime warning** (`src/publish-compatibility-warning-component.ts`). When
+  Publish is enabled **and** the exclude mode is `Full` (the only unsafe combination —
+  `Files Pane` is Publish-safe), the plugin shows a persistent notice offering four actions:
+  disable Advanced Exclude, switch to `Files Pane` mode, disable the Publish core plugin, or
+  cancel (acknowledge the risk). It re-evaluates on plugin load, on the `app.internalPlugins`
+  `change` event (Publish enabled/disabled), and on settings `saveSettings` (the exclude mode
+  may have changed). The Publish plugin instance implements only `onEnable`/`onDisable` (not
+  `onUserEnable`/`onUserDisable`), so the `internalPlugins` `change` event — not a method
+  patch on `onUserEnable` — is the reliable live hook.
 
 ## Summary
 
@@ -87,5 +96,6 @@ does not hide from Backlinks/Graph/Search.
   event-free hide fires no `delete` event, so Sync's `onFileRemove` never runs for a hide.
 - [ ] Optionally still verify on a throwaway synced vault that an S6 hide propagates **no**
       deletion to other devices (confirm the fix empirically; do NOT test on a real vault).
-- [ ] Decide whether `Full` mode should warn when **Publish** is enabled (still index-driven:
-      a hidden file cannot be published, and hiding a published file reads as a removal).
+- **Done:** `Full` mode now warns when **Publish** is enabled (still index-driven: a hidden
+      file cannot be published, and hiding a published file reads as a removal). See the
+      Publish section above and `src/publish-compatibility-warning-component.ts`.

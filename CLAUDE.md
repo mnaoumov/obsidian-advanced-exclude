@@ -60,6 +60,17 @@ Built on `obsidian-dev-utils`. Patches Obsidian's `FileSystemAdapter` / `Capacit
 
 ## Current Task
 
+**Publish-compatibility warning shipped.** `src/publish-compatibility-warning-component.ts`
+(a `LayoutReadyComponent`, wired in `plugin.ts`) warns when Obsidian Publish is enabled
+while `excludeMode === Full` (the only unsafe combo; `Files Pane` mode is Publish-safe). The
+warning notice offers four actions: disable Advanced Exclude, switch to Files Pane mode,
+disable the Publish core plugin, or cancel (acknowledge the risk). It revalidates on plugin
+load (`onLayoutReady`), on `app.internalPlugins` `'change'` (Publish enable/disable), and on
+settings `saveSettings` (exclude-mode change). The Publish plugin instance implements only
+`onEnable`/`onDisable` (not `onUserEnable`/`onUserDisable`), so the live hook is the
+`internalPlugins` `'change'` event, not a `registerMethodPatch` on `onUserEnable` (that
+would wrap `undefined` and crash). See `docs/sync-and-publish.md` (Publish section).
+
 **S6 (direct index mutation) shipped.** `Full`-mode hide/show no longer calls
 `reconcileDeletion`/`reconcileFile`. `ManualIndexHider` (`src/manual-index-hider.ts`)
 removes files from the index directly and fires no events; `IndexProjectionComponent`
