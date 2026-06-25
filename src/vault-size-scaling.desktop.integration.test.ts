@@ -15,8 +15,6 @@ import type { PluginSettingsComponent } from './plugin-settings-component.ts';
 interface ScenarioSpec {
   // Sibling file outside the ignored scope; must stay visible after the hide.
   readonly controlPath: string;
-  // Number of `reconcileDeletion` calls expected within the scope (= hide-roots).
-  readonly expectedDeletionCount: number;
   // Total files inside the scope; all must vanish on hide and return on un-ignore.
   readonly fileCount: number;
   readonly files: readonly string[];
@@ -125,18 +123,18 @@ afterEach(async () => {
 describe('Vault size scaling — Full mode', () => {
   for (const size of FLAT_SIZES) {
     const spec = flatSpec(size);
-    it(`hides and re-shows a flat ${String(size)}-file folder with a single deletion`, async () => {
+    it(`hides and re-shows a flat ${String(size)}-file folder with no index deletion`, async () => {
       await assertScenario(spec);
     }, scenarioTimeout(spec.fileCount));
   }
 
   const nestedSpec = nestedTreeSpec();
-  it('hides and re-shows a deep, wide folder tree with a single deletion', async () => {
+  it('hides and re-shows a deep, wide folder tree with no index deletion', async () => {
     await assertScenario(nestedSpec);
   }, scenarioTimeout(nestedSpec.fileCount));
 
   const manySpec = manyFoldersSpec();
-  it('hides and re-shows many independently-ignored folders, one deletion each', async () => {
+  it('hides and re-shows many independently-ignored folders with no index deletion', async () => {
     await assertScenario(manySpec);
   }, scenarioTimeout(manySpec.fileCount));
 });
@@ -145,8 +143,9 @@ async function assertScenario(spec: ScenarioSpec): Promise<void> {
   const result = await runIgnoreScenario(spec);
 
   expect(result.error).toBeNull();
-  // Hiding issues exactly one deletion per hide-root, independent of file count.
-  expect(result.reconcileDeletionCount).toBe(spec.expectedDeletionCount);
+  // S6 hides by mutating the index directly and firing no events, so a hide issues
+  // No `reconcileDeletion` at all — at any file count or hide-root count.
+  expect(result.reconcileDeletionCount).toBe(0);
   // Every file inside the ignored scope is gone from the vault.
   expect(result.inScopeVisibleAfterHide).toBe(0);
   // A sibling outside the pattern stays visible.
@@ -160,7 +159,6 @@ function flatSpec(fileCount: number): ScenarioSpec {
   const files = Array.from({ length: fileCount }, (_unused, index) => `${folder}/file-${String(index)}.md`);
   return {
     controlPath: `control-${String(fileCount)}.md`,
-    expectedDeletionCount: 1,
     fileCount,
     files,
     folders: [folder],
@@ -183,8 +181,6 @@ function manyFoldersSpec(): ScenarioSpec {
   }
   return {
     controlPath: 'control-many.md',
-    // The parent stays visible; each `module-*` folder is its own hide-root.
-    expectedDeletionCount: MANY_FOLDER_COUNT,
     fileCount: files.length,
     files,
     folders,
@@ -211,7 +207,6 @@ function nestedTreeSpec(): ScenarioSpec {
   }
   return {
     controlPath: 'control-nested.md',
-    expectedDeletionCount: 1,
     fileCount: files.length,
     files,
     folders,
@@ -286,8 +281,9 @@ function runIgnoreScenario(spec: ScenarioSpec): Promise<VaultSizeScenarioResult>
       /*
        * Count only deletions inside the ignored scope. Saving settings also churns
        * config files (`data.json`, `.obsidianignore`) which fire their own
-       * reconciles; those are constant noise unrelated to vault size. Each ignored
-       * folder must collapse to a single deletion (its hide-root), at any size.
+       * reconciles; those are constant noise unrelated to vault size. Under S6 a hide
+       * mutates the index directly and fires no events, so the in-scope count must
+       * stay zero no matter how many files or hide-roots the scope holds.
        */
       const adapterEx = app.vault.adapter as DataAdapterEx;
       const originalReconcileDeletion = adapterEx.reconcileDeletion.bind(adapterEx);
