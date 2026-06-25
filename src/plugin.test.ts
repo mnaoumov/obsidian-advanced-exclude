@@ -114,6 +114,13 @@ vi.mock('./restore-notice-component.ts', () => ({
   })
 }));
 
+vi.mock('./publish-compatibility-warning-component.ts', () => ({
+  // eslint-disable-next-line prefer-arrow-callback, func-names -- mock must be constructable with `new` and return a real loadable Component.
+  PublishCompatibilityWarningComponent: vi.fn(function () {
+    return new Component();
+  })
+}));
+
 vi.mock('./vault-path-store.ts', () => ({
   IndexedDbVaultPathStore: vi.fn()
 }));
@@ -176,10 +183,10 @@ describe('Plugin', () => {
   it('should call addChild the expected number of times', async () => {
     /*
      * The real `PluginBase` registers 5 universal child components before
-     * `onloadImpl`, then the plugin's `onloadImpl` adds its own 12 children.
+     * `onloadImpl`, then the plugin's `onloadImpl` adds its own 13 children.
      */
     const EXPECTED_BASE_ADD_CHILD_CALLS = 5;
-    const EXPECTED_PLUGIN_ADD_CHILD_CALLS = 12;
+    const EXPECTED_PLUGIN_ADD_CHILD_CALLS = 13;
     const EXPECTED_ADD_CHILD_CALLS = EXPECTED_BASE_ADD_CHILD_CALLS + EXPECTED_PLUGIN_ADD_CHILD_CALLS;
     const appOriginal = app.asOriginalType__();
 

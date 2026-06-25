@@ -4,3 +4,11 @@
     width: 300px;
   }
 }
+
+// Rendered inside a Notice (attached to document body), so it lives outside `.advanced-exclude`.
+.advanced-exclude-publish-warning-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--size-4-2);
+  margin-top: var(--size-4-2);
+}
