@@ -46,7 +46,7 @@ export class Plugin extends PluginBase {
       })
     );
 
-    const updateProgressNotice = this.addChild(new UpdateProgressNoticeComponent());
+    const updateProgressNotice = this.addChild(new UpdateProgressNoticeComponent(this.pluginNoticeComponent));
 
     const indexProjectionComponent = this.addChild(
       new IndexProjectionComponent({

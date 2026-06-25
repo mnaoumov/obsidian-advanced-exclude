@@ -3,6 +3,7 @@ import type {
   PluginNoticeComponentShowNoticeOptions
 } from 'obsidian-dev-utils/obsidian/components/plugin-notice-component';
 
+import { Notice } from 'obsidian';
 import { strictProxy } from 'obsidian-dev-utils/strict-proxy';
 import {
   beforeEach,
@@ -16,9 +17,8 @@ import type { IndexProjectionComponent } from './index-projection-component.ts';
 
 import { RestoreNoticeComponent } from './restore-notice-component.ts';
 
-const showNoticeMock = vi.fn((_message: DocumentFragment | string, _options?: PluginNoticeComponentShowNoticeOptions): void => {
-  // Captured via showNoticeMock.mock.calls.
-});
+// Return value captured via showNoticeMock.mock.calls.
+const showNoticeMock = vi.fn((message: DocumentFragment | string, _options?: PluginNoticeComponentShowNoticeOptions): Notice => new Notice(message, 0));
 
 function createComponent(hiddenCount: number): RestoreNoticeComponent {
   const indexProjectionComponent = strictProxy<IndexProjectionComponent>({
