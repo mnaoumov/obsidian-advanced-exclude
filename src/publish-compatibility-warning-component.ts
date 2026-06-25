@@ -1,7 +1,10 @@
-import type { App } from 'obsidian';
+import type {
+  App,
+  Notice
+} from 'obsidian';
+import type { PluginNoticeComponent } from 'obsidian-dev-utils/obsidian/components/plugin-notice-component';
 
 import { InternalPluginName } from '@obsidian-typings/obsidian-public-latest/implementations';
-import { Notice } from 'obsidian';
 import { convertAsyncToSync } from 'obsidian-dev-utils/async';
 import { registerAsyncEvent } from 'obsidian-dev-utils/obsidian/components/async-events-component';
 import { LayoutReadyComponent } from 'obsidian-dev-utils/obsidian/components/layout-ready-component';
@@ -11,13 +14,11 @@ import type { PluginSettingsComponent } from './plugin-settings-component.ts';
 
 import { ExcludeMode } from './plugin-settings.ts';
 
-const NOTICE_DURATION_PERSISTENT_IN_MILLISECONDS = 0;
-
 interface PublishCompatibilityWarningComponentConstructorParams {
   readonly app: App;
   readonly ignorePatternsComponent: IgnorePatternsComponent;
   readonly pluginId: string;
-  readonly pluginName: string;
+  readonly pluginNoticeComponent: PluginNoticeComponent;
   readonly pluginSettingsComponent: PluginSettingsComponent;
 }
 
@@ -38,14 +39,14 @@ export class PublishCompatibilityWarningComponent extends LayoutReadyComponent {
   private isDismissed = false;
   private notice: Notice | null = null;
   private readonly pluginId: string;
-  private readonly pluginName: string;
+  private readonly pluginNoticeComponent: PluginNoticeComponent;
   private readonly pluginSettingsComponent: PluginSettingsComponent;
 
   public constructor(params: PublishCompatibilityWarningComponentConstructorParams) {
     super(params.app);
     this.ignorePatternsComponent = params.ignorePatternsComponent;
     this.pluginId = params.pluginId;
-    this.pluginName = params.pluginName;
+    this.pluginNoticeComponent = params.pluginNoticeComponent;
     this.pluginSettingsComponent = params.pluginSettingsComponent;
   }
 
@@ -101,8 +102,6 @@ export class PublishCompatibilityWarningComponent extends LayoutReadyComponent {
     }
 
     const fragment = createFragment((f) => {
-      f.createEl('strong', { text: this.pluginName });
-      f.createEl('br');
       f.appendText(
         'Obsidian Publish is enabled while Exclude mode is "Full". In Full mode, hidden files are '
           + 'removed from the index, so Publish cannot see them: a file that is already published and is '
@@ -120,7 +119,7 @@ export class PublishCompatibilityWarningComponent extends LayoutReadyComponent {
       });
     });
 
-    this.notice = new Notice(fragment, NOTICE_DURATION_PERSISTENT_IN_MILLISECONDS);
+    this.notice = this.pluginNoticeComponent.showNotice(fragment, { isPermanent: true });
 
     function addButton(containerEl: HTMLElement, text: string, listener: () => void): void {
       containerEl.createEl('button', { text }).addEventListener('click', listener);

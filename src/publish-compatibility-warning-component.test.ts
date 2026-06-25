@@ -2,8 +2,15 @@ import type {
   AsyncEventRef,
   GenericAsyncEventSource
 } from 'obsidian-dev-utils/async-events';
+import type {
+  PluginNoticeComponent,
+  PluginNoticeComponentShowNoticeOptions
+} from 'obsidian-dev-utils/obsidian/components/plugin-notice-component';
 
-import { Events } from 'obsidian';
+import {
+  Events,
+  Notice
+} from 'obsidian';
 import { waitForAllAsyncOperations } from 'obsidian-dev-utils/async';
 import { strictProxy } from 'obsidian-dev-utils/strict-proxy';
 import { App } from 'obsidian-test-mocks/obsidian';
@@ -26,27 +33,16 @@ import {
 import { PublishCompatibilityWarningComponent } from './publish-compatibility-warning-component.ts';
 
 const PLUGIN_ID = 'advanced-exclude';
-const PLUGIN_NAME = 'Advanced Exclude';
 
-interface CapturedNotice {
-  hide: ReturnType<typeof vi.fn>;
-  message: DocumentFragment | string;
-}
-
-const capturedNotices: CapturedNotice[] = [];
-
-vi.mock('obsidian', async (importOriginal) => ({
-  ...await importOriginal<typeof import('obsidian')>(),
-  // eslint-disable-next-line prefer-arrow-callback, func-names -- mock must be constructable with `new`.
-  Notice: vi.fn(function (message: DocumentFragment | string, _duration?: number) {
-    const captured: CapturedNotice = {
-      hide: vi.fn(),
-      message
-    };
-    capturedNotices.push(captured);
-    return { hide: captured.hide };
-  })
-}));
+const shownNotices: Notice[] = [];
+const showNoticeMock = vi.fn(
+  (message: DocumentFragment | string, _options?: PluginNoticeComponentShowNoticeOptions): Notice => {
+    const notice = new Notice(message, 0);
+    vi.spyOn(notice, 'hide');
+    shownNotices.push(notice);
+    return notice;
+  }
+);
 
 interface Harness {
   component: PublishCompatibilityWarningComponent;
@@ -69,7 +65,8 @@ interface HarnessState {
 
 describe('PublishCompatibilityWarningComponent', () => {
   beforeEach(() => {
-    capturedNotices.length = 0;
+    shownNotices.length = 0;
+    showNoticeMock.mockClear();
   });
 
   afterEach(() => {
@@ -81,7 +78,7 @@ describe('PublishCompatibilityWarningComponent', () => {
     harness.component.load();
     harness.fireSaveSettings();
 
-    expect(capturedNotices).toHaveLength(0);
+    expect(shownNotices).toHaveLength(0);
   });
 
   it('should not warn in Full mode when Publish is disabled', () => {
@@ -89,7 +86,7 @@ describe('PublishCompatibilityWarningComponent', () => {
     harness.component.load();
     harness.fireSaveSettings();
 
-    expect(capturedNotices).toHaveLength(0);
+    expect(shownNotices).toHaveLength(0);
   });
 
   it('should warn in Full mode when Publish is enabled', () => {
@@ -97,9 +94,9 @@ describe('PublishCompatibilityWarningComponent', () => {
     harness.component.load();
     harness.fireSaveSettings();
 
-    expect(capturedNotices).toHaveLength(1);
-    const fragment = getFragment(capturedNotices[0]?.message);
-    expect(fragment.textContent).toContain(PLUGIN_NAME);
+    expect(shownNotices).toHaveLength(1);
+    expect(showNoticeMock).toHaveBeenCalledWith(expect.any(DocumentFragment), { isPermanent: true });
+    const fragment = getFragment(showNoticeMock.mock.calls[0]?.[0]);
     expect(fragment.textContent).toContain('Obsidian Publish is enabled');
     expect(getButtonLabels(fragment)).toStrictEqual([
       'Disable Advanced Exclude',
@@ -115,7 +112,7 @@ describe('PublishCompatibilityWarningComponent', () => {
     harness.component.load();
     await harness.triggerLayoutReady();
 
-    expect(capturedNotices).toHaveLength(1);
+    expect(shownNotices).toHaveLength(1);
   });
 
   it('should not create a second notice on repeated validation', () => {
@@ -124,7 +121,7 @@ describe('PublishCompatibilityWarningComponent', () => {
     harness.fireSaveSettings();
     harness.fireSaveSettings();
 
-    expect(capturedNotices).toHaveLength(1);
+    expect(shownNotices).toHaveLength(1);
   });
 
   it('should hide the warning when Publish becomes disabled', () => {
@@ -135,7 +132,7 @@ describe('PublishCompatibilityWarningComponent', () => {
     harness.state.publishEnabled = false;
     harness.fireInternalPluginsChange();
 
-    expect(capturedNotices[0]?.hide).toHaveBeenCalledTimes(1);
+    expect(shownNotices[0]?.hide).toHaveBeenCalledTimes(1);
   });
 
   it('should disable this plugin when the Disable Advanced Exclude button is clicked', async () => {
@@ -143,7 +140,7 @@ describe('PublishCompatibilityWarningComponent', () => {
     harness.component.load();
     harness.fireSaveSettings();
 
-    getButton(getFragment(capturedNotices[0]?.message), 'Disable Advanced Exclude').click();
+    getButton(getFragment(showNoticeMock.mock.calls[0]?.[0]), 'Disable Advanced Exclude').click();
     await waitForAllAsyncOperations();
 
     expect(harness.disablePluginAndSave).toHaveBeenCalledWith(PLUGIN_ID);
@@ -154,7 +151,7 @@ describe('PublishCompatibilityWarningComponent', () => {
     harness.component.load();
     harness.fireSaveSettings();
 
-    getButton(getFragment(capturedNotices[0]?.message), 'Switch to Files Pane mode').click();
+    getButton(getFragment(showNoticeMock.mock.calls[0]?.[0]), 'Switch to Files Pane mode').click();
     await waitForAllAsyncOperations();
 
     expect(harness.setProperty).toHaveBeenCalledWith('excludeMode', ExcludeMode.FilesPane);
@@ -166,7 +163,7 @@ describe('PublishCompatibilityWarningComponent', () => {
     harness.component.load();
     harness.fireSaveSettings();
 
-    getButton(getFragment(capturedNotices[0]?.message), 'Disable Publish').click();
+    getButton(getFragment(showNoticeMock.mock.calls[0]?.[0]), 'Disable Publish').click();
 
     expect(harness.publishDisable).toHaveBeenCalledWith(true);
   });
@@ -176,7 +173,7 @@ describe('PublishCompatibilityWarningComponent', () => {
     harness.component.load();
     harness.fireSaveSettings();
 
-    getButton(getFragment(capturedNotices[0]?.message), 'Disable Publish').click();
+    getButton(getFragment(showNoticeMock.mock.calls[0]?.[0]), 'Disable Publish').click();
 
     expect(harness.publishDisable).not.toHaveBeenCalled();
   });
@@ -186,25 +183,25 @@ describe('PublishCompatibilityWarningComponent', () => {
     harness.component.load();
     harness.fireSaveSettings();
 
-    getButton(getFragment(capturedNotices[0]?.message), 'Cancel (I am aware of the risks)').click();
-    expect(capturedNotices[0]?.hide).toHaveBeenCalledTimes(1);
+    getButton(getFragment(showNoticeMock.mock.calls[0]?.[0]), 'Cancel (I am aware of the risks)').click();
+    expect(shownNotices[0]?.hide).toHaveBeenCalledTimes(1);
 
     harness.fireSaveSettings();
-    expect(capturedNotices).toHaveLength(1);
+    expect(shownNotices).toHaveLength(1);
   });
 
   it('should re-warn after dismissal once the unsafe state clears and returns', () => {
     const harness = createHarness({ excludeMode: ExcludeMode.Full, publishEnabled: true });
     harness.component.load();
     harness.fireSaveSettings();
-    getButton(getFragment(capturedNotices[0]?.message), 'Cancel (I am aware of the risks)').click();
+    getButton(getFragment(showNoticeMock.mock.calls[0]?.[0]), 'Cancel (I am aware of the risks)').click();
 
     harness.effectiveSettings.excludeMode = ExcludeMode.FilesPane;
     harness.fireSaveSettings();
     harness.effectiveSettings.excludeMode = ExcludeMode.Full;
     harness.fireSaveSettings();
 
-    expect(capturedNotices).toHaveLength(2);
+    expect(shownNotices).toHaveLength(2);
   });
 
   it('should hide the warning on unload', () => {
@@ -214,7 +211,7 @@ describe('PublishCompatibilityWarningComponent', () => {
 
     harness.component.unload();
 
-    expect(capturedNotices[0]?.hide).toHaveBeenCalledTimes(1);
+    expect(shownNotices[0]?.hide).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -284,11 +281,13 @@ function createHarness(overrides?: Partial<HarnessState>): Harness {
   const processConfigChanges = vi.fn().mockResolvedValue(undefined);
   const ignorePatternsComponent = strictProxy<IgnorePatternsComponent>({ processConfigChanges });
 
+  const pluginNoticeComponent = strictProxy<PluginNoticeComponent>({ showNotice: showNoticeMock });
+
   const component = new PublishCompatibilityWarningComponent({
     app: appOriginal,
     ignorePatternsComponent,
     pluginId: PLUGIN_ID,
-    pluginName: PLUGIN_NAME,
+    pluginNoticeComponent,
     pluginSettingsComponent
   });
 
