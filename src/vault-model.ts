@@ -17,11 +17,6 @@ export interface VaultModelEntry {
 }
 
 /**
- * Options for {@link VaultModel.rebuild}; identical to {@link VaultModelRecomputeAllOptions}.
- */
-type VaultModelRebuildOptions = VaultModelRecomputeAllOptions;
-
-/**
  * Options for {@link VaultModel.recomputeAll} / {@link VaultModel.rebuild}.
  *
  * A full recompute evaluates every node (~90k on a large vault), which would
@@ -58,6 +53,11 @@ export interface VisibilityChange {
   readonly isVisible: boolean;
   readonly path: string;
 }
+
+/**
+ * Options for {@link VaultModel.rebuild}; identical to {@link VaultModelRecomputeAllOptions}.
+ */
+type VaultModelRebuildOptions = VaultModelRecomputeAllOptions;
 
 /**
  * Number of node-visits between cooperative yields in {@link VaultModel.recomputeAll}.

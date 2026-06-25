@@ -1,5 +1,4 @@
 import process from 'node:process';
-
 import { wrapCliTask } from 'obsidian-dev-utils/script-utils/cli-utils';
 import {
   findOverExposure,
