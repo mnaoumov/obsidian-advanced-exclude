@@ -176,10 +176,23 @@ S6, `Full` mode also hides without the freeze, but `FilesPane` remains the cheap
   change). The per-plugin performance findings still stand (each is independently slow on
   *real* bulk deletes) and remain in each plugin's `CLAUDE.md`.
 
-- **Progress-bar smoothness (still open, ours).** Two real issues found in the
-  progress-bar/async work that ARE ours and were
-  fixed earlier (queue-bound + async recompute + apply-phase yields), but note: the
-  cooperative `setImmediate` yield does not reliably repaint the progress bar in a real
-  foreground Obsidian session (bar appears to stick at chunk boundaries); switching the
-  recompute/apply yield to `requestAnimationFrameAsync` is worth trying for the bar's
-  smoothness (rAF pauses only when the window is unfocused, which is not the Apply case).
+- **Progress-bar smoothness — RESOLVED (yield switched to rAF; verified live).** Two
+  real issues found in the progress-bar/async work that ARE ours were fixed earlier
+  (queue-bound + async recompute + apply-phase yields). The remaining symptom — the
+  cooperative `setImmediate` yield not reliably repainting the bar in a real foreground
+  session (bar sticks at chunk boundaries) — is fixed: both yield points in
+  `IndexProjectionComponent` (the recompute `yieldFn` and `reportApplyProgress`) go through
+  a new module-level `yieldToPaint()` that races `requestAnimationFrameAsync()` against
+  `setTimeoutAsync(BACKGROUND_YIELD_FALLBACK_MS)` (100 ms). The rAF leg aligns the resume
+  with the next paint so the bar advances visibly; the timeout leg is the fallback for an
+  unfocused/hidden window (where rAF is suspended) so a background projection keeps
+  progressing instead of stalling on a frame that never arrives — the exact hidden-window
+  hazard that previously argued against plain rAF. Unit-covered (incl. a "keeps progressing
+  when the window is hidden" test that stubs rAF to never fire); 100% coverage.
+  **Verified live** via CDP on `F:\Obsidian` (~90k files, `Full` mode, foreground window):
+  a delta-path recompute advanced the bar through **35 distinct values** (clean 5000-step
+  staircase) over ~0.85–1.1 s, with **one serviced animation frame per chunk** at a
+  **median 18–20 ms inter-frame gap** (~50 fps; all gaps 3–22 ms in the steady run) — i.e.
+  the renderer paints each step rather than the bar jumping at the end. Note on the
+  follow-up to swap `yieldToPaint()` for the library's built-in fallback (see Current Task):
+  that change is purely mechanical and preserves this behavior (same 100 ms default).
