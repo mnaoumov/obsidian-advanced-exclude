@@ -1,7 +1,9 @@
 import type { DataAdapterEx } from '@obsidian-typings/obsidian-public-latest';
 import type {
   App,
-  TAbstractFile
+  TAbstractFile,
+  View,
+  WorkspaceLeaf
 } from 'obsidian';
 import type { Mock } from 'vitest';
 
@@ -126,6 +128,7 @@ function setup(params: SetupParams): SetupResult {
       getAllLoadedFiles: vi.fn().mockReturnValue(loadedFiles)
     },
     workspace: {
+      getLeavesOfType: vi.fn<(viewType: string) => WorkspaceLeaf[]>().mockReturnValue([]),
       onLayoutReady: vi.fn((callback: () => void) => {
         workspaceLayoutReadyCallback = callback;
       })
@@ -452,6 +455,54 @@ describe('IndexProjectionComponent', () => {
 
       expect(manualIndexHider.dropStaleSnapshot).not.toHaveBeenCalled();
       expect(addToFilesPane).toHaveBeenCalledExactlyOnceWith('back.md');
+    });
+  });
+
+  describe('link view refresh (Full mode)', () => {
+    function linkLeaf(backlink: View['backlink'], outgoingLink: View['outgoingLink']): WorkspaceLeaf {
+      return strictProxy<WorkspaceLeaf>({ view: strictProxy<View>({ backlink, outgoingLink }) });
+    }
+
+    it('recomputes the open Backlinks and Outgoing Links views after a projection', async () => {
+      const { app, component } = setup({ entries: [{ isFolderFlag: false, path: 'a.md' }], isIgnored: () => false });
+      const backlink = { backlinkFile: 'stale', unlinkedFile: 'stale', update: vi.fn() };
+      const outgoingLink = { outgoingFile: 'stale', unlinkedFile: 'stale', update: vi.fn() };
+      vi.mocked(app.workspace.getLeavesOfType).mockImplementation((viewType) => {
+        if (viewType === 'backlink') {
+          return [linkLeaf(backlink, undefined)];
+        }
+        if (viewType === 'outgoing-link') {
+          return [linkLeaf(undefined, outgoingLink)];
+        }
+        return [];
+      });
+
+      await component.update();
+
+      expect(backlink.update).toHaveBeenCalledTimes(1);
+      expect(backlink.backlinkFile).toBeNull();
+      expect(backlink.unlinkedFile).toBeNull();
+      expect(outgoingLink.update).toHaveBeenCalledTimes(1);
+      expect(outgoingLink.outgoingFile).toBeNull();
+    });
+
+    it('ignores a link view that exposes no renderer', async () => {
+      const { app, component } = setup({ entries: [{ isFolderFlag: false, path: 'a.md' }], isIgnored: () => false });
+      vi.mocked(app.workspace.getLeavesOfType).mockReturnValue([linkLeaf(undefined, undefined)]);
+
+      await expect(component.update()).resolves.toBeUndefined();
+    });
+
+    it('does not touch link views in FilesPane mode', async () => {
+      const { app, component } = setup({
+        entries: [{ isFolderFlag: false, path: 'a.md' }],
+        excludeMode: ExcludeMode.FilesPane,
+        isIgnored: () => false
+      });
+
+      await component.update();
+
+      expect(app.workspace.getLeavesOfType).not.toHaveBeenCalled();
     });
   });
 

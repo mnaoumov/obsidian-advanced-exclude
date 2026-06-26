@@ -237,9 +237,20 @@ cascade.
    which re-promotes the inbound demotions but discards the stale cached content, so the show
    falls through to the same proven `reconcileFile` re-parse as the no-snapshot case. The
    common case (file untouched while hidden) keeps its snapshot and restores instantly.
-3. **Coalesced graph/backlinks refresh — deferred.** The link graph is kept *correct* by the
-   batched inbound demote, but no single end-of-projection refresh is emitted, so open
-   Graph/Backlinks views may render stale until the next interaction. Follow-up.
+3. **Coalesced link-view refresh — implemented (Backlinks / Outgoing Links).** The link graph is
+   kept *correct* by the batched inbound demote, but the event-free projection fires nothing, so
+   open side-panes would render stale until the next interaction. `IndexProjectionComponent`
+   now calls `refreshLinkViews()` once at the end of a successful `Full`-mode projection: for each
+   open `backlink` / `outgoing-link` leaf it clears the renderer's `*File` trackers (not `file`,
+   the current target) and calls the renderer's `update()`, forcing an event-free recompute. The
+   renderers are undocumented internals (typed via `obsidian-internals.d.ts`, accessed defensively
+   — a no-op if absent), verified live via CDP **end to end**: with a note's Backlinks pane open,
+   hiding the note that links to it through the plugin's `update()` flips the pane to "No backlinks found" with
+   no manual interaction (and re-showing restores it), driven by exactly one `recomputeBacklink`
+   from `refreshLinkViews` — firing `metadataCache` `resolve`/`resolved` instead does **not**
+   refresh it, which is why the direct renderer call is required. The **Graph**
+   view is not covered — its engine isn't reliably exposed on the view, and it refreshes on its
+   own; revisit if it proves to render stale in practice.
 4. **`updateRelatedLinks` batching — removed.** With no `reconcileDeletion` there is no per-file
    `updateRelatedLinks` cascade to coalesce.
 5. **Version-fragility guardrails.** The internals are typed via `@obsidian-typings` (`fileMap`,
