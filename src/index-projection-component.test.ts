@@ -317,6 +317,25 @@ describe('IndexProjectionComponent', () => {
       expect(addToFilesPane).not.toHaveBeenCalled();
     });
 
+    it('keeps progressing when the window is hidden (no paint frame arrives)', async () => {
+      const { component, deleteFromFilesPane, manualIndexHider } = setup({
+        entries: [{ isFolderFlag: false, path: 'a.md' }],
+        isIgnored: () => false
+      });
+      // Simulate an unfocused/hidden window: requestAnimationFrame never fires its
+      // Callback, so the projection must fall back to the timeout to keep going.
+      const requestAnimationFrameSpy = vi.spyOn(window, 'requestAnimationFrame').mockReturnValue(0);
+
+      try {
+        await component.applyDelta([{ isFolder: false, isVisible: false, path: 'gone.md' }]);
+      } finally {
+        requestAnimationFrameSpy.mockRestore();
+      }
+
+      expect(deleteFromFilesPane).toHaveBeenCalledExactlyOnceWith('gone.md');
+      expect(hiddenPaths(manualIndexHider)).toEqual(['gone.md']);
+    });
+
     it('routes flips through the files pane in FilesPane mode', async () => {
       const { addToFilesPane, component, deleteFromFilesPane, manualIndexHider } = setup({
         entries: [{ isFolderFlag: false, path: 'a.md' }],
