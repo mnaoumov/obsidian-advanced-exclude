@@ -1,5 +1,8 @@
 import type { DataAdapterEx } from '@obsidian-typings/obsidian-public-latest';
-import type { App } from 'obsidian';
+import type {
+  App,
+  View
+} from 'obsidian';
 
 import { getDataAdapterEx } from '@obsidian-typings/obsidian-public-latest/implementations';
 import {
@@ -47,6 +50,14 @@ const APPLY_PROGRESS_REPORT_INTERVAL = 20;
  * is visible the frame arrives first (~16 ms), so the bound is never hit.
  */
 const BACKGROUND_YIELD_FALLBACK_MS = 100;
+
+/**
+ * The link-dependent side-pane view types refreshed after a `Full`-mode projection. Their
+ * renderers recompute only on an active-file change or a `metadataCache` event — neither of
+ * which the event-free projection fires — so they would otherwise show stale links (a hidden
+ * file lingering as a backlink) until the next interaction.
+ */
+const LINK_VIEW_TYPES = ['backlink', 'outgoing-link'];
 
 interface IndexProjectionComponentConstructorParams {
   addToFilesPane(this: void, normalizedPath: string): void;
@@ -260,6 +271,9 @@ export class IndexProjectionComponent extends ComponentEx {
         return;
       }
       this.needsFullProjection = false;
+      if (this.excludeMode === ExcludeMode.Full) {
+        this.refreshLinkViews();
+      }
     } finally {
       this.endProjection();
       // Only the current update owns the notice/controller: a superseding update
@@ -354,6 +368,21 @@ export class IndexProjectionComponent extends ComponentEx {
     this.vaultPathStore.save(this.vaultModel.getPathsByVisibility(false));
   }
 
+  /**
+   * Nudges the open link side-panes (Backlinks, Outgoing Links) to recompute after a
+   * `Full`-mode projection. The projection mutates the link index without firing events, so
+   * these views would otherwise render stale links (a hidden file lingering as a backlink)
+   * until the next interaction. Their renderers are undocumented internals, so the refresh
+   * is fully guarded — a no-op when a view exposes no matching renderer.
+   */
+  private refreshLinkViews(): void {
+    for (const viewType of LINK_VIEW_TYPES) {
+      for (const leaf of this.app.workspace.getLeavesOfType(viewType)) {
+        refreshLinkRenderer(leaf.view);
+      }
+    }
+  }
+
   private async reportApplyProgress(processed: number, total: number): Promise<void> {
     if (processed % APPLY_PROGRESS_REPORT_INTERVAL === 0 || processed === total) {
       this.updateProgressNotice.report(processed, total);
@@ -399,6 +428,25 @@ function pathDepth(normalizedPath: string): number {
     }
   }
   return count;
+}
+
+/**
+ * Forces a link side-pane renderer to recompute from the current link cache. The renderer
+ * caches the file it last rendered in its `*File` fields and its `update()` short-circuits
+ * while they still match the active file; clearing those trackers (but not `file`, the
+ * current target) makes `update()` recompute. Guarded: a no-op when the view exposes no
+ * such renderer.
+ */
+function refreshLinkRenderer(view: View): void {
+  for (const renderer of [view.backlink, view.outgoingLink]) {
+    if (!renderer) {
+      continue;
+    }
+    renderer.backlinkFile = null;
+    renderer.outgoingFile = null;
+    renderer.unlinkedFile = null;
+    renderer.update?.();
+  }
 }
 
 /**

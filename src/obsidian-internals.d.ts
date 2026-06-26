@@ -1,5 +1,17 @@
 export {};
 
+/**
+ * The internal renderer behind the Backlinks / Outgoing Links side-panes. It caches the
+ * file it last computed in its `*File` fields; clearing those and calling `update()` forces
+ * a recompute from the current link cache without firing any event.
+ */
+interface LinkViewRenderer {
+  backlinkFile?: unknown;
+  outgoingFile?: unknown;
+  unlinkedFile?: unknown;
+  update?(this: void): void;
+}
+
 declare module 'obsidian' {
   interface MetadataCache {
     /**
@@ -11,5 +23,20 @@ declare module 'obsidian' {
      * batches around. This overload adds the real array signature.
      */
     updateRelatedLinks(names: string[]): void;
+  }
+
+  interface View {
+    /**
+     * The Backlinks side-pane's renderer (present on the `backlink` view). Internal,
+     * undocumented; accessed only to force an event-free recompute after a projection.
+     */
+    backlink?: LinkViewRenderer | undefined;
+
+    /**
+     * The Outgoing Links side-pane's renderer (present on the `outgoing-link` view).
+     * Internal, undocumented; accessed only to force an event-free recompute after a
+     * projection.
+     */
+    outgoingLink?: LinkViewRenderer | undefined;
   }
 }
