@@ -49,7 +49,10 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginSettings> {
       .addTextArea((textArea) => {
         textArea.setPlaceholder('foo/bar/*\n!foo/bar/baz.md');
         textArea.inputEl.addClass('ignore-patterns-control');
-        this.bind(textArea, 'obsidianIgnoreContent');
+        this.bind({
+          propertyName: 'obsidianIgnoreContent',
+          valueComponent: textArea
+        });
       })
       .addButton((button) => {
         button
@@ -72,7 +75,10 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginSettings> {
         f.appendText(' file.');
       }))
       .addToggle((toggle) => {
-        this.bind(toggle, 'shouldIncludeGitIgnorePatterns');
+        this.bind({
+          propertyName: 'shouldIncludeGitIgnorePatterns',
+          valueComponent: toggle
+        });
       });
 
     new Setting(this.containerEl)
@@ -83,7 +89,10 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginSettings> {
         f.appendText(' setting.');
       }))
       .addToggle((toggle) => {
-        this.bind(toggle, 'shouldIgnoreExcludedFiles');
+        this.bind({
+          propertyName: 'shouldIgnoreExcludedFiles',
+          valueComponent: toggle
+        });
       })
       .addButton((button) => {
         button.setButtonText('Go to settings');
@@ -112,7 +121,10 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginSettings> {
       .addDropdown((dropdown) => {
         dropdown.addOption(ExcludeMode.Full, 'Full');
         dropdown.addOption(ExcludeMode.FilesPane, 'Files pane');
-        this.bind(dropdown, 'excludeMode');
+        this.bind({
+          propertyName: 'excludeMode',
+          valueComponent: dropdown
+        });
       });
   }
 

@@ -101,7 +101,9 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
 
     if (shouldRefresh) {
       this.cachedIgnoreTester = null;
-      invokeAsyncSafelyAfterDelay(() => this.processConfigChanges());
+      invokeAsyncSafelyAfterDelay({
+        asyncFn: () => this.processConfigChanges()
+      });
     }
   }
 
@@ -186,7 +188,9 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
     this.cachedExcludeRegExps = null;
     if (this.pluginSettingsComponent.settings.shouldIgnoreExcludedFiles) {
       this.fileIgnoreMap.clear();
-      invokeAsyncSafelyAfterDelay(() => this.processConfigChanges());
+      invokeAsyncSafelyAfterDelay({
+        asyncFn: () => this.processConfigChanges()
+      });
     }
   }
 
