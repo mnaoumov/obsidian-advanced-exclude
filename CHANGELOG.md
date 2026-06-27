@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## 3.1.0
+
+- perf: improve performance
+
 ## 3.0.0
 
 - perf: improve performance
