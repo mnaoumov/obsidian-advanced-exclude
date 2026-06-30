@@ -2,7 +2,7 @@ import type { PluginSettingsTabBaseConstructorParams } from 'obsidian-dev-utils/
 
 import { Setting } from 'obsidian';
 import { convertAsyncToSync } from 'obsidian-dev-utils/async';
-import { appendCodeBlock } from 'obsidian-dev-utils/html-element';
+import { appendCodeBlock } from 'obsidian-dev-utils/obsidian/html-element';
 import { PluginSettingsTabBase } from 'obsidian-dev-utils/obsidian/plugin/plugin-settings-tab';
 
 import type { IgnorePatternsComponent } from './ignore-patterns-component.ts';
