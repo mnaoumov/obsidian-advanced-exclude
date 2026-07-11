@@ -67,8 +67,18 @@ const MANY_FILES_PER_FOLDER = 4;
 const CREATE_BATCH_SIZE = 50;
 
 /*
- * Generous settle after a plugin reload / config change so the async model
- * build and projection update finish before assertions read the vault.
+ * A single CDP `Runtime.evaluate` is aborted after 30s by the transport, and creating the
+ * whole flat 5000-file scenario in one closure alone exceeds that. So file creation is split
+ * across multiple `evalInObsidian` calls — one per chunk of this many files — each of which
+ * finishes well under the command timeout. All calls hit the same running Obsidian, so the
+ * vault state accumulates across them.
+ */
+const FILES_PER_CALL = 1000;
+
+/*
+ * Upper bound for each readiness `waitUntil` (plugin load, hide, re-show). Each poll returns as soon as
+ * the async model build / projection update is observable, so this only caps a genuinely stuck step —
+ * keeping every single CDP `Runtime.evaluate` well under the transport's 30s command timeout.
  */
 const SETTLE_DELAY_IN_MS = 5000;
 
@@ -222,157 +232,214 @@ function nestedTreeSpec(): ScenarioSpec {
   }
 }
 
-function runIgnoreScenario(spec: ScenarioSpec): Promise<VaultSizeScenarioResult> {
-  return evalInObsidian({
-    args: {
-      CREATE_BATCH_SIZE,
-      OBSIDIAN_IGNORE_FILE,
-      PLUGIN_ID,
-      SETTLE_DELAY_IN_MS,
-      spec
-    },
-    async fn({
-      app,
-      CREATE_BATCH_SIZE: batchSize,
-      OBSIDIAN_IGNORE_FILE: ignoreFile,
-      PLUGIN_ID: pluginId,
-      SETTLE_DELAY_IN_MS: settleDelay,
-      spec: scenario
-    }) {
-      const { controlPath, files, folders, pattern, scopePrefix } = scenario;
-      const topFolders = folders.filter((folder) => !folder.includes('/'));
+async function runIgnoreScenario(spec: ScenarioSpec): Promise<VaultSizeScenarioResult> {
+  const vaultPath = getTempVault().path;
+  // Split the scenario across separate CDP calls so no single `evalInObsidian` exceeds the 30s
+  // Command timeout: one prepare call (plugin off, clean baseline), one call per file chunk, one
+  // Exercise call (enable, hide, re-show). All hit the same Obsidian, so vault state persists.
+  await prepareBaseline();
+  await createFilesInChunks();
+  return exerciseHideAndShow();
 
-      /*
-       * Build a clean baseline while the plugin is off: no patterns on disk and a
-       * freshly generated folder structure plus one sibling control file. Creating
-       * via the core vault API indexes everything so the next enable rebuilds the
-       * plugin model from a fully loaded tree.
-       */
-      await app.plugins.disablePluginAndSave(pluginId);
-      await removeQuietly(ignoreFile);
-      for (const folder of topFolders) {
-        await rmdirQuietly(folder);
-      }
-      await removeQuietly(controlPath);
+  async function prepareBaseline(): Promise<void> {
+    await evalInObsidian({
+      args: {
+        controlPath: spec.controlPath,
+        folders: spec.folders,
+        OBSIDIAN_IGNORE_FILE,
+        PLUGIN_ID
+      },
+      async fn({ app, controlPath, folders, OBSIDIAN_IGNORE_FILE: ignoreFile, PLUGIN_ID: pluginId }) {
+        const topFolders = folders.filter((folder) => !folder.includes('/'));
 
-      for (const folder of folders) {
-        await app.vault.createFolder(folder);
-      }
-      await app.vault.create(controlPath, 'control');
-      for (let start = 0; start < files.length; start += batchSize) {
-        const batch = files.slice(start, start + batchSize).map((path) => app.vault.create(path, ''));
-        await Promise.all(batch);
-      }
-
-      await app.plugins.enablePluginAndSave(pluginId);
-      await sleep(settleDelay);
-
-      const plugin = app.plugins.getPlugin(pluginId);
-      if (!plugin) {
-        return makeResult('Plugin not loaded');
-      }
-
-      const ignorePatternsComponent = findComponent(plugin, 'IgnorePatternsComponent') as IgnorePatternsComponent | undefined;
-      const pluginSettingsComponent = findComponent(plugin, 'PluginSettingsComponent') as PluginSettingsComponent | undefined;
-      if (!ignorePatternsComponent || !pluginSettingsComponent) {
-        return makeResult('Could not locate plugin components');
-      }
-
-      /*
-       * Count only deletions inside the ignored scope. Saving settings also churns
-       * config files (`data.json`, `.obsidianignore`) which fire their own
-       * reconciles; those are constant noise unrelated to vault size. Under S6 a hide
-       * mutates the index directly and fires no events, so the in-scope count must
-       * stay zero no matter how many files or hide-roots the scope holds.
-       */
-      const adapterEx = app.vault.adapter as DataAdapterEx;
-      const originalReconcileDeletion = adapterEx.reconcileDeletion.bind(adapterEx);
-      let reconcileDeletionCount = 0;
-      adapterEx.reconcileDeletion = async (normalizedPath, normalizedNewPath, shouldSkipDeletionTimeout): Promise<void> => {
-        if (normalizedPath.startsWith(scopePrefix)) {
-          reconcileDeletionCount++;
-        }
-        await originalReconcileDeletion(normalizedPath, normalizedNewPath, shouldSkipDeletionTimeout);
-      };
-
-      try {
         /*
-         * Reproduce the exact "edit settings to change ignores" flow: saving the
-         * setting fires `saveSettings` (reloads patterns, marks a pending change)
-         * and `processConfigChanges` drives the incremental projection delta — the
-         * path that used to freeze.
+         * Build a clean baseline while the plugin is off: no patterns on disk and a
+         * freshly generated folder structure plus one sibling control file. The files
+         * themselves are created by the later chunked calls (still with the plugin off),
+         * so the next enable rebuilds the plugin model from a fully loaded tree.
          */
-        await pluginSettingsComponent.editAndSave((settings) => {
-          settings.obsidianIgnoreContent = pattern;
-        });
-        await ignorePatternsComponent.processConfigChanges();
-        await sleep(settleDelay);
-
-        const visibleAfterHide = app.vault.getFiles().map((file) => file.path);
-        const inScopeVisibleAfterHide = visibleAfterHide.filter((path) => path.startsWith(scopePrefix)).length;
-        const isControlVisibleAfterHide = visibleAfterHide.includes(controlPath);
-
-        // Remove the pattern the same way and confirm the scope returns live with no reload — the model must have retained the hidden subtree.
-        await pluginSettingsComponent.editAndSave((settings) => {
-          settings.obsidianIgnoreContent = '';
-        });
-        await ignorePatternsComponent.processConfigChanges();
-        await sleep(settleDelay);
-
-        const inScopeVisibleAfterShow = app.vault.getFiles().map((file) => file.path).filter((path) => path.startsWith(scopePrefix)).length;
-
-        return {
-          error: null,
-          inScopeVisibleAfterHide,
-          inScopeVisibleAfterShow,
-          isControlVisibleAfterHide,
-          reconcileDeletionCount
-        };
-      } finally {
-        adapterEx.reconcileDeletion = originalReconcileDeletion;
-      }
-
-      function makeResult(error: string): VaultSizeScenarioResult {
-        return {
-          error,
-          inScopeVisibleAfterHide: -1,
-          inScopeVisibleAfterShow: -1,
-          isControlVisibleAfterHide: false,
-          reconcileDeletionCount: -1
-        };
-      }
-
-      function findComponent(root: object, className: string): unknown {
-        if (root.constructor.name === className) {
-          return root;
+        await app.plugins.disablePluginAndSave(pluginId);
+        await removeQuietly(ignoreFile);
+        for (const folder of topFolders) {
+          await rmdirQuietly(folder);
         }
-        for (const child of (root as TraversableComponent)._children ?? []) {
-          if (typeof child === 'object' && child !== null) {
-            const found = findComponent(child, className);
-            if (found) {
-              return found;
-            }
+        await removeQuietly(controlPath);
+
+        for (const folder of folders) {
+          await app.vault.createFolder(folder);
+        }
+        await app.vault.create(controlPath, 'control');
+
+        async function removeQuietly(path: string): Promise<void> {
+          try {
+            await app.vault.adapter.remove(path);
+          } catch {
+            // Ignore — the path may not exist.
           }
         }
-        return undefined;
-      }
 
-      async function removeQuietly(path: string): Promise<void> {
-        try {
-          await app.vault.adapter.remove(path);
-        } catch {
-          // Ignore — the path may not exist.
+        async function rmdirQuietly(path: string): Promise<void> {
+          try {
+            await app.vault.adapter.rmdir(path, true);
+          } catch {
+            // Ignore — the folder may not exist.
+          }
         }
-      }
+      },
+      vaultPath
+    });
+  }
 
-      async function rmdirQuietly(path: string): Promise<void> {
-        try {
-          await app.vault.adapter.rmdir(path, true);
-        } catch {
-          // Ignore — the folder may not exist.
+  async function createFilesInChunks(): Promise<void> {
+    // Keep the plugin off during creation; each chunk is its own CDP call so none blows the timeout.
+    for (let start = 0; start < spec.files.length; start += FILES_PER_CALL) {
+      const chunk = spec.files.slice(start, start + FILES_PER_CALL);
+      await evalInObsidian({
+        args: {
+          chunk,
+          CREATE_BATCH_SIZE
+        },
+        async fn({ app, chunk: chunkFiles, CREATE_BATCH_SIZE: batchSize }) {
+          for (let batchStart = 0; batchStart < chunkFiles.length; batchStart += batchSize) {
+            const batch = chunkFiles.slice(batchStart, batchStart + batchSize).map((path) => app.vault.create(path, ''));
+            await Promise.all(batch);
+          }
+        },
+        vaultPath
+      });
+    }
+  }
+
+  function exerciseHideAndShow(): Promise<VaultSizeScenarioResult> {
+    return evalInObsidian({
+      args: {
+        controlPath: spec.controlPath,
+        fileCount: spec.fileCount,
+        pattern: spec.pattern,
+        PLUGIN_ID,
+        scopePrefix: spec.scopePrefix,
+        SETTLE_DELAY_IN_MS
+      },
+      async fn({
+        app,
+        controlPath,
+        fileCount,
+        pattern,
+        PLUGIN_ID: pluginId,
+        scopePrefix,
+        SETTLE_DELAY_IN_MS: settleDelay,
+        waitUntil
+      }) {
+        // This call creates no files, so it stays well under the 30s command timeout.
+        await app.plugins.enablePluginAndSave(pluginId);
+        // Wait on a readiness signal (the plugin loading) instead of a fixed delay, keeping the single CDP call short.
+        await waitUntil({
+          message: 'plugin to load after enabling',
+          predicate: () => Boolean(app.plugins.getPlugin(pluginId)),
+          timeoutInMilliseconds: settleDelay
+        });
+
+        const plugin = app.plugins.getPlugin(pluginId);
+        if (!plugin) {
+          return makeResult('Plugin not loaded');
         }
-      }
-    },
-    vaultPath: getTempVault().path
-  });
+
+        const ignorePatternsComponent = findComponent(plugin, 'IgnorePatternsComponent') as IgnorePatternsComponent | undefined;
+        const pluginSettingsComponent = findComponent(plugin, 'PluginSettingsComponent') as PluginSettingsComponent | undefined;
+        if (!ignorePatternsComponent || !pluginSettingsComponent) {
+          return makeResult('Could not locate plugin components');
+        }
+
+        /*
+         * Count only deletions inside the ignored scope. Saving settings also churns
+         * config files (`data.json`, `.obsidianignore`) which fire their own
+         * reconciles; those are constant noise unrelated to vault size. Under S6 a hide
+         * mutates the index directly and fires no events, so the in-scope count must
+         * stay zero no matter how many files or hide-roots the scope holds.
+         */
+        const adapterEx = app.vault.adapter as DataAdapterEx;
+        const originalReconcileDeletion = adapterEx.reconcileDeletion.bind(adapterEx);
+        let reconcileDeletionCount = 0;
+        adapterEx.reconcileDeletion = async (normalizedPath, normalizedNewPath, shouldSkipDeletionTimeout): Promise<void> => {
+          if (normalizedPath.startsWith(scopePrefix)) {
+            reconcileDeletionCount++;
+          }
+          await originalReconcileDeletion(normalizedPath, normalizedNewPath, shouldSkipDeletionTimeout);
+        };
+
+        try {
+          /*
+           * Reproduce the exact "edit settings to change ignores" flow: saving the
+           * setting fires `saveSettings` (reloads patterns, marks a pending change)
+           * and `processConfigChanges` drives the incremental projection delta — the
+           * path that used to freeze.
+           */
+          await pluginSettingsComponent.editAndSave((settings) => {
+            settings.obsidianIgnoreContent = pattern;
+          });
+          await ignorePatternsComponent.processConfigChanges();
+          // Wait for the ignored scope to actually vanish rather than sleeping a fixed interval.
+          await waitUntil({
+            message: 'ignored scope to be hidden',
+            predicate: () => app.vault.getFiles().every((file) => !file.path.startsWith(scopePrefix)),
+            timeoutInMilliseconds: settleDelay
+          });
+
+          const visibleAfterHide = app.vault.getFiles().map((file) => file.path);
+          const inScopeVisibleAfterHide = visibleAfterHide.filter((path) => path.startsWith(scopePrefix)).length;
+          const isControlVisibleAfterHide = visibleAfterHide.includes(controlPath);
+
+          // Remove the pattern the same way and confirm the scope returns live with no reload — the model must have retained the hidden subtree.
+          await pluginSettingsComponent.editAndSave((settings) => {
+            settings.obsidianIgnoreContent = '';
+          });
+          await ignorePatternsComponent.processConfigChanges();
+          // Wait for the whole scope to return rather than sleeping a fixed interval.
+          await waitUntil({
+            message: 'ignored scope to be shown again',
+            predicate: () => app.vault.getFiles().filter((file) => file.path.startsWith(scopePrefix)).length === fileCount,
+            timeoutInMilliseconds: settleDelay
+          });
+
+          const inScopeVisibleAfterShow = app.vault.getFiles().map((file) => file.path).filter((path) => path.startsWith(scopePrefix)).length;
+
+          return {
+            error: null,
+            inScopeVisibleAfterHide,
+            inScopeVisibleAfterShow,
+            isControlVisibleAfterHide,
+            reconcileDeletionCount
+          };
+        } finally {
+          adapterEx.reconcileDeletion = originalReconcileDeletion;
+        }
+
+        function makeResult(error: string): VaultSizeScenarioResult {
+          return {
+            error,
+            inScopeVisibleAfterHide: -1,
+            inScopeVisibleAfterShow: -1,
+            isControlVisibleAfterHide: false,
+            reconcileDeletionCount: -1
+          };
+        }
+
+        function findComponent(root: object, className: string): unknown {
+          if (root.constructor.name === className) {
+            return root;
+          }
+          for (const child of (root as TraversableComponent)._children ?? []) {
+            if (typeof child === 'object' && child !== null) {
+              const found = findComponent(child, className);
+              if (found) {
+                return found;
+              }
+            }
+          }
+          return undefined;
+        }
+      },
+      vaultPath
+    });
+  }
 }
