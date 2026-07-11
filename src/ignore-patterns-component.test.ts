@@ -427,6 +427,9 @@ describe('IgnorePatternsComponent', () => {
       castTo<TestableIgnorePatternsComponent>(component).clearCachedExcludeRegExps();
 
       expect(invokeAsyncSafelyAfterDelay).toHaveBeenCalled();
+
+      // Drain the scheduled processConfigChanges so its callback actually runs.
+      await vi.runAllTimersAsync();
     });
   });
 
@@ -510,6 +513,9 @@ describe('IgnorePatternsComponent', () => {
       await component.handleDeletedOrDotFile('.obsidianignore');
 
       expect(invokeAsyncSafelyAfterDelay).toHaveBeenCalled();
+
+      // Drain the scheduled processConfigChanges so its callback actually runs.
+      await vi.runAllTimersAsync();
     });
   });
 

@@ -1,6 +1,3 @@
-// eslint-disable-next-line import/no-nodejs-modules, import-x/no-nodejs-modules -- Desktop code.
-import type { Stats } from 'node:fs';
-
 import { strictProxy } from 'obsidian-dev-utils/strict-proxy';
 import {
   App,
@@ -118,7 +115,7 @@ describe('FileSystemAdapterPatchComponent', () => {
     component2.load();
 
     // Trigger the patched reconcileFileCreation
-    await adapter.reconcileFileCreation('test/file.md', 'test/file.md', strictProxy<Stats>({}));
+    await adapter.reconcileFileCreation('test/file.md', 'test/file.md', strictProxy<Parameters<typeof adapter.reconcileFileCreation>[2]>({}));
 
     expect(vi.mocked(ignorePatternsComponent.isIgnored)).toHaveBeenCalledWith({ isFolder: false, normalizedPath: 'test/file.md' });
   });

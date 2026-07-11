@@ -43,8 +43,7 @@ afterEach(async () => {
         try {
           const file = app.vault.getAbstractFileByPath(path);
           if (file) {
-            // eslint-disable-next-line obsidianmd/prefer-file-manager-trash-file -- Test cleanup.
-            await app.vault.delete(file, true);
+            await app.fileManager.trashFile(file);
           }
         } catch {
           // Ignore
