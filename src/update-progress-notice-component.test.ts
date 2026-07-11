@@ -44,7 +44,7 @@ describe('UpdateProgressNoticeComponent', () => {
     component.start('Working…');
     const progressEl = getFragment(createFragmentSpy.mock.results[0]?.value).querySelector('progress');
 
-    component.report(3, 10);
+    component.report({ processed: 3, total: 10 });
 
     expect(progressEl?.value).toBe(3);
     expect(progressEl?.max).toBe(10);
@@ -54,7 +54,7 @@ describe('UpdateProgressNoticeComponent', () => {
     const component = createComponent();
 
     expect(() => {
-      component.report(1, 2);
+      component.report({ processed: 1, total: 2 });
     }).not.toThrow();
   });
 

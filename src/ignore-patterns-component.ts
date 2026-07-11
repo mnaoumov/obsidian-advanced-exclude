@@ -33,6 +33,11 @@ const MTIME_STORE_NAME = 'mtime';
 const FILES_STORE_NAME = 'files';
 const PROCESS_STORE_ACTIONS_DEBOUNCE_INTERVAL_IN_MILLISECONDS = 5000;
 
+export interface IgnorePatternsComponentIsIgnoredParams {
+  readonly isFolder: boolean;
+  readonly normalizedPath: string;
+}
+
 interface DbFileEntry {
   isIgnored: boolean;
   path: string;
@@ -107,7 +112,8 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
     }
   }
 
-  public isIgnored(normalizedPath: string, isFolder: boolean): boolean {
+  public isIgnored(params: IgnorePatternsComponentIsIgnoredParams): boolean {
+    const { isFolder, normalizedPath } = params;
     if (normalizedPath === ROOT_PATH) {
       return false;
     }
@@ -364,7 +370,7 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
       return;
     }
 
-    await writeSafe(this.app, OBSIDIAN_IGNORE_FILE, obsidianIgnoreContent);
+    await writeSafe({ app: this.app, content: obsidianIgnoreContent, path: OBSIDIAN_IGNORE_FILE });
     await this.pluginSettingsComponent.setProperty('obsidianIgnoreContent', obsidianIgnoreContent);
     this.cachedObsidianIgnoreContent = obsidianIgnoreContent;
   }

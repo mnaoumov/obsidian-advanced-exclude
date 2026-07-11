@@ -77,7 +77,7 @@ describe('AdapterPatchBaseComponent', () => {
       const wrapper = component.callGenerateReconcileWrapper(next, false);
       await wrapper('test/path');
 
-      expect(vi.mocked(ignorePatternsComponent.isIgnored)).toHaveBeenCalledWith('test/path', false);
+      expect(vi.mocked(ignorePatternsComponent.isIgnored)).toHaveBeenCalledWith({ isFolder: false, normalizedPath: 'test/path' });
       expect(next).toHaveBeenCalledWith('test/path');
     });
 
@@ -114,7 +114,7 @@ describe('AdapterPatchBaseComponent', () => {
       const wrapper = component.callGenerateReconcileWrapper(next, true);
       await wrapper('folder/path');
 
-      expect(vi.mocked(ignorePatternsComponent.isIgnored)).toHaveBeenCalledWith('folder/path', true);
+      expect(vi.mocked(ignorePatternsComponent.isIgnored)).toHaveBeenCalledWith({ isFolder: true, normalizedPath: 'folder/path' });
     });
 
     it('should forward additional arguments to next', async () => {
@@ -134,7 +134,7 @@ describe('AdapterPatchBaseComponent', () => {
       const wrapper = component.callGenerateReconcileWrapper(next, true);
       await wrapper('some/folder');
 
-      expect(vi.mocked(indexProjectionComponent.recordCreate)).toHaveBeenCalledWith('some/folder', true);
+      expect(vi.mocked(indexProjectionComponent.recordCreate)).toHaveBeenCalledWith({ isFolderPath: true, normalizedPath: 'some/folder' });
     });
   });
 });

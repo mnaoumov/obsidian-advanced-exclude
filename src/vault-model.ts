@@ -70,6 +70,11 @@ const RECOMPUTE_YIELD_CHUNK_SIZE = 5000;
  */
 const RECOMPUTE_VISITS_PER_NODE = 2;
 
+interface VaultModelEnsureNodeParams {
+  readonly isFolder: boolean;
+  readonly normalizedPath: string;
+}
+
 interface VaultModelNode {
   children: Map<string, VaultModelNode> | null;
   isFolder: boolean;
@@ -77,6 +82,11 @@ interface VaultModelNode {
   isVisible: boolean;
   parent: null | VaultModelNode;
   path: string;
+}
+
+interface VaultModelSetPathParams {
+  readonly isFolder: boolean;
+  readonly normalizedPath: string;
 }
 
 /**
@@ -192,7 +202,7 @@ export class VaultModel {
     this.nodes.set(ROOT_PATH, this.root);
 
     for (const entry of entries) {
-      this.ensureNode(entry.path, entry.isFolder);
+      this.ensureNode({ isFolder: entry.isFolder, normalizedPath: entry.path });
     }
 
     return this.recomputeAll(options);
@@ -265,8 +275,9 @@ export class VaultModel {
    * its ignore verdict, and propagates visibility up the ancestor chain. Returns
    * the visibility flips.
    */
-  public setPath(normalizedPath: string, isFolder: boolean): VisibilityChange[] {
-    const node = this.ensureNode(normalizedPath, isFolder);
+  public setPath(params: VaultModelSetPathParams): VisibilityChange[] {
+    const { isFolder, normalizedPath } = params;
+    const node = this.ensureNode({ isFolder, normalizedPath });
     this.evaluateIgnored(node);
     return this.propagateFrom(node);
   }
@@ -290,14 +301,15 @@ export class VaultModel {
     return false;
   }
 
-  private ensureNode(normalizedPath: string, isFolder: boolean): VaultModelNode {
+  private ensureNode(params: VaultModelEnsureNodeParams): VaultModelNode {
+    const { isFolder, normalizedPath } = params;
     const existing = this.nodes.get(normalizedPath);
     if (existing) {
       return existing;
     }
 
     const parentPath = getParentPath(normalizedPath);
-    const parent = this.ensureNode(parentPath, true);
+    const parent = this.ensureNode({ isFolder: true, normalizedPath: parentPath });
 
     const node: VaultModelNode = {
       children: isFolder ? new Map() : null,

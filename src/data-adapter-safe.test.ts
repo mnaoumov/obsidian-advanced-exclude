@@ -125,7 +125,7 @@ describe('data-adapter-safe', () => {
     describe('writeSafe', () => {
       it('should write content to file', async () => {
         mockFsPromises.writeFile.mockResolvedValue(undefined);
-        await writeSafe(mockApp, 'test.md', 'content');
+        await writeSafe({ app: mockApp, content: 'content', path: 'test.md' });
         expect(mockFsPromises.writeFile).toHaveBeenCalledWith('/vault/test.md', 'content');
       });
     });
@@ -212,7 +212,7 @@ describe('data-adapter-safe', () => {
     describe('writeSafe', () => {
       it('should write content via capacitor fs', async () => {
         mockFs.write.mockResolvedValue(undefined);
-        await writeSafe(mockApp, 'test.md', 'content');
+        await writeSafe({ app: mockApp, content: 'content', path: 'test.md' });
         expect(mockFs.write).toHaveBeenCalledWith('/vault/test.md', 'content');
       });
     });
@@ -264,7 +264,7 @@ describe('data-adapter-safe', () => {
     });
 
     it('writeSafe should throw for unknown adapter', async () => {
-      await expect(writeSafe(mockApp, 'test.md', 'content')).rejects.toThrow('Unknown adapter');
+      await expect(writeSafe({ app: mockApp, content: 'content', path: 'test.md' })).rejects.toThrow('Unknown adapter');
     });
   });
 });

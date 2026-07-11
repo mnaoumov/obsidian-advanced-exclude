@@ -14,6 +14,12 @@ import type { PluginSettingsComponent } from './plugin-settings-component.ts';
 
 import { ExcludeMode } from './plugin-settings.ts';
 
+interface AddButtonParams {
+  readonly containerEl: HTMLElement;
+  listener(this: void): void;
+  readonly text: string;
+}
+
 interface PublishCompatibilityWarningComponentConstructorParams {
   readonly app: App;
   readonly ignorePatternsComponent: IgnorePatternsComponent;
@@ -109,19 +115,28 @@ export class PublishCompatibilityWarningComponent extends LayoutReadyComponent {
           + 'Choose how to resolve this:'
       );
       const buttonsEl = f.createDiv({ cls: 'advanced-exclude-publish-warning-buttons' });
-      addButton(buttonsEl, 'Disable Advanced Exclude', convertAsyncToSync(() => this.disableThisPlugin()));
-      addButton(buttonsEl, 'Switch to Files Pane mode', convertAsyncToSync(() => this.switchToFilesPaneMode()));
-      addButton(buttonsEl, 'Disable Publish', () => {
-        this.disablePublishPlugin();
+      addButton({ containerEl: buttonsEl, listener: convertAsyncToSync(() => this.disableThisPlugin()), text: 'Disable Advanced Exclude' });
+      addButton({ containerEl: buttonsEl, listener: convertAsyncToSync(() => this.switchToFilesPaneMode()), text: 'Switch to Files Pane mode' });
+      addButton({
+        containerEl: buttonsEl,
+        listener: () => {
+          this.disablePublishPlugin();
+        },
+        text: 'Disable Publish'
       });
-      addButton(buttonsEl, 'Cancel (I am aware of the risks)', () => {
-        this.dismiss();
+      addButton({
+        containerEl: buttonsEl,
+        listener: () => {
+          this.dismiss();
+        },
+        text: 'Cancel (I am aware of the risks)'
       });
     });
 
     this.notice = this.pluginNoticeComponent.showNotice(fragment, { isPermanent: true });
 
-    function addButton(containerEl: HTMLElement, text: string, listener: () => void): void {
+    function addButton(params: AddButtonParams): void {
+      const { containerEl, listener, text } = params;
       containerEl.createEl('button', { text }).addEventListener('click', listener);
     }
   }

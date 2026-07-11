@@ -9,6 +9,12 @@ import {
   FileSystemAdapter
 } from 'obsidian';
 
+interface WriteSafeParams {
+  readonly app: App;
+  readonly content: string;
+  readonly path: string;
+}
+
 export async function readSafe(app: App, path: string): Promise<string> {
   if (!await existsSafe(app, path)) {
     return '';
@@ -55,7 +61,8 @@ export async function statSafe(app: App, path: string): Promise<null | Stat> {
   throw new Error('Unknown adapter');
 }
 
-export async function writeSafe(app: App, path: string, content: string): Promise<void> {
+export async function writeSafe(params: WriteSafeParams): Promise<void> {
+  const { app, content, path } = params;
   const adapter = getDataAdapterEx(app);
   const fullPath = adapter.getFullPath(path);
 

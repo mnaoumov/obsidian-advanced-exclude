@@ -260,7 +260,7 @@ describe('IgnorePatternsComponent', () => {
     it('should return false for ROOT_PATH', () => {
       setupIndexedDb();
       const component = createComponent();
-      expect(component.isIgnored('/', false)).toBe(false);
+      expect(component.isIgnored({ isFolder: false, normalizedPath: '/' })).toBe(false);
     });
 
     it('should return cached result when available', async () => {
@@ -269,9 +269,9 @@ describe('IgnorePatternsComponent', () => {
       await component.loadWithPromises();
 
       // First call caches the result
-      const result1 = component.isIgnored('some/file.md', false);
+      const result1 = component.isIgnored({ isFolder: false, normalizedPath: 'some/file.md' });
       // Second call should return the same result from cache
-      const result2 = component.isIgnored('some/file.md', false);
+      const result2 = component.isIgnored({ isFolder: false, normalizedPath: 'some/file.md' });
 
       expect(result1).toBe(result2);
       expect(result2).toBe(false);
@@ -284,8 +284,8 @@ describe('IgnorePatternsComponent', () => {
       const component = createComponent({ pluginSettingsComponent });
       await component.loadWithPromises();
 
-      expect(component.isIgnored('debug.log', false)).toBe(true);
-      expect(component.isIgnored('readme.md', false)).toBe(false);
+      expect(component.isIgnored({ isFolder: false, normalizedPath: 'debug.log' })).toBe(true);
+      expect(component.isIgnored({ isFolder: false, normalizedPath: 'readme.md' })).toBe(false);
     });
 
     it('should test both path and path/ for folders', async () => {
@@ -294,7 +294,7 @@ describe('IgnorePatternsComponent', () => {
       const component = createComponent();
       await component.loadWithPromises();
 
-      expect(component.isIgnored('build', true)).toBe(true);
+      expect(component.isIgnored({ isFolder: true, normalizedPath: 'build' })).toBe(true);
     });
 
     it('should test exclude regexps when shouldIgnoreExcludedFiles is true', async () => {
@@ -307,7 +307,7 @@ describe('IgnorePatternsComponent', () => {
       const component = createComponent({ app, pluginSettingsComponent });
       await component.loadWithPromises();
 
-      expect(component.isIgnored('secret/file.md', false)).toBe(true);
+      expect(component.isIgnored({ isFolder: false, normalizedPath: 'secret/file.md' })).toBe(true);
     });
 
     it('should handle regex exclude filters wrapped in slashes', async () => {
@@ -320,8 +320,8 @@ describe('IgnorePatternsComponent', () => {
       const component = createComponent({ app, pluginSettingsComponent });
       await component.loadWithPromises();
 
-      expect(component.isIgnored('file.tmp', false)).toBe(true);
-      expect(component.isIgnored('file.md', false)).toBe(false);
+      expect(component.isIgnored({ isFolder: false, normalizedPath: 'file.tmp' })).toBe(true);
+      expect(component.isIgnored({ isFolder: false, normalizedPath: 'file.md' })).toBe(false);
     });
 
     it('should handle invalid regex filters gracefully', async () => {
@@ -335,7 +335,7 @@ describe('IgnorePatternsComponent', () => {
       const component = createComponent({ app, pluginSettingsComponent });
       await component.loadWithPromises();
 
-      component.isIgnored('anything', false);
+      component.isIgnored({ isFolder: false, normalizedPath: 'anything' });
       expect(consoleErrorSpy).toHaveBeenCalledWith('Invalid exclude filter: /[invalid/');
     });
 
@@ -349,7 +349,7 @@ describe('IgnorePatternsComponent', () => {
       const component = createComponent({ app, pluginSettingsComponent });
       await component.loadWithPromises();
 
-      expect(component.isIgnored('secret/file.md', false)).toBe(false);
+      expect(component.isIgnored({ isFolder: false, normalizedPath: 'secret/file.md' })).toBe(false);
     });
 
     it('should return cached exclude regexps on subsequent calls', async () => {
@@ -363,13 +363,13 @@ describe('IgnorePatternsComponent', () => {
       const component = createComponent({ app, pluginSettingsComponent });
       await component.loadWithPromises();
 
-      component.isIgnored('secret/file.md', false);
-      component.isIgnored('secret/other.md', false);
+      component.isIgnored({ isFolder: false, normalizedPath: 'secret/file.md' });
+      component.isIgnored({ isFolder: false, normalizedPath: 'secret/other.md' });
 
       // GetConfig should be called for the first isIgnored, but the second should use cached regexps.
       // We can verify by checking that both return true (i.e., the pattern was applied)
-      expect(component.isIgnored('secret/file.md', false)).toBe(true);
-      expect(component.isIgnored('secret/other.md', false)).toBe(true);
+      expect(component.isIgnored({ isFolder: false, normalizedPath: 'secret/file.md' })).toBe(true);
+      expect(component.isIgnored({ isFolder: false, normalizedPath: 'secret/other.md' })).toBe(true);
     });
 
     it('should handle single-character filter that looks like regex delimiter', async () => {
@@ -384,7 +384,7 @@ describe('IgnorePatternsComponent', () => {
 
       // Single "/" has length 1, so filter.length > 1 is false. It should be treated as plain prefix match.
       // The escapeRegExp('/') produces '\/' and the regex becomes /^\//i
-      expect(component.isIgnored('some/path', false)).toBe(false);
+      expect(component.isIgnored({ isFolder: false, normalizedPath: 'some/path' })).toBe(false);
     });
 
     it('should store results in IndexedDB via addStoreAction', async () => {
@@ -392,7 +392,7 @@ describe('IgnorePatternsComponent', () => {
       const component = createComponent();
       await component.loadWithPromises();
 
-      component.isIgnored('test.md', false);
+      component.isIgnored({ isFolder: false, normalizedPath: 'test.md' });
 
       // Trigger the debounced store actions
       vi.runAllTimers();
@@ -437,11 +437,11 @@ describe('IgnorePatternsComponent', () => {
       await component.loadWithPromises();
 
       // Populate the cache
-      component.isIgnored('test.md', false);
+      component.isIgnored({ isFolder: false, normalizedPath: 'test.md' });
 
       await component.handleDeletedOrDotFile('test.md');
       // After deletion, should recalculate
-      expect(component.isIgnored('test.md', false)).toBe(false);
+      expect(component.isIgnored({ isFolder: false, normalizedPath: 'test.md' })).toBe(false);
     });
 
     it('should not add store action when path is not in fileIgnoreMap', async () => {
@@ -504,7 +504,7 @@ describe('IgnorePatternsComponent', () => {
       await component.loadWithPromises();
 
       // Populate cache with the obsidian ignore file path
-      component.isIgnored('.obsidianignore', false);
+      component.isIgnored({ isFolder: false, normalizedPath: '.obsidianignore' });
 
       vi.mocked(readSafe).mockResolvedValueOnce('changed-content');
       await component.handleDeletedOrDotFile('.obsidianignore');
@@ -789,8 +789,8 @@ describe('IgnorePatternsComponent', () => {
       await component.loadWithPromises();
 
       // The cached entries should be loaded
-      expect(component.isIgnored('ignored.md', false)).toBe(true);
-      expect(component.isIgnored('visible.md', false)).toBe(false);
+      expect(component.isIgnored({ isFolder: false, normalizedPath: 'ignored.md' })).toBe(true);
+      expect(component.isIgnored({ isFolder: false, normalizedPath: 'visible.md' })).toBe(false);
     });
 
     it('should reset DB when mtime does not match', async () => {
@@ -855,7 +855,7 @@ describe('IgnorePatternsComponent', () => {
       vi.mocked(readSafe).mockResolvedValueOnce('node_modules');
       await component.handleDeletedOrDotFile('.gitignore');
 
-      expect(component.isIgnored('node_modules/pkg', false)).toBe(true);
+      expect(component.isIgnored({ isFolder: false, normalizedPath: 'node_modules/pkg' })).toBe(true);
     });
   });
 
@@ -925,8 +925,8 @@ describe('IgnorePatternsComponent', () => {
       await component.loadWithPromises();
 
       // Populate fileIgnoreMap by calling isIgnored — no patterns loaded, so not ignored
-      component.isIgnored('test-file.md', false);
-      expect(component.isIgnored('test-file.md', false)).toBe(false);
+      component.isIgnored({ isFolder: false, normalizedPath: 'test-file.md' });
+      expect(component.isIgnored({ isFolder: false, normalizedPath: 'test-file.md' })).toBe(false);
 
       // Trigger saveSettings with new obsidianignore content, which calls reload()
       const saveSettingsCall = (vi.mocked(pluginSettingsComponent.on).mock.calls as MockCallEntry[]).find(([name]) => name === 'saveSettings');
@@ -939,7 +939,7 @@ describe('IgnorePatternsComponent', () => {
 
       // After reload with changed patterns, cached entry should be cleared
       // And re-evaluated with new patterns
-      expect(component.isIgnored('test-file.md', false)).toBe(true);
+      expect(component.isIgnored({ isFolder: false, normalizedPath: 'test-file.md' })).toBe(true);
     });
   });
 
@@ -950,8 +950,8 @@ describe('IgnorePatternsComponent', () => {
       await component.loadWithPromises();
 
       // Trigger multiple isIgnored calls to queue store actions
-      component.isIgnored('file1.md', false);
-      component.isIgnored('file2.md', false);
+      component.isIgnored({ isFolder: false, normalizedPath: 'file1.md' });
+      component.isIgnored({ isFolder: false, normalizedPath: 'file2.md' });
 
       // Run the debounced timer
       vi.runAllTimers();
@@ -964,7 +964,7 @@ describe('IgnorePatternsComponent', () => {
       const component = createComponent();
       await component.loadWithPromises();
 
-      component.isIgnored('file1.md', false);
+      component.isIgnored({ isFolder: false, normalizedPath: 'file1.md' });
       vi.runAllTimers();
 
       const putCallsAfterFirst = filesStore.put.mock.calls.length;
@@ -984,7 +984,7 @@ describe('IgnorePatternsComponent', () => {
       // Debounced flush: the delete must overwrite the put (last-write-wins)
       // Rather than both accumulating, so repeated config changes cannot grow
       // The queue beyond the number of distinct paths.
-      component.isIgnored('file1.md', false);
+      component.isIgnored({ isFolder: false, normalizedPath: 'file1.md' });
       await component.handleDeletedOrDotFile('file1.md');
 
       vi.runAllTimers();
@@ -1135,9 +1135,9 @@ describe('IgnorePatternsComponent', () => {
       const component = createComponent({ pluginSettingsComponent });
       await component.loadWithPromises();
 
-      expect(component.isIgnored('debug.log', false)).toBe(true);
-      expect(component.isIgnored('node_modules/pkg', false)).toBe(true);
-      expect(component.isIgnored('src/main.ts', false)).toBe(false);
+      expect(component.isIgnored({ isFolder: false, normalizedPath: 'debug.log' })).toBe(true);
+      expect(component.isIgnored({ isFolder: false, normalizedPath: 'node_modules/pkg' })).toBe(true);
+      expect(component.isIgnored({ isFolder: false, normalizedPath: 'src/main.ts' })).toBe(false);
     });
 
     it('should cache the ignore tester', async () => {
@@ -1147,11 +1147,11 @@ describe('IgnorePatternsComponent', () => {
       await component.loadWithPromises();
 
       // Both calls should use the same tester
-      component.isIgnored('a.log', false);
-      component.isIgnored('b.log', false);
+      component.isIgnored({ isFolder: false, normalizedPath: 'a.log' });
+      component.isIgnored({ isFolder: false, normalizedPath: 'b.log' });
 
-      expect(component.isIgnored('a.log', false)).toBe(true);
-      expect(component.isIgnored('b.log', false)).toBe(true);
+      expect(component.isIgnored({ isFolder: false, normalizedPath: 'a.log' })).toBe(true);
+      expect(component.isIgnored({ isFolder: false, normalizedPath: 'b.log' })).toBe(true);
     });
   });
 
@@ -1165,7 +1165,7 @@ describe('IgnorePatternsComponent', () => {
       expect(() => {
         // Force processStoreActions by calling isIgnored (adds store action)
         // Then immediately running the debounce
-        component.isIgnored('test.md', false);
+        component.isIgnored({ isFolder: false, normalizedPath: 'test.md' });
         // Manually trigger the debounce
         vi.runAllTimers();
       }).toThrow('db is not set');
@@ -1179,7 +1179,7 @@ describe('IgnorePatternsComponent', () => {
       await component.loadWithPromises();
 
       // Cache a path
-      component.isIgnored('cached.md', false);
+      component.isIgnored({ isFolder: false, normalizedPath: 'cached.md' });
       // Now handle it as deleted
       await component.handleDeletedOrDotFile('cached.md');
 
@@ -1301,7 +1301,7 @@ describe('IgnorePatternsComponent', () => {
       const component = createComponent({ app, pluginSettingsComponent });
       await component.loadWithPromises();
 
-      expect(component.isIgnored('testing123', false)).toBe(true);
+      expect(component.isIgnored({ isFolder: false, normalizedPath: 'testing123' })).toBe(true);
     });
 
     it('should treat plain filter as anchored prefix match', async () => {
@@ -1314,8 +1314,8 @@ describe('IgnorePatternsComponent', () => {
       const component = createComponent({ app, pluginSettingsComponent });
       await component.loadWithPromises();
 
-      expect(component.isIgnored('docs/readme.md', false)).toBe(true);
-      expect(component.isIgnored('my-docs/readme.md', false)).toBe(false);
+      expect(component.isIgnored({ isFolder: false, normalizedPath: 'docs/readme.md' })).toBe(true);
+      expect(component.isIgnored({ isFolder: false, normalizedPath: 'my-docs/readme.md' })).toBe(false);
     });
   });
 });

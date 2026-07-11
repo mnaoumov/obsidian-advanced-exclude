@@ -125,7 +125,7 @@ describe('CapacitorAdapterPatchComponent', () => {
 
     await adapter.reconcileFileCreation('test/file.md', 'test/file.md', strictProxy<CapacitorFileEntry>({}));
 
-    expect(vi.mocked(ignorePatternsComponent.isIgnored)).toHaveBeenCalledWith('test/file.md', false);
+    expect(vi.mocked(ignorePatternsComponent.isIgnored)).toHaveBeenCalledWith({ isFolder: false, normalizedPath: 'test/file.md' });
   });
 
   it('should pass isFolder=true for reconcileFolderCreation', async () => {
@@ -144,6 +144,6 @@ describe('CapacitorAdapterPatchComponent', () => {
 
     await adapter.reconcileFolderCreation('test/folder', 'test/folder');
 
-    expect(vi.mocked(ignorePatternsComponent.isIgnored)).toHaveBeenCalledWith('test/folder', true);
+    expect(vi.mocked(ignorePatternsComponent.isIgnored)).toHaveBeenCalledWith({ isFolder: true, normalizedPath: 'test/folder' });
   });
 });

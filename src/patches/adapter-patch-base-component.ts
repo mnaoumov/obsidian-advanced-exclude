@@ -36,9 +36,9 @@ export class AdapterPatchBaseComponent extends MonkeyAroundComponent {
 
   protected generateReconcileWrapper(originalFn: GenericReconcileFn, isFolder: boolean): GenericReconcileFn {
     return async (normalizedPath: string, ...args: unknown[]) => {
-      this.indexProjectionComponent.recordCreate(normalizedPath, isFolder);
+      this.indexProjectionComponent.recordCreate({ isFolderPath: isFolder, normalizedPath });
       let shouldRemoveFromFilesPane = false;
-      if (this.ignorePatternsComponent.isIgnored(normalizedPath, isFolder)) {
+      if (this.ignorePatternsComponent.isIgnored({ isFolder, normalizedPath })) {
         if (this.pluginSettingsComponent.settings.excludeMode === ExcludeMode.Full) {
           return;
         }

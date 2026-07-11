@@ -20,7 +20,10 @@ import {
   vi
 } from 'vitest';
 
-import type { IgnorePatternsComponent } from './ignore-patterns-component.ts';
+import type {
+  IgnorePatternsComponent,
+  IgnorePatternsComponentIsIgnoredParams
+} from './ignore-patterns-component.ts';
 import type {
   ManualIndexHider,
   SnapshotStat
@@ -136,7 +139,7 @@ function setup(params: SetupParams): SetupResult {
   });
 
   const ignorePatternsComponent = strictProxy<IgnorePatternsComponent>({
-    isIgnored: vi.fn((normalizedPath: string) => isIgnored(normalizedPath))
+    isIgnored: vi.fn((isIgnoredParams: IgnorePatternsComponentIsIgnoredParams) => isIgnored(isIgnoredParams.normalizedPath))
   });
 
   const pluginSettingsComponent = strictProxy<PluginSettingsComponent>({
@@ -837,7 +840,7 @@ describe('IndexProjectionComponent', () => {
         isIgnored: () => false
       });
 
-      component.recordCreate('new/file.md', false);
+      component.recordCreate({ isFolderPath: false, normalizedPath: 'new/file.md' });
       expect(castTo<TestableIndexProjectionComponent>(component).vaultModel.isVisible('new/file.md')).not.toBeUndefined();
 
       component.recordDelete('new/file.md');

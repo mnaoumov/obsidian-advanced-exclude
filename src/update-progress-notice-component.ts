@@ -3,6 +3,11 @@ import type { PluginNoticeComponent } from 'obsidian-dev-utils/obsidian/componen
 import { Notice } from 'obsidian';
 import { ComponentEx } from 'obsidian-dev-utils/obsidian/components/component-ex';
 
+interface UpdateProgressNoticeComponentReportParams {
+  readonly processed: number;
+  readonly total: number;
+}
+
 /**
  * A persistent {@link Notice} carrying a `<progress>` bar, shown while the
  * projection updates the file tree.
@@ -36,7 +41,8 @@ export class UpdateProgressNoticeComponent extends ComponentEx {
   /**
    * Updates the bar to `processed` of `total`. No-op if no notice is showing.
    */
-  public report(processed: number, total: number): void {
+  public report(params: UpdateProgressNoticeComponentReportParams): void {
+    const { processed, total } = params;
     if (!this.progressEl) {
       return;
     }

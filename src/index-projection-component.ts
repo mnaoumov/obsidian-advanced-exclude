@@ -71,6 +71,16 @@ interface IndexProjectionComponentConstructorParams {
   readonly vaultPathStore: VaultPathStore;
 }
 
+interface IndexProjectionComponentRecordCreateParams {
+  readonly isFolderPath: boolean;
+  readonly normalizedPath: string;
+}
+
+interface IndexProjectionComponentReportApplyProgressParams {
+  readonly processed: number;
+  readonly total: number;
+}
+
 /**
  * Projects the {@link VaultModel}'s visibility onto Obsidian's index.
  *
@@ -122,7 +132,7 @@ export class IndexProjectionComponent extends ComponentEx {
     this.deleteFromFilesPane = params.deleteFromFilesPane;
     this.manualIndexHider = params.manualIndexHider;
     this.updateProgressNotice = params.updateProgressNotice;
-    this.vaultModel = new VaultModel((normalizedPath, isFolderPath) => params.ignorePatternsComponent.isIgnored(normalizedPath, isFolderPath));
+    this.vaultModel = new VaultModel((normalizedPath, isFolderPath) => params.ignorePatternsComponent.isIgnored({ isFolder: isFolderPath, normalizedPath }));
   }
 
   /**
@@ -146,7 +156,7 @@ export class IndexProjectionComponent extends ComponentEx {
         return;
       }
       await this.show(adapter, change);
-      await this.reportApplyProgress(++processed, total);
+      await this.reportApplyProgress({ processed: ++processed, total });
     }
 
     const hiddenPaths: string[] = [];
@@ -156,7 +166,7 @@ export class IndexProjectionComponent extends ComponentEx {
       }
       this.deleteFromFilesPane(change.path);
       hiddenPaths.push(change.path);
-      await this.reportApplyProgress(++processed, total);
+      await this.reportApplyProgress({ processed: ++processed, total });
     }
     this.hideFromIndex(hiddenPaths);
   }
@@ -181,7 +191,7 @@ export class IndexProjectionComponent extends ComponentEx {
       }
       this.deleteFromFilesPane(target.path);
       hiddenPaths.push(target.path);
-      await this.reportApplyProgress(++processed, total);
+      await this.reportApplyProgress({ processed: ++processed, total });
     }
     this.hideFromIndex(hiddenPaths);
 
@@ -190,7 +200,7 @@ export class IndexProjectionComponent extends ComponentEx {
         return;
       }
       await this.show(adapter, entry);
-      await this.reportApplyProgress(++processed, total);
+      await this.reportApplyProgress({ processed: ++processed, total });
     }
   }
 
@@ -223,8 +233,9 @@ export class IndexProjectionComponent extends ComponentEx {
    * change accounts for it. The live visibility of the path is handled by the
    * adapter patch; this only keeps the model in sync.
    */
-  public recordCreate(normalizedPath: string, isFolderPath: boolean): void {
-    this.vaultModel.setPath(normalizedPath, isFolderPath);
+  public recordCreate(params: IndexProjectionComponentRecordCreateParams): void {
+    const { isFolderPath, normalizedPath } = params;
+    this.vaultModel.setPath({ isFolder: isFolderPath, normalizedPath });
   }
 
   /**
@@ -292,7 +303,7 @@ export class IndexProjectionComponent extends ComponentEx {
   private createRecomputeOptions(abortSignal?: AbortSignal): VaultModelRecomputeAllOptions {
     const options: VaultModelRecomputeAllOptions = {
       onProgress: (processed, total) => {
-        this.updateProgressNotice.report(processed, total);
+        this.updateProgressNotice.report({ processed, total });
       },
       // Yield aligned to a paint frame so the progress bar actually repaints
       // Between chunks, with a timeout fallback so an unfocused/hidden window
@@ -383,9 +394,10 @@ export class IndexProjectionComponent extends ComponentEx {
     }
   }
 
-  private async reportApplyProgress(processed: number, total: number): Promise<void> {
+  private async reportApplyProgress(params: IndexProjectionComponentReportApplyProgressParams): Promise<void> {
+    const { processed, total } = params;
     if (processed % APPLY_PROGRESS_REPORT_INTERVAL === 0 || processed === total) {
-      this.updateProgressNotice.report(processed, total);
+      this.updateProgressNotice.report({ processed, total });
       // Yield to a paint frame so the apply loop returns to the event loop and the
       // Progress bar repaints — otherwise the UI freezes for the whole apply.
       await yieldToPaint();

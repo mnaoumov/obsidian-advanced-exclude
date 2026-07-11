@@ -152,7 +152,7 @@ describe('VaultModel', () => {
 
       expect(model.isVisible('a/b')).toBe(false);
 
-      const changes = model.setPath('a/b/new.md', false);
+      const changes = model.setPath({ isFolder: false, normalizedPath: 'a/b/new.md' });
       expect(model.isVisible('a/b/new.md')).not.toBeUndefined();
       expect(changes).toEqual([
         { isFolder: false, isVisible: true, path: 'a/b/new.md' },

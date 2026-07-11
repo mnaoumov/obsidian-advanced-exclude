@@ -65,7 +65,7 @@ export class FileExplorerViewOnCreatePatchComponent extends MonkeyAroundComponen
       return;
     }
 
-    const isIgnored = this.ignorePatternsComponent.isIgnored(file.path, isFolderFn(file));
+    const isIgnored = this.ignorePatternsComponent.isIgnored({ isFolder: isFolderFn(file), normalizedPath: file.path });
     if (isIgnored) {
       return;
     }
