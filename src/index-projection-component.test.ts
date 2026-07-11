@@ -20,10 +20,7 @@ import {
   vi
 } from 'vitest';
 
-import type {
-  IgnorePatternsComponent,
-  IgnorePatternsComponentIsIgnoredParams
-} from './ignore-patterns-component.ts';
+import type { IgnorePatternsComponent } from './ignore-patterns-component.ts';
 import type {
   ManualIndexHider,
   SnapshotStat
@@ -50,6 +47,10 @@ const mockIsFolder = vi.mocked(isFolder);
 // The disk stat a fresh (non-stale) snapshot matches: getSnapshotStat and adapter.stat
 // Both return this by default, so the staleness check finds the snapshot up to date.
 const FRESH_STAT = { mtime: 1000, size: 50 };
+
+interface IsIgnoredParams {
+  readonly normalizedPath: string;
+}
 
 interface MockAdapter {
   files: DataAdapterEx['files'];
@@ -139,7 +140,7 @@ function setup(params: SetupParams): SetupResult {
   });
 
   const ignorePatternsComponent = strictProxy<IgnorePatternsComponent>({
-    isIgnored: vi.fn((isIgnoredParams: IgnorePatternsComponentIsIgnoredParams) => isIgnored(isIgnoredParams.normalizedPath))
+    isIgnored: vi.fn((isIgnoredParams: IsIgnoredParams) => isIgnored(isIgnoredParams.normalizedPath))
   });
 
   const pluginSettingsComponent = strictProxy<PluginSettingsComponent>({

@@ -33,11 +33,6 @@ const MTIME_STORE_NAME = 'mtime';
 const FILES_STORE_NAME = 'files';
 const PROCESS_STORE_ACTIONS_DEBOUNCE_INTERVAL_IN_MILLISECONDS = 5000;
 
-export interface IgnorePatternsComponentIsIgnoredParams {
-  readonly isFolder: boolean;
-  readonly normalizedPath: string;
-}
-
 interface DbFileEntry {
   isIgnored: boolean;
   path: string;
@@ -54,6 +49,11 @@ interface IgnorePatternsComponentConstructorParams {
   onUpdateFileTree(this: void): Promise<void>;
   readonly pluginSettingsComponent: PluginSettingsComponent;
   readonly vaultLoadPatch: VaultLoadPatchComponent;
+}
+
+interface IgnorePatternsComponentIsIgnoredParams {
+  readonly isFolder: boolean;
+  readonly normalizedPath: string;
 }
 
 export class IgnorePatternsComponent extends LayoutReadyComponent {
