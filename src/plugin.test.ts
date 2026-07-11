@@ -182,10 +182,10 @@ describe('Plugin', () => {
 
   it('should call addChild the expected number of times', async () => {
     /*
-     * The real `PluginBase` registers 5 universal child components before
+     * The real `PluginBase` registers 6 universal child components before
      * `onloadImpl`, then the plugin's `onloadImpl` adds its own 13 children.
      */
-    const EXPECTED_BASE_ADD_CHILD_CALLS = 5;
+    const EXPECTED_BASE_ADD_CHILD_CALLS = 6;
     const EXPECTED_PLUGIN_ADD_CHILD_CALLS = 13;
     const EXPECTED_ADD_CHILD_CALLS = EXPECTED_BASE_ADD_CHILD_CALLS + EXPECTED_PLUGIN_ADD_CHILD_CALLS;
     const appOriginal = app.asOriginalType__();
