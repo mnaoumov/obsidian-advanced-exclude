@@ -1,5 +1,18 @@
 # CHANGELOG
 
+## 3.1.1
+
+- test: split vault-size-scaling creation across CDP calls to fit the command timeout
+- chore: overexposed
+- chore: update libs
+- chore: update obsidian-dev-utils to 85.0.0
+- test: bump expected PluginBase base child count to 6
+- refactor: pass params objects to vault/projection/ignore APIs
+- build: lock typescript to 6.0.3
+- test: wire integration-testing vitest-setup into integration projects
+- chore: update libs
+- chore: clean up tsconfig
+
 ## 3.1.0
 
 - perf: improve performance
