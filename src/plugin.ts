@@ -1,8 +1,4 @@
-import { AppActiveFileProvider } from 'obsidian-dev-utils/obsidian/active-file-provider';
-import { CommandHandlerComponent } from 'obsidian-dev-utils/obsidian/command-handlers/command-handler-component';
 import { OpenSettingsCommandHandler } from 'obsidian-dev-utils/obsidian/command-handlers/open-settings-command-handler';
-import { PluginCommandRegistrar } from 'obsidian-dev-utils/obsidian/command-registrar';
-import { MenuEventRegistrarComponent } from 'obsidian-dev-utils/obsidian/components/menu-event-registrar-component';
 import { PluginSettingsTabComponent } from 'obsidian-dev-utils/obsidian/components/plugin-settings-tab-component';
 import { PluginDataHandler } from 'obsidian-dev-utils/obsidian/data-handler';
 import { PluginBase } from 'obsidian-dev-utils/obsidian/plugin/plugin';
@@ -111,20 +107,11 @@ export class Plugin extends PluginBase {
       })
     );
 
-    const menuEventRegistrar = this.addChild(new MenuEventRegistrarComponent(this.app));
-    this.addChild(
-      new CommandHandlerComponent({
-        activeFileProvider: new AppActiveFileProvider(this.app),
-        commandHandlers: [
-          new OpenSettingsCommandHandler({
-            app: this.app,
-            settingTab: pluginSettingsTab
-          })
-        ],
-        commandRegistrar: new PluginCommandRegistrar(this),
-        menuEventRegistrar,
-        pluginName: this.manifest.name
+    this.commandHandlerComponent.registerCommandHandlers([
+      new OpenSettingsCommandHandler({
+        app: this.app,
+        settingTab: pluginSettingsTab
       })
-    );
+    ]);
   }
 }
