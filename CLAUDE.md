@@ -58,21 +58,6 @@ Built on `obsidian-dev-utils`. Patches Obsidian's `FileSystemAdapter` / `Capacit
 - **v8 ignore**: only block form (`/* v8 ignore start -- reason. */` … `/* v8 ignore stop */`) is honored. Single-line `/* v8 ignore next */` does not work.
 - **Commit messages**: Conventional Commits. Use `npm run commit` (czg) for the interactive wizard.
 
-## Current Task
-
-**Pending dev-utils release — simplify the projection yield.** `obsidian-dev-utils`
-commit `fa07bc1e` ("feat: add fallback to requestAnimationFrameAsync") moved the
-rAF-vs-timeout race into `requestAnimationFrameAsync(fallbackTimeoutInMilliseconds = 100)`
-itself — identical default to the plugin's local `yieldToPaint()`. It is committed in
-dev-utils but **not yet published** (npm latest `80.1.0` predates it; the maintainer will
-release a new version). Once a dev-utils version containing `fa07bc1e` is published and
-installed: bump the plugin's `obsidian-dev-utils` dependency, then in
-`src/index-projection-component.ts` delete `yieldToPaint()` and `BACKGROUND_YIELD_FALLBACK_MS`
-and call `requestAnimationFrameAsync()` directly at both yield points (recompute `yieldFn`
-and `reportApplyProgress`); keep the "keeps progressing when the window is hidden" test (it
-still passes against the library's built-in fallback). Do NOT refactor before then — the
-no-arg call against the current `80.1.0` has no fallback, so the hidden-window test would hang.
-
 ## Design & History (S6, publish-compatibility, in-memory tree rewrite)
 
 **Publish-compatibility warning shipped.** `src/publish-compatibility-warning-component.ts`
@@ -156,7 +141,3 @@ maintainer's full vault size.
 the whole vault folder in **`FilesPane` mode** and asserts the explorer is cleared
 (~0.8 s at 90k). `FilesPane` is used here because it is the fastest mode (pure DOM); since
 S6, `Full` mode also hides without the freeze, but `FilesPane` remains the cheapest at 90k.
-
-## Known Issues
-
-None currently open.
