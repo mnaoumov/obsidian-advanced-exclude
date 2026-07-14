@@ -5,10 +5,7 @@ import type {
 } from 'obsidian';
 
 import { getDataAdapterEx } from '@obsidian-typings/obsidian-public-latest/implementations';
-import {
-  requestAnimationFrameAsync,
-  setTimeoutAsync
-} from 'obsidian-dev-utils/async';
+import { requestAnimationFrameAsync } from 'obsidian-dev-utils/async';
 import { ComponentEx } from 'obsidian-dev-utils/obsidian/components/component-ex';
 import { CallbackLayoutReadyComponent } from 'obsidian-dev-utils/obsidian/components/layout-ready-component';
 import { isFolder } from 'obsidian-dev-utils/obsidian/file-system';
@@ -41,15 +38,6 @@ const UPDATE_PROGRESS_MESSAGE = 'Advanced Exclude: updating file tree…';
  * each blocking span to roughly this many files.
  */
 const APPLY_PROGRESS_REPORT_INTERVAL = 20;
-
-/**
- * Upper bound (ms) on how long {@link yieldToPaint} waits for a paint frame
- * before resuming anyway. `requestAnimationFrame` is suspended while the
- * Obsidian window is unfocused/hidden, so a background projection would stall
- * indefinitely on rAF alone; this fallback keeps it progressing. When the window
- * is visible the frame arrives first (~16 ms), so the bound is never hit.
- */
-const BACKGROUND_YIELD_FALLBACK_MS = 100;
 
 /**
  * The link-dependent side-pane view types refreshed after a `Full`-mode projection. Their
@@ -306,9 +294,9 @@ export class IndexProjectionComponent extends ComponentEx {
         this.updateProgressNotice.report({ processed, total });
       },
       // Yield aligned to a paint frame so the progress bar actually repaints
-      // Between chunks, with a timeout fallback so an unfocused/hidden window
-      // (where rAF is paused) keeps progressing instead of stalling.
-      yieldFn: yieldToPaint
+      // Between chunks. `requestAnimationFrameAsync` falls back to a timeout so
+      // An unfocused/hidden window (where rAF is paused) keeps progressing.
+      yieldFn: requestAnimationFrameAsync
     };
     return abortSignal ? { ...options, abortSignal } : options;
   }
@@ -400,7 +388,7 @@ export class IndexProjectionComponent extends ComponentEx {
       this.updateProgressNotice.report({ processed, total });
       // Yield to a paint frame so the apply loop returns to the event loop and the
       // Progress bar repaints — otherwise the UI freezes for the whole apply.
-      await yieldToPaint();
+      await requestAnimationFrameAsync();
     }
   }
 
@@ -459,15 +447,4 @@ function refreshLinkRenderer(view: View): void {
     renderer.unlinkedFile = null;
     renderer.update?.();
   }
-}
-
-/**
- * Yields to the event loop between chunks so the renderer can repaint the
- * progress bar. Prefers a paint frame (`requestAnimationFrameAsync`) so the bar
- * advances visibly between chunks, but races it against a timeout so an
- * unfocused/hidden window — where `requestAnimationFrame` is suspended — keeps
- * the projection progressing instead of stalling on a frame that never arrives.
- */
-async function yieldToPaint(): Promise<void> {
-  await Promise.race([requestAnimationFrameAsync(), setTimeoutAsync(BACKGROUND_YIELD_FALLBACK_MS)]);
 }

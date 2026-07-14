@@ -244,9 +244,9 @@ describe('IgnorePatternsComponent', () => {
   });
 
   afterEach(async () => {
-    // Flush delayed async operations scheduled via the real invokeAsyncSafelyAfterDelay so
-    // obsidian-dev-utils' async-operation tracking can settle them; otherwise its global afterEach
-    // waitForAllAsyncOperations hangs for the full hook timeout on a scheduled-but-never-run op.
+    // Flush delayed async operations scheduled via the real invokeAsyncSafelyAfterDelay.
+    // This lets obsidian-dev-utils' async-operation tracking settle them.
+    // Otherwise its global afterEach waitForAllAsyncOperations hangs for the full hook timeout on a scheduled-but-never-run op.
     await vi.runAllTimersAsync();
     vi.useRealTimers();
     vi.restoreAllMocks();
