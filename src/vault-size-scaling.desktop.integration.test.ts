@@ -324,11 +324,11 @@ async function runIgnoreScenario(spec: ScenarioSpec): Promise<VaultSizeScenarioR
         app,
         controlPath,
         fileCount,
+        lib: { waitUntil },
         pattern,
         PLUGIN_ID: pluginId,
         scopePrefix,
-        SETTLE_DELAY_IN_MS: settleDelay,
-        waitUntil
+        SETTLE_DELAY_IN_MS: settleDelay
       }) {
         // This call creates no files, so it stays well under the 30s command timeout.
         await app.plugins.enablePluginAndSave(pluginId);
