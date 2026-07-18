@@ -16,6 +16,8 @@ import {
   PluginSettings
 } from './plugin-settings.ts';
 
+const README_URL = 'https://github.com/mnaoumov/obsidian-advanced-exclude';
+
 interface PluginSettingsTabConstructorParams extends PluginSettingsTabBaseConstructorParams<PluginSettings> {
   readonly ignorePatternsComponent: IgnorePatternsComponent;
 }
@@ -41,6 +43,10 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginSettings> {
         f.appendText('Uses ');
         f.createEl('a', { href: 'https://git-scm.com/docs/gitignore#_pattern_format', text: 'gitignore' });
         f.appendText(' syntax.');
+        f.createEl('br');
+        f.appendText('See ');
+        f.createEl('a', { href: `${README_URL}#pattern-examples`, text: 'Pattern examples' });
+        f.appendText(' (including how to whitelist only certain files).');
         f.createEl('br');
         f.appendText('You can also edit ');
         appendCodeBlock(f, OBSIDIAN_IGNORE_FILE);

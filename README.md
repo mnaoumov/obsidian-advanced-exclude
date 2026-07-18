@@ -22,6 +22,51 @@ The plugin adds the following features:
 >
 > Ensure you configured the plugin correctly to avoid data loss.
 
+## Pattern examples
+
+Patterns use [`gitignore`](https://git-scm.com/docs/gitignore) syntax. A few common recipes:
+
+Ignore a folder and everything under it:
+
+```gitignore
+Archive/
+```
+
+Ignore all files with a given extension, anywhere in the vault:
+
+```gitignore
+*.png
+```
+
+Ignore **everything except** a few file types (a whitelist). This is the idiom most people get wrong: once `*` ignores everything, you must re-include directories with `!*/` **before** a negated file rule can match inside them — otherwise the files stay ignored because their parent folder is still excluded:
+
+```gitignore
+# Ignore everything...
+*
+# ...but keep folders traversable so the rules below can reach into them...
+!*/
+# ...and re-include these file types.
+!*.md
+!*.canvas
+!*.base
+```
+
+Whitelist specific folders instead of file types:
+
+```gitignore
+*
+!Journal/
+!Journal/**
+!Templates/
+!Templates/**
+```
+
+> [!NOTE]
+>
+> The `!*/` (or `!Folder/`) line is required by `gitignore` itself: *"It is not possible to re-include a file if a parent directory of that file is excluded."* Re-including the directory is what lets the later `!...` file rules take effect.
+
+See the [official `gitignore` pattern format](https://git-scm.com/docs/gitignore#_pattern_format) for the full syntax.
+
 ## Installation
 
 The plugin is available in [the official Community Plugins repository](https://community.obsidian.md/plugins/advanced-exclude).

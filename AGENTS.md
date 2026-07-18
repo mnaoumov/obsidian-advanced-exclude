@@ -141,3 +141,14 @@ maintainer's full vault size.
 the whole vault folder in **`FilesPane` mode** and asserts the explorer is cleared
 (~0.8 s at 90k). `FilesPane` is used here because it is the fastest mode (pure DOM); since
 S6, `Full` mode also hides without the freeze, but `FilesPane` remains the cheapest at 90k.
+
+`IndexProjectionComponent.reportApplyProgress` yields on a **time-based** cadence
+(`APPLY_YIELD_INTERVAL_IN_MILLISECONDS`, reset per `applyDelta`/`applyFull`), not per-N-items.
+The old per-20-items cadence made the apply loop's wall-clock scale as `itemCount / 20` paint
+frames — a "hide almost everything" delta (`*` + a few `!whitelist` lines) at 90k spent ~4,500
+frames ≈ 72 s **yielding** while the real index work (`recomputeAll` ~70 ms, `ManualIndexHider.hide`
+~14 ms) was under 100 ms. This was the true cause of issue #8's "negation is broken" report
+(the whitelisted content did reappear — it just took ~72 s). Regression guard:
+`src/vault-hide-timing.desktop-performance.integration.test.ts` asserts the whole op stays under
+0.2 ms/path. Note the O(N log N)/~ms scaling claim above is about `VaultModel.recomputeAll`, not
+the apply loop.

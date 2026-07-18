@@ -743,8 +743,11 @@ describe('IndexProjectionComponent', () => {
 
       // Loading runs the onloadAsync projection (nothing ignored yet, so no hide) and
       // Registers the real layout-ready child; clear so the assertion only sees the
-      // Layout-ready projection.
-      await component.loadWithPromises();
+      // Layout-ready projection. The projection yields a (faked) paint frame, so advance
+      // Timers to let load finish.
+      const loadPromise = component.loadWithPromises();
+      await vi.runAllTimersAsync();
+      await loadPromise;
       manualIndexHider.hide.mockClear();
 
       // Flip the file hidden, then fire layout ready: since the vault load was not
@@ -764,7 +767,10 @@ describe('IndexProjectionComponent', () => {
         vaultLoadCalled: true
       });
 
-      await component.loadWithPromises();
+      // The projection yields a (faked) paint frame, so advance timers to let load finish.
+      const loadPromise = component.loadWithPromises();
+      await vi.runAllTimersAsync();
+      await loadPromise;
       manualIndexHider.hide.mockClear();
 
       // Flip the file hidden, but since the vault load was intercepted, onLayoutReady
@@ -793,8 +799,10 @@ describe('IndexProjectionComponent', () => {
       });
 
       // Load fully (no update is left in flight), then unload runs the real onunload.
-      await component.loadWithPromises();
+      // The projection yields a (faked) paint frame, so advance timers to let load finish.
+      const loadPromise = component.loadWithPromises();
       await vi.runAllTimersAsync();
+      await loadPromise;
 
       expect(() => {
         component.unload();
@@ -807,12 +815,12 @@ describe('IndexProjectionComponent', () => {
         isIgnored: (path) => path === 'drop.md'
       });
 
-      // The load-time projection is in flight at the async model rebuild (parked on
-      // The persisted-path-store load); unload aborts it before it hides.
+      // The load-time projection is in flight (parked on the initial paint yield / async
+      // Model rebuild); unload aborts it before it hides.
       const loadPromise = component.loadWithPromises();
       component.unload();
-      await loadPromise;
       await vi.runAllTimersAsync();
+      await loadPromise;
 
       expect(manualIndexHider.hide).not.toHaveBeenCalled();
     });

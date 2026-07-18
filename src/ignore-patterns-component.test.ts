@@ -403,6 +403,40 @@ describe('IgnorePatternsComponent', () => {
 
       expect(filesStore.put).toHaveBeenCalled();
     });
+
+    it('should not ignore a folder re-included by the negation whitelist idiom', async () => {
+      setupIndexedDb();
+      vi.mocked(readSafe).mockResolvedValueOnce('*\n!*/\n!*.md\n!*.canvas\n!*.base');
+      const component = createComponent();
+      await component.loadWithPromises();
+
+      // `!*/` re-includes directories, so folders must test not-ignored for traversal to descend.
+      expect(component.isIgnored({ isFolder: true, normalizedPath: 'sub' })).toBe(false);
+      expect(component.isIgnored({ isFolder: true, normalizedPath: 'sub/nested' })).toBe(false);
+    });
+
+    it('should re-include whitelisted file extensions and ignore the rest under the negation idiom', async () => {
+      setupIndexedDb();
+      vi.mocked(readSafe).mockResolvedValueOnce('*\n!*/\n!*.md\n!*.canvas\n!*.base');
+      const component = createComponent();
+      await component.loadWithPromises();
+
+      expect(component.isIgnored({ isFolder: false, normalizedPath: 'sub/note.md' })).toBe(false);
+      expect(component.isIgnored({ isFolder: false, normalizedPath: 'top.canvas' })).toBe(false);
+      expect(component.isIgnored({ isFolder: false, normalizedPath: 'sub/data.base' })).toBe(false);
+      expect(component.isIgnored({ isFolder: false, normalizedPath: 'sub/image.png' })).toBe(true);
+      expect(component.isIgnored({ isFolder: false, normalizedPath: 'sub/note.txt' })).toBe(true);
+    });
+
+    it('should still ignore a folder matched by a dir-only or plain pattern', async () => {
+      setupIndexedDb();
+      vi.mocked(readSafe).mockResolvedValueOnce('build/\nnode_modules\n');
+      const component = createComponent();
+      await component.loadWithPromises();
+
+      expect(component.isIgnored({ isFolder: true, normalizedPath: 'build' })).toBe(true);
+      expect(component.isIgnored({ isFolder: true, normalizedPath: 'node_modules' })).toBe(true);
+    });
   });
 
   describe('clearCachedExcludeRegExps', () => {

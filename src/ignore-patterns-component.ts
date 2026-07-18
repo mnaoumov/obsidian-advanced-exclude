@@ -29,6 +29,11 @@ import {
 import { getResult } from './indexed-db-utils.ts';
 
 const DB_VERSION = 1;
+// Bumped whenever the ignore-matching logic changes shape (e.g. the folder verdict
+// Now tests the trailing-slash form only). It rides in the mtime entry so an upgrade
+// Whose ignore-file modification times are unchanged still fails the `deepEqual` check in `loadDb`
+// And resets the persisted per-path verdicts instead of serving stale ones.
+const IGNORE_MATCHER_VERSION = 2;
 const MTIME_STORE_NAME = 'mtime';
 const FILES_STORE_NAME = 'files';
 const PROCESS_STORE_ACTIONS_DEBOUNCE_INTERVAL_IN_MILLISECONDS = 5000;
@@ -40,6 +45,7 @@ interface DbFileEntry {
 
 interface DbMtimeEntry {
   gitIgnoreMtime: number;
+  matcherVersion: number;
   obsidianIgnoreMtime: number;
   userIgnoreFiltersStr: string;
 }
@@ -126,8 +132,16 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
     const ignoreTester = this.getIgnoreTester();
     const excludeRegExps = this.getExcludeRegExps();
 
-    const pathsToCheck = isFolder ? [normalizedPath, `${normalizedPath}/`] : [normalizedPath];
-    isIgnoredResult = pathsToCheck.some((path) => ignoreTester.ignores(path) || excludeRegExps.some((regExp) => regExp.test(path)));
+    // A folder is tested against the trailing-slash (directory) form only: that is the
+    // Form gitignore negation re-includes via `!*/`, so a whitelist idiom (`*` + `!*/` +
+    // `!*.md`) leaves folders traversable instead of the slash-less `foo` being caught by
+    // `*`. Dir-only (`build/`) and plain (`node_modules`) patterns still match the slash
+    // Form, so this is stricter only where negation intends it. The exclude regexps
+    // (Obsidian's `userIgnoreFilters`) keep testing both forms, unchanged.
+    const gitignorePath = isFolder ? `${normalizedPath}/` : normalizedPath;
+    const excludePaths = isFolder ? [normalizedPath, `${normalizedPath}/`] : [normalizedPath];
+    isIgnoredResult = ignoreTester.ignores(gitignorePath)
+      || excludePaths.some((path) => excludeRegExps.some((regExp) => regExp.test(path)));
     this.fileIgnoreMap.set(normalizedPath, isIgnoredResult);
     this.addStoreAction(normalizedPath, (store) =>
       store.put({
@@ -203,6 +217,7 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
   private async getCurrentMtimeEntry(): Promise<DbMtimeEntry> {
     return {
       gitIgnoreMtime: this.pluginSettingsComponent.settings.shouldIncludeGitIgnorePatterns ? (await statSafe(this.app, GIT_IGNORE_FILE))?.mtime ?? 0 : 0,
+      matcherVersion: IGNORE_MATCHER_VERSION,
       obsidianIgnoreMtime: (await statSafe(this.app, OBSIDIAN_IGNORE_FILE))?.mtime ?? 0,
       userIgnoreFiltersStr: this.getUserIgnoreFilters().join('\n')
     };
@@ -279,6 +294,7 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
 
     const DEFAULT_MTIME_ENTRY: DbMtimeEntry = {
       gitIgnoreMtime: 0,
+      matcherVersion: IGNORE_MATCHER_VERSION,
       obsidianIgnoreMtime: 0,
       userIgnoreFiltersStr: ''
     };

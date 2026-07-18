@@ -32,12 +32,19 @@ import { VaultModel } from './vault-model.ts';
 const UPDATE_PROGRESS_MESSAGE = 'Advanced Exclude: updating file tree…';
 
 /**
- * Number of paths processed between progress-bar updates and cooperative yields
- * during the apply phase. Without periodically yielding a macrotask the whole
- * apply loop would block the main thread (frozen UI, unpainted bar); this bounds
- * each blocking span to roughly this many files.
+ * Minimum wall-clock gap between progress-bar updates and cooperative yields
+ * during the apply phase.
+ *
+ * The yield cadence is time-based, not per-N-items: each `await
+ * requestAnimationFrameAsync()` costs roughly one frame (~16 ms), so yielding on a
+ * fixed item count made the apply loop's wall-clock scale with the item count
+ * rather than the work — a whole-vault hide of ~90k paths at the old every-20-items
+ * cadence spent ~4,500 frame-waits (~72 s) yielding, while the real index work was
+ * well under a second. Yielding only once this many milliseconds have elapsed keeps
+ * the bar responsive (~20 repaints/s) while making the yield overhead a function of
+ * elapsed time, not vault size.
  */
-const APPLY_PROGRESS_REPORT_INTERVAL = 20;
+const APPLY_YIELD_INTERVAL_IN_MILLISECONDS = 50;
 
 /**
  * The link-dependent side-pane view types refreshed after a `Full`-mode projection. Their
@@ -94,6 +101,9 @@ export class IndexProjectionComponent extends ComponentEx {
   private applyingProjectionDepth = 0;
   private readonly deleteFromFilesPane: (normalizedPath: string) => void;
   private hasBuiltModel = false;
+  // Timestamp of the last cooperative yield during an apply phase; drives the
+  // Time-based yield cadence in `reportApplyProgress` (see APPLY_YIELD_INTERVAL_IN_MILLISECONDS).
+  private lastApplyYieldInMilliseconds = 0;
   private readonly manualIndexHider: ManualIndexHider;
   // Set while a delta is mid-flight: a superseded/aborted delta leaves the model's
   // Visibility ahead of Obsidian (the recompute mutated the model but the apply was
@@ -133,6 +143,7 @@ export class IndexProjectionComponent extends ComponentEx {
    * removed from the index in one batched, event-free pass.
    */
   public async applyDelta(changes: readonly VisibilityChange[], abortSignal?: AbortSignal): Promise<void> {
+    this.lastApplyYieldInMilliseconds = performance.now();
     const adapter = getDataAdapterEx(this.app);
     const shows = changes.filter((change) => change.isVisible).sort((a, b) => pathDepth(a.path) - pathDepth(b.path));
     const hides = changes.filter((change) => !change.isVisible).sort((a, b) => pathDepth(b.path) - pathDepth(a.path));
@@ -166,6 +177,7 @@ export class IndexProjectionComponent extends ComponentEx {
    */
   public async applyFull(abortSignal?: AbortSignal): Promise<void> {
     await this.rebuildModel(abortSignal);
+    this.lastApplyYieldInMilliseconds = performance.now();
     const adapter = getDataAdapterEx(this.app);
     const targets = this.vaultModel.getPathsByVisibility(false).sort((a, b) => pathDepth(b.path) - pathDepth(a.path));
     const missing = this.getMissingVisiblePaths();
@@ -249,6 +261,14 @@ export class IndexProjectionComponent extends ComponentEx {
     this.beginProjection();
     this.updateProgressNotice.start(UPDATE_PROGRESS_MESSAGE);
     try {
+      // Let the notice (and its indeterminate bar) paint before the first synchronous
+      // Slice of recompute/apply work. `start()` only inserts the DOM; without this yield
+      // The browser would not paint it until the first internal yield (after a recompute
+      // Chunk or `rebuildModel`'s node-build), so on a large vault the bar would appear
+      // Late — the very "looks frozen / nothing happening" perception this guards against.
+      // An abort during this yield needs no check here: `recomputeAll`/`applyFull` short-
+      // Circuit on the signal, and the post-phase `aborted` checks below still bail.
+      await requestAnimationFrameAsync();
       if (!this.hasBuiltModel || this.needsFullProjection) {
         this.hasBuiltModel = true;
         await this.applyFull(abortSignal);
@@ -384,12 +404,19 @@ export class IndexProjectionComponent extends ComponentEx {
 
   private async reportApplyProgress(params: IndexProjectionComponentReportApplyProgressParams): Promise<void> {
     const { processed, total } = params;
-    if (processed % APPLY_PROGRESS_REPORT_INTERVAL === 0 || processed === total) {
-      this.updateProgressNotice.report({ processed, total });
-      // Yield to a paint frame so the apply loop returns to the event loop and the
-      // Progress bar repaints — otherwise the UI freezes for the whole apply.
-      await requestAnimationFrameAsync();
+    // Time-based cadence: yield only once APPLY_YIELD_INTERVAL_IN_MILLISECONDS have
+    // Elapsed since the last yield (always at completion). A per-item-count cadence
+    // Made the loop's wall-clock scale with the item count — each yield is ~one frame,
+    // So ~90k items / 20 ≈ 4,500 frames ≈ 72 s of pure yielding for <1 s of real work.
+    const now = performance.now();
+    if (processed !== total && now - this.lastApplyYieldInMilliseconds < APPLY_YIELD_INTERVAL_IN_MILLISECONDS) {
+      return;
     }
+    this.lastApplyYieldInMilliseconds = now;
+    this.updateProgressNotice.report({ processed, total });
+    // Yield to a paint frame so the apply loop returns to the event loop and the
+    // Progress bar repaints — otherwise the UI freezes for the whole apply.
+    await requestAnimationFrameAsync();
   }
 
   /**
