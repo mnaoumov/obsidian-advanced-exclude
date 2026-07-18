@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## 3.1.2
+
+- fix: re #8
+
 ## 3.1.1
 
 - test: split vault-size-scaling creation across CDP calls to fit the command timeout
