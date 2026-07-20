@@ -1,9 +1,8 @@
-# Advanced Exclude demo vault
+This is an [Obsidian](https://obsidian.md/) vault demonstrating features of the [Advanced Exclude](https://github.com/mnaoumov/obsidian-advanced-exclude) plugin.
 
-A small Obsidian vault that demonstrates the [Advanced Exclude](https://github.com/mnaoumov/obsidian-advanced-exclude) plugin - it enhances Obsidian's **Excluded files** setting with full [`gitignore`](https://git-scm.com/docs/gitignore) syntax and makes ignored files behave as if they do not exist (hidden from the Files pane, Backlinks, Graph, and search).
+## Opening this vault
 
-Open [00 Start](<./00 Start.md>) and work through the numbered notes. Add `Archive/` to the plugin's **Ignore patterns**, then watch the folder disappear from the Files pane and the backlink vanish from [Shared/Topic](<./Shared/Topic.md>).
+- **If you already have the plugin installed**, run the **Advanced Exclude: Open demo vault** command — it downloads and opens the latest demo vault automatically.
+- **Otherwise**, download `advanced-exclude.demo-vault.zip` from the [plugin releases](https://github.com/mnaoumov/obsidian-advanced-exclude/releases), unzip it, and in Obsidian choose `Manage vaults...` → `Open folder as vault` → select the unzipped folder.
 
-## First open
-
-The first time you open this vault, Obsidian treats it as **untrusted**, so the bundled plugins are listed but not loaded until you **Trust author and enable plugins** and reload. After that, the Demo Vault Helper installs [CodeScript Toolkit](https://github.com/mnaoumov/obsidian-codescript-toolkit) and opens the start note for you.
+On first open, Obsidian treats the vault as untrusted — choose **Trust author and enable plugins** (or enable Community plugins manually), then open [00 Start](<./00 Start.md>).
