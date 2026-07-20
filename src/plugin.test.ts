@@ -181,6 +181,15 @@ describe('Plugin', () => {
     addChildSpy.mockRestore();
   });
 
+  it('should register the open demo vault command via its command handler', async () => {
+    const plugin = new Plugin(app.asOriginalType__(), manifest);
+    const addCommandSpy = vi.spyOn(plugin, 'addCommand');
+    await plugin.onload();
+    expect(addCommandSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'open-demo-vault' })
+    );
+  });
+
   it('should wire onUpdateFileTree callback to indexProjectionComponent.update', async () => {
     resetCapturedOnUpdateFileTree();
     mockUpdate.mockClear();
