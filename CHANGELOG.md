@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## 3.1.3
+
+- docs: standardize demo-vault README
+- docs: drop per-plugin demo-vault setup notes (bootstrap covered by ODU harness)
+- docs: unnumber demo-vault setup notes
+- Merge branch 'T92': create the Advanced Exclude demo vault (S2)
+
 ## 3.1.2
 
 - fix: re #8
