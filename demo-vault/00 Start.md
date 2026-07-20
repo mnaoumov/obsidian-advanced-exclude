@@ -8,7 +8,7 @@ Welcome to the [Advanced Exclude](https://github.com/mnaoumov/obsidian-advanced-
 
 > [!TIP] Interactive buttons
 >
-> The two setup notes have **Run** buttons, powered by [`CodeScript Toolkit`](https://github.com/mnaoumov/obsidian-codescript-toolkit/), which this vault installs for you automatically on first open (see [[06 CodeScript Toolkit prerequisite]]). Excluding files is done through the plugin's settings tab, so the feature notes have no buttons - you drive them by editing the ignore patterns yourself.
+> The two setup notes have **Run** buttons, powered by [`CodeScript Toolkit`](https://github.com/mnaoumov/obsidian-codescript-toolkit/), which this vault installs for you automatically on first open (see [[CodeScript Toolkit prerequisite]]). Excluding files is done through the plugin's settings tab, so the feature notes have no buttons - you drive them by editing the ignore patterns yourself.
 
 ## Feature
 
@@ -19,5 +19,5 @@ Welcome to the [Advanced Exclude](https://github.com/mnaoumov/obsidian-advanced-
 
 ## Setup
 
-- [[05 Code buttons check]]
-- [[06 CodeScript Toolkit prerequisite]]
+- [[Code buttons check]]
+- [[CodeScript Toolkit prerequisite]]
