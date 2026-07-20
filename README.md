@@ -22,6 +22,14 @@ The plugin adds the following features:
 >
 > Ensure you configured the plugin correctly to avoid data loss.
 
+## Demo vault
+
+A demo vault with usage examples ships with every release. You can access it via any of the following:
+
+1. Running the **Advanced Exclude: Open demo vault** command.
+2. Downloading `advanced-exclude.demo-vault.zip` from the [Releases](https://github.com/mnaoumov/obsidian-advanced-exclude/releases).
+3. Browsing its source in [`demo-vault/`](./demo-vault/README.md) in this repository.
+
 ## Pattern examples
 
 Patterns use [`gitignore`](https://git-scm.com/docs/gitignore) syntax. A few common recipes:
