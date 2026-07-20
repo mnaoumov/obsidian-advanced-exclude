@@ -6,18 +6,9 @@ Welcome to the [Advanced Exclude](https://github.com/mnaoumov/obsidian-advanced-
 
 **How to try it:** open [[01 Exclude a folder]] and follow the steps - you will add `Archive/` to the plugin's ignore patterns and watch that folder disappear from the Files pane, Backlinks, and search. The other feature notes build up to whitelists and the different exclude modes.
 
-> [!TIP] Interactive buttons
->
-> The two setup notes have **Run** buttons, powered by [`CodeScript Toolkit`](https://github.com/mnaoumov/obsidian-codescript-toolkit/), which this vault installs for you automatically on first open (see [[CodeScript Toolkit prerequisite]]). Excluding files is done through the plugin's settings tab, so the feature notes have no buttons - you drive them by editing the ignore patterns yourself.
-
 ## Feature
 
 - [[01 Exclude a folder]]
 - [[02 Whitelist with negation]]
 - [[03 Exclude mode and sources]]
 - [[04 Settings]]
-
-## Setup
-
-- [[Code buttons check]]
-- [[CodeScript Toolkit prerequisite]]
