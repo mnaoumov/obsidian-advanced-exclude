@@ -20,9 +20,13 @@ import { RestoreNoticeComponent } from './restore-notice-component.ts';
 // Return value captured via showNoticeMock.mock.calls.
 const showNoticeMock = vi.fn((message: DocumentFragment | string, _options?: PluginNoticeComponentShowNoticeOptions): Notice => new Notice(message, 0));
 
-function createComponent(hiddenCount: number): RestoreNoticeComponent {
+// The restore normally runs (and succeeds) first, suppressing the notice; the notice
+// Path is only reached when it reports the index NOT fully restored, so these notice
+// Tests default `restored` to false. A dedicated test covers the restore-succeeds path.
+function createComponent(hiddenCount: number, restored = false): RestoreNoticeComponent {
   const indexProjectionComponent = strictProxy<IndexProjectionComponent>({
-    getHiddenCount: vi.fn().mockReturnValue(hiddenCount)
+    getHiddenCount: vi.fn().mockReturnValue(hiddenCount),
+    restoreHiddenFilesOnUnload: vi.fn().mockReturnValue(restored)
   });
   const pluginNoticeComponent = strictProxy<PluginNoticeComponent>({ showNotice: showNoticeMock });
   return new RestoreNoticeComponent({ indexProjectionComponent, pluginNoticeComponent });
@@ -56,6 +60,16 @@ describe('RestoreNoticeComponent', () => {
 
   it('should do nothing on unload when nothing was hidden', () => {
     const component = createComponent(0);
+    component.load();
+    component.unload();
+
+    expect(showNoticeMock).not.toHaveBeenCalled();
+  });
+
+  it('should suppress the notice on unload when the restore fully succeeds', () => {
+    // Even though the model still reports hidden paths, a successful in-place restore
+    // Means no reload is needed, so the notice must not appear.
+    const component = createComponent(5, true);
     component.load();
     component.unload();
 

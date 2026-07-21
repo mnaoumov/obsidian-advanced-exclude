@@ -22,6 +22,15 @@ export class RestoreNoticeComponent extends ComponentEx {
   public override onunload(): void {
     super.onunload();
 
+    // This component is added after `IndexProjectionComponent`, so it unloads FIRST
+    // (children unload in reverse add order). That is exactly why the on-disable
+    // Restore is driven from here — the projection is still loaded, so its in-memory
+    // Snapshots are intact and the index can be restored synchronously. When the
+    // Restore succeeds there is nothing to reload, so the notice is suppressed.
+    if (this.indexProjectionComponent.restoreHiddenFilesOnUnload()) {
+      return;
+    }
+
     if (this.indexProjectionComponent.getHiddenCount() === 0) {
       return;
     }

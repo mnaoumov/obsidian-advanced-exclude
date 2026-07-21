@@ -101,6 +101,14 @@ export class IndexProjectionComponent extends ComponentEx {
   private applyingProjectionDepth = 0;
   private readonly deleteFromFilesPane: (normalizedPath: string) => void;
   private hasBuiltModel = false;
+  // Guards `restoreHiddenFilesOnUnload` so the on-disable restore runs at most once
+  // (it is invoked by both `RestoreNoticeComponent.onunload` and this component's own
+  // `onunload` fallback — see `restoreHiddenFilesOnUnload`).
+  private hasRestoredOnUnload = false;
+  // Set once Obsidian starts quitting: an unload during app shutdown must not spend
+  // Time restoring the index/explorer (both are being torn down). See the `'quit'`
+  // Registration in `onloadAsync` and the guard in `restoreHiddenFilesOnUnload`.
+  private isQuitting = false;
   // Timestamp of the last cooperative yield during an apply phase; drives the
   // Time-based yield cadence in `reportApplyProgress` (see APPLY_YIELD_INTERVAL_IN_MILLISECONDS).
   private lastApplyYieldInMilliseconds = 0;
@@ -222,12 +230,22 @@ export class IndexProjectionComponent extends ComponentEx {
   }
 
   public override async onloadAsync(): Promise<void> {
+    // A disable during app shutdown must skip the restore (see `restoreHiddenFilesOnUnload`):
+    // The index and file explorer are being torn down, so re-inserting the hidden set is
+    // Wasted work. `'quit'` fires before the teardown, so the flag is set in time.
+    this.registerEvent(this.app.workspace.on('quit', () => {
+      this.isQuitting = true;
+    }));
     await this.update();
     this.addChild(new CallbackLayoutReadyComponent(this.app, this.onLayoutReady.bind(this)));
   }
 
   public override onunload(): void {
     this.updateAbortController?.abort();
+    // Defensive fallback: `RestoreNoticeComponent.onunload` (which unloads first, being added
+    // Later) normally drives the restore before this runs, so this is a no-op then. It stays
+    // Here so the index is still restored if the child add-order ever changes.
+    this.restoreHiddenFilesOnUnload();
     super.onunload();
   }
 
@@ -246,6 +264,56 @@ export class IndexProjectionComponent extends ComponentEx {
    */
   public recordDelete(normalizedPath: string): void {
     this.vaultModel.deletePath(normalizedPath);
+  }
+
+  /**
+   * Restores the index on disable so the file tree returns to its original state
+   * without an app reload or a re-index — the fix for the "vault session
+   * interrupted" complaint (issue #10).
+   *
+   * Every path hidden this session carries an in-memory {@link ManualIndexHider}
+   * snapshot, so `show` restores it verbatim and synchronously (no `stat` /
+   * `reconcileFile`), which is what makes this safe to run in the synchronous
+   * `onunload`. Idempotent (guarded by {@link hasRestoredOnUnload}) because it is
+   * invoked from both `RestoreNoticeComponent.onunload` (which unloads first and so
+   * actually performs the restore in time) and this component's own `onunload`
+   * fallback.
+   *
+   * Returns whether the index is fully restored — `true` unless a path the model
+   * still considers hidden had no snapshot (e.g. one hidden by a prior session and
+   * never loaded, hence never in the index this session). The notice falls back to
+   * its "Reload the app" message only when this returns `false`.
+   */
+  public restoreHiddenFilesOnUnload(): boolean {
+    if (this.hasRestoredOnUnload) {
+      return true;
+    }
+    this.hasRestoredOnUnload = true;
+
+    // On app shutdown the index and explorer are being destroyed — restoring is
+    // Wasted work, and driving the tearing-down explorer could throw.
+    if (this.isQuitting) {
+      return true;
+    }
+
+    // `FilesPane` mode never mutates the index (`hideFromIndex` is a no-op), so there
+    // Is nothing to restore and no reload is ever needed.
+    if (this.excludeMode !== ExcludeMode.Full) {
+      return true;
+    }
+
+    const hidden = this.vaultModel.getPathsByVisibility(false);
+    const withoutSnapshot = new Set(this.manualIndexHider.show(hidden.map((entry) => entry.path)));
+    // Show shallowest-first so a folder is re-inserted into the explorer before any
+    // File it must contain.
+    const restored = hidden
+      .filter((entry) => !withoutSnapshot.has(entry.path))
+      .sort((a, b) => pathDepth(a.path) - pathDepth(b.path));
+    for (const entry of restored) {
+      this.addToFilesPane(entry.path);
+    }
+    this.refreshLinkViews();
+    return withoutSnapshot.size === 0;
   }
 
   /**
