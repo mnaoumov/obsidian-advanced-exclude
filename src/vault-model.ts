@@ -99,14 +99,24 @@ interface VaultModelSetPathParams {
  * The second clause is why a folder whose own path tests ignored can still be
  * visible — it must remain in the tree to keep a re-included descendant
  * reachable.
+ *
+ * When `shouldHideEmptyFolders` returns `true`, the folder clause tightens: a
+ * folder that is *emptied by exclusion* — it has children but none are visible —
+ * is also hidden, even if the folder's own path is not ignored. A genuinely
+ * empty folder (no children on disk) stays visible. Because visibility is
+ * computed bottom-up, this cascades: once the last visible leaf is hidden, the
+ * whole ancestor folder chain collapses (e.g. hiding `a/b/c/leaf.md` hides `c`,
+ * `b`, and `a`).
  */
 export class VaultModel {
   private readonly isIgnored: IsIgnoredFn;
   private readonly nodes = new Map<string, VaultModelNode>();
   private readonly root: VaultModelNode;
+  private readonly shouldHideEmptyFolders: () => boolean;
 
-  public constructor(isIgnored: IsIgnoredFn) {
+  public constructor(isIgnored: IsIgnoredFn, shouldHideEmptyFolders: () => boolean = () => false) {
     this.isIgnored = isIgnored;
+    this.shouldHideEmptyFolders = shouldHideEmptyFolders;
     this.root = {
       children: new Map(),
       isFolder: true,
@@ -289,16 +299,17 @@ export class VaultModel {
     if (!node.isFolder) {
       return !node.isIgnoredSelf;
     }
-    if (!node.isIgnoredSelf) {
-      return true;
-    }
     const children = ensureNonNullable(node.children);
-    for (const child of children.values()) {
-      if (child.isVisible) {
-        return true;
-      }
+    if (node.isIgnoredSelf) {
+      return this.hasVisibleChild(children);
     }
-    return false;
+    // A non-ignored folder emptied by exclusion (has children but none visible)
+    // Collapses only when the setting is on; a genuinely empty folder (no
+    // Children on disk) always stays visible.
+    if (this.shouldHideEmptyFolders() && children.size > 0) {
+      return this.hasVisibleChild(children);
+    }
+    return true;
   }
 
   private ensureNode(params: VaultModelEnsureNodeParams): VaultModelNode {
@@ -326,6 +337,15 @@ export class VaultModel {
 
   private evaluateIgnored(node: VaultModelNode): void {
     node.isIgnoredSelf = node === this.root ? false : this.isIgnored(node.path, node.isFolder);
+  }
+
+  private hasVisibleChild(children: Map<string, VaultModelNode>): boolean {
+    for (const child of children.values()) {
+      if (child.isVisible) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private propagateFrom(start: null | VaultModelNode): VisibilityChange[] {

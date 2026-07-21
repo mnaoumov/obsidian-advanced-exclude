@@ -15,6 +15,7 @@ The plugin adds the following features:
 - `.obsidianignore` file for manual editing.
 - Support ignore patterns from `.gitignore` file.
 - Reuse existing `Files and links > Excluded files` setting in string/regexp format.
+- Optionally hide folders left empty by exclusion via the `Hide empty folders` setting. When every file inside a folder is excluded, the folder is hidden too, cascading up through parent folders whose whole subtree became empty. Genuinely empty folders (with no files at all) stay visible.
 
 > [!WARNING]
 >

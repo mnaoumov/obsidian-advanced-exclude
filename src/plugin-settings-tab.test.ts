@@ -82,7 +82,7 @@ describe('PluginSettingsTab', () => {
       settingsState: {
         effectiveValues: settings,
         inputValues: settings,
-        validationMessages: { excludeMode: '', obsidianIgnoreContent: '', shouldIgnoreExcludedFiles: '', shouldIncludeGitIgnorePatterns: '' }
+        validationMessages: { excludeMode: '', obsidianIgnoreContent: '', shouldHideEmptyFolders: '', shouldIgnoreExcludedFiles: '', shouldIncludeGitIgnorePatterns: '' }
       }
     });
 
@@ -103,6 +103,12 @@ describe('PluginSettingsTab', () => {
 
       // Display creates 4 Setting elements as children
       expect(tab.containerEl.children.length).toBeGreaterThan(0);
+    });
+
+    it('should render a Hide empty folders setting', () => {
+      tab.displayLegacy();
+
+      expect(tab.containerEl.textContent).toContain('Hide empty folders');
     });
   });
 

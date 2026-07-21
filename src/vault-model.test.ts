@@ -94,6 +94,87 @@ describe('VaultModel', () => {
     });
   });
 
+  describe('hide empty folders', () => {
+    const ENTRIES: readonly VaultModelEntry[] = [
+      { isFolder: true, path: 'alpha' },
+      { isFolder: true, path: 'alpha/bravo' },
+      { isFolder: true, path: 'alpha/bravo/charlie' },
+      { isFolder: false, path: 'alpha/bravo/charlie/hidden.md' }
+    ];
+
+    it('leaves an emptied-by-exclusion folder chain visible when the setting is off', () => {
+      // Default constructor => shouldHideEmptyFolders() returns false, so the
+      // Non-ignored folder chain stays visible even though its only file is hidden.
+      const model = build(ENTRIES, matcher(['alpha/bravo/charlie/hidden.md']));
+
+      expect(model.isVisible('alpha/bravo/charlie/hidden.md')).toBe(false);
+      expect(model.isVisible('alpha/bravo/charlie')).toBe(true);
+      expect(model.isVisible('alpha/bravo')).toBe(true);
+      expect(model.isVisible('alpha')).toBe(true);
+    });
+
+    it('hides the whole non-ignored folder chain once its only file is excluded', () => {
+      const model = buildHidingEmpty(ENTRIES, matcher(['alpha/bravo/charlie/hidden.md']));
+
+      expect(model.isVisible('alpha/bravo/charlie/hidden.md')).toBe(false);
+      expect(model.isVisible('alpha/bravo/charlie')).toBe(false);
+      expect(model.isVisible('alpha/bravo')).toBe(false);
+      expect(model.isVisible('alpha')).toBe(false);
+    });
+
+    it('keeps a genuinely empty folder (no children) visible', () => {
+      const model = buildHidingEmpty([{ isFolder: true, path: 'empty' }], matcher([]));
+      expect(model.isVisible('empty')).toBe(true);
+    });
+
+    it('keeps a folder visible when at least one file survives exclusion', () => {
+      const model = buildHidingEmpty(
+        [
+          { isFolder: true, path: 'mixed' },
+          { isFolder: false, path: 'mixed/keep.md' },
+          { isFolder: false, path: 'mixed/drop.md' }
+        ],
+        matcher(['mixed/drop.md'])
+      );
+
+      expect(model.isVisible('mixed/drop.md')).toBe(false);
+      expect(model.isVisible('mixed/keep.md')).toBe(true);
+      expect(model.isVisible('mixed')).toBe(true);
+    });
+
+    it('keeps a folder visible when its only child is a genuinely empty subfolder', () => {
+      const model = buildHidingEmpty(
+        [
+          { isFolder: true, path: 'outer' },
+          { isFolder: true, path: 'outer/inner' }
+        ],
+        matcher([])
+      );
+
+      // `inner` is genuinely empty => visible, so `outer` has a visible child.
+      expect(model.isVisible('outer/inner')).toBe(true);
+      expect(model.isVisible('outer')).toBe(true);
+    });
+
+    it('re-shows the folder chain when its last excluded file becomes visible again', () => {
+      const ignored = new Set<string>(['alpha/bravo/charlie/hidden.md']);
+      const model = new VaultModel((path) => ignored.has(path), () => true);
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises -- settles synchronously without a yieldFn.
+      model.rebuild(ENTRIES);
+      expect(model.isVisible('alpha')).toBe(false);
+
+      ignored.delete('alpha/bravo/charlie/hidden.md');
+      const changes = model.recomputeFrom('alpha/bravo/charlie/hidden.md');
+
+      expect(changes).toEqual([
+        { isFolder: false, isVisible: true, path: 'alpha/bravo/charlie/hidden.md' },
+        { isFolder: true, isVisible: true, path: 'alpha/bravo/charlie' },
+        { isFolder: true, isVisible: true, path: 'alpha/bravo' },
+        { isFolder: true, isVisible: true, path: 'alpha' }
+      ]);
+    });
+  });
+
   describe('ancestor propagation', () => {
     it('hides the folder chain only when the last visible child is hidden', () => {
       // The folders are themselves ignored, so each is visible only while it holds a visible descendant.
@@ -427,6 +508,13 @@ function build(entries: readonly VaultModelEntry[], isIgnored: IsIgnoredFn): Vau
   const model = new VaultModel(isIgnored);
   // Without a `yieldFn` the async recompute never suspends, so the model is fully
   // Built synchronously by the time `rebuild` returns its (already resolved) promise.
+  // eslint-disable-next-line @typescript-eslint/no-floating-promises -- settles synchronously without a yieldFn.
+  model.rebuild(entries);
+  return model;
+}
+
+function buildHidingEmpty(entries: readonly VaultModelEntry[], isIgnored: IsIgnoredFn): VaultModel {
+  const model = new VaultModel(isIgnored, () => true);
   // eslint-disable-next-line @typescript-eslint/no-floating-promises -- settles synchronously without a yieldFn.
   model.rebuild(entries);
   return model;
