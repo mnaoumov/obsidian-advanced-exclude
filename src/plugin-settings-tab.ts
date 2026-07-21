@@ -114,6 +114,22 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginSettings> {
       });
 
     new Setting(this.containerEl)
+      .setName('Hide empty folders')
+      .setDesc(createFragment((f) => {
+        f.appendText('Whether to hide folders left empty because every file inside them is excluded.');
+        f.createEl('br');
+        f.appendText('Cascades to parent folders: when a folder and all of its subfolders become empty, the whole chain is hidden.');
+        f.createEl('br');
+        f.appendText('Genuinely empty folders (with no files at all) stay visible.');
+      }))
+      .addToggle((toggle) => {
+        this.bind({
+          propertyName: 'shouldHideEmptyFolders',
+          valueComponent: toggle
+        });
+      });
+
+    new Setting(this.containerEl)
       .setName('Exclude mode')
       .setDesc(createFragment((f) => {
         f.appendText('How to exclude files and folders.');

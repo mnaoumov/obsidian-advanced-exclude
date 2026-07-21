@@ -144,7 +144,7 @@ function setup(params: SetupParams): SetupResult {
   });
 
   const pluginSettingsComponent = strictProxy<PluginSettingsComponent>({
-    settings: { excludeMode }
+    settings: { excludeMode, shouldHideEmptyFolders: false }
   });
 
   const vaultLoadPatch = strictProxy<VaultLoadPatchComponent>({ vaultLoadCalled });

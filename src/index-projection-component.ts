@@ -130,7 +130,10 @@ export class IndexProjectionComponent extends ComponentEx {
     this.deleteFromFilesPane = params.deleteFromFilesPane;
     this.manualIndexHider = params.manualIndexHider;
     this.updateProgressNotice = params.updateProgressNotice;
-    this.vaultModel = new VaultModel((normalizedPath, isFolderPath) => params.ignorePatternsComponent.isIgnored({ isFolder: isFolderPath, normalizedPath }));
+    this.vaultModel = new VaultModel(
+      (normalizedPath, isFolderPath) => params.ignorePatternsComponent.isIgnored({ isFolder: isFolderPath, normalizedPath }),
+      () => this.pluginSettingsComponent.settings.shouldHideEmptyFolders
+    );
   }
 
   /**
