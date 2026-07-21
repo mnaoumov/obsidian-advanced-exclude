@@ -24,3 +24,7 @@ Each option below lists the setting key stored in the plugin's `data.json`.
 - `excludeMode` - how far the exclusion reaches: `Full` hides ignored files from the whole
   app (Files pane, Backlinks, Graph, search, ...), while `FilesPane` hides them from the
   Files pane only. See [[03 Exclude mode and sources]].
+- `shouldHideEmptyFolders` - when on, also hide folders left empty because every file inside
+  them is excluded. This cascades to parent folders: when a folder and all of its subfolders
+  become empty, the whole chain is hidden. Genuinely empty folders (with no files at all) stay
+  visible.
