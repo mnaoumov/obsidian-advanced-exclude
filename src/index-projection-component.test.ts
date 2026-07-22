@@ -1,6 +1,7 @@
 import type { DataAdapterEx } from '@obsidian-typings/obsidian-public-latest';
 import type {
   App,
+  EventRef,
   TAbstractFile,
   View,
   WorkspaceLeaf
@@ -84,6 +85,7 @@ interface SetupResult {
   readonly app: App;
   readonly component: IndexProjectionComponent;
   readonly deleteFromFilesPane: Mock<(normalizedPath: string) => void>;
+  fireQuit(): void;
   fireWorkspaceLayoutReady(): void;
   readonly manualIndexHider: MockManualIndexHider;
   readonly mockAdapter: MockAdapter;
@@ -127,12 +129,23 @@ function setup(params: SetupParams): SetupResult {
   mockIsFolder.mockImplementation((file) => flagByPath.get((file as TAbstractFile).path) ?? false);
 
   let workspaceLayoutReadyCallback: (() => void) | undefined;
+  let workspaceQuitCallback: (() => void) | undefined;
   const app = strictProxy<App>({
     vault: {
       getAllLoadedFiles: vi.fn().mockReturnValue(loadedFiles)
     },
     workspace: {
       getLeavesOfType: vi.fn<(viewType: string) => WorkspaceLeaf[]>().mockReturnValue([]),
+      // Capture the `'quit'` handler so tests can simulate app shutdown; the returned
+      // `EventRef` stub has no `e`, so `registerEvent`'s unload cleanup is a safe no-op.
+      on: castTo<App['workspace']['on']>(vi.fn((name: string, callback: () => void) => {
+        if (name === 'quit') {
+          workspaceQuitCallback = callback;
+        }
+        // A plain stub (not a strictProxy): `registerEvent`'s unload cleanup reads
+        // `ref.e?.offref`, and a strictProxy would throw on the unmocked `e` read.
+        return castTo<EventRef>({});
+      })),
       onLayoutReady: vi.fn((callback: () => void) => {
         workspaceLayoutReadyCallback = callback;
       })
@@ -195,10 +208,14 @@ function setup(params: SetupParams): SetupResult {
     vaultPathStore
   });
 
-  return { addToFilesPane, app, component, deleteFromFilesPane, fireWorkspaceLayoutReady, manualIndexHider, mockAdapter, save };
+  return { addToFilesPane, app, component, deleteFromFilesPane, fireQuit, fireWorkspaceLayoutReady, manualIndexHider, mockAdapter, save };
 
   function fireWorkspaceLayoutReady(): void {
     workspaceLayoutReadyCallback?.();
+  }
+
+  function fireQuit(): void {
+    workspaceQuitCallback?.();
   }
 }
 
@@ -839,6 +856,109 @@ describe('IndexProjectionComponent', () => {
       await component.applyFull();
 
       expect(component.getHiddenCount()).toBe(1);
+    });
+  });
+
+  describe('restoreHiddenFilesOnUnload', () => {
+    it('restores the hidden set from snapshots and drives the explorer shallowest-first (Full mode)', async () => {
+      const { addToFilesPane, component, manualIndexHider } = setup({
+        entries: [
+          { isFolderFlag: true, path: 'a' },
+          { isFolderFlag: false, path: 'a/x.md' }
+        ],
+        isIgnored: (path) => path === 'a' || path.startsWith('a/')
+      });
+      await component.applyFull();
+      addToFilesPane.mockClear();
+
+      const restored = component.restoreHiddenFilesOnUnload();
+
+      expect(restored).toBe(true);
+      expect(manualIndexHider.show).toHaveBeenCalledWith(expect.arrayContaining(['a', 'a/x.md']));
+      // Shallowest-first: the folder is re-inserted before the file it contains.
+      expect(addToFilesPane.mock.calls.map((call) => call[0])).toEqual(['a', 'a/x.md']);
+    });
+
+    it('reports an incomplete restore when a hidden path has no snapshot', async () => {
+      const { addToFilesPane, component, manualIndexHider } = setup({
+        entries: [
+          { isFolderFlag: true, path: 'a' },
+          { isFolderFlag: false, path: 'a/x.md' }
+        ],
+        isIgnored: (path) => path === 'a' || path.startsWith('a/')
+      });
+      await component.applyFull();
+      addToFilesPane.mockClear();
+      // A path with no snapshot (e.g. a prior-session hide never loaded) cannot be
+      // Restored synchronously, so the tree is not fully back and the notice must show.
+      manualIndexHider.show.mockReturnValue(['a/x.md']);
+
+      const restored = component.restoreHiddenFilesOnUnload();
+
+      expect(restored).toBe(false);
+      // Only the snapshot-backed path is re-added to the explorer.
+      expect(addToFilesPane.mock.calls.map((call) => call[0])).toEqual(['a']);
+    });
+
+    it('does nothing and reports restored in FilesPane mode (the index was never mutated)', async () => {
+      const { addToFilesPane, component, manualIndexHider } = setup({
+        entries: [
+          { isFolderFlag: true, path: 'a' },
+          { isFolderFlag: false, path: 'a/x.md' }
+        ],
+        excludeMode: ExcludeMode.FilesPane,
+        isIgnored: (path) => path === 'a' || path.startsWith('a/')
+      });
+      await component.applyFull();
+      addToFilesPane.mockClear();
+
+      const restored = component.restoreHiddenFilesOnUnload();
+
+      expect(restored).toBe(true);
+      expect(manualIndexHider.show).not.toHaveBeenCalled();
+      expect(addToFilesPane).not.toHaveBeenCalled();
+    });
+
+    it('is idempotent — a second call restores nothing', async () => {
+      const { component, manualIndexHider } = setup({
+        entries: [{ isFolderFlag: false, path: 'drop.md' }],
+        isIgnored: (path) => path === 'drop.md'
+      });
+      await component.applyFull();
+
+      expect(component.restoreHiddenFilesOnUnload()).toBe(true);
+      expect(component.restoreHiddenFilesOnUnload()).toBe(true);
+      expect(manualIndexHider.show).toHaveBeenCalledTimes(1);
+    });
+
+    describe('app shutdown', () => {
+      beforeEach(() => {
+        vi.useFakeTimers();
+      });
+
+      afterEach(() => {
+        vi.useRealTimers();
+      });
+
+      it('skips the restore during app quit (index/explorer are being torn down)', async () => {
+        const { component, fireQuit, manualIndexHider } = setup({
+          entries: [{ isFolderFlag: false, path: 'drop.md' }],
+          isIgnored: (path) => path === 'drop.md'
+        });
+
+        // Load so onloadAsync registers the `'quit'` handler; advance the (faked) paint
+        // Frame so the load-time projection finishes and hides the file.
+        const loadPromise = component.loadWithPromises();
+        await vi.runAllTimersAsync();
+        await loadPromise;
+        manualIndexHider.show.mockClear();
+
+        fireQuit();
+        const restored = component.restoreHiddenFilesOnUnload();
+
+        expect(restored).toBe(true);
+        expect(manualIndexHider.show).not.toHaveBeenCalled();
+      });
     });
   });
 
