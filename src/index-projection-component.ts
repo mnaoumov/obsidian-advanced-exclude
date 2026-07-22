@@ -29,7 +29,7 @@ import { VaultModel } from './vault-model.ts';
 /**
  * Message shown in the progress notice while the projection updates the tree.
  */
-const UPDATE_PROGRESS_MESSAGE = 'Advanced Exclude: updating file tree…';
+const UPDATE_PROGRESS_MESSAGE = 'Updating file tree…';
 
 /**
  * Minimum wall-clock gap between progress-bar updates and cooperative yields
