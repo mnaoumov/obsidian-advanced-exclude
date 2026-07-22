@@ -219,6 +219,38 @@ export class VaultModel {
   }
 
   /**
+   * Seeds the model directly from an already-known hidden set, **without** a
+   * whole-vault {@link recomputeAll}. Inserts each hidden entry (creating any
+   * missing ancestor folders) and then marks exactly the given paths hidden — the
+   * auto-created ancestors stay visible, reproducing the visibility a prior full
+   * recompute persisted.
+   *
+   * Used by the fast-enable path: the ~42 persisted hidden paths are the only
+   * nodes that matter for a re-hide, and `getPathsByVisibility(false)` must return
+   * them so a later disable-restore ({@link IndexProjectionComponent.restoreHiddenFilesOnUnload})
+   * can re-insert them. Cost is O(hidden set), not O(~90k). Node `isIgnoredSelf`
+   * is left unevaluated (it is only read by a recompute, and the next config
+   * change does a full {@link rebuild} that clears and re-evaluates the tree).
+   */
+  public seedHidden(entries: readonly VaultModelEntry[]): void {
+    this.nodes.clear();
+    this.root.children = new Map();
+    this.root.isVisible = true;
+    this.nodes.set(ROOT_PATH, this.root);
+
+    const hiddenPaths = new Set(entries.map((entry) => entry.path));
+    for (const entry of entries) {
+      this.ensureNode({ isFolder: entry.isFolder, normalizedPath: entry.path });
+    }
+    for (const node of this.nodes.values()) {
+      if (node === this.root) {
+        continue;
+      }
+      node.isVisible = !hiddenPaths.has(node.path);
+    }
+  }
+
+  /**
    * Re-evaluates the ignore verdict and visibility for every node (used after a
    * config / pattern change). Processes deepest nodes first so a folder sees its
    * children's final visibility. Returns the visibility flips.

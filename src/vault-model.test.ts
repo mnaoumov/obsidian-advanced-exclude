@@ -387,6 +387,48 @@ describe('VaultModel', () => {
     });
   });
 
+  describe('seedHidden', () => {
+    it('marks exactly the seeded paths hidden and keeps auto-created ancestors visible', () => {
+      const model = new VaultModel(() => false);
+      model.seedHidden([
+        { isFolder: false, path: 'a/b/hidden.md' },
+        { isFolder: false, path: 'top.md' }
+      ]);
+
+      expect(model.getPathsByVisibility(false)).toEqual([
+        { isFolder: false, path: 'a/b/hidden.md' },
+        { isFolder: false, path: 'top.md' }
+      ]);
+      // The folders created to reach the hidden file are not themselves hidden.
+      expect(model.isVisible('a')).toBe(true);
+      expect(model.isVisible('a/b')).toBe(true);
+    });
+
+    it('seeds an empty hidden set', () => {
+      const model = new VaultModel(() => false);
+      model.seedHidden([]);
+      expect(model.getPathsByVisibility(false)).toEqual([]);
+    });
+
+    it('reproduces the hidden set a full recompute produced, without recomputing', () => {
+      const entries: VaultModelEntry[] = [
+        { isFolder: true, path: 'a' },
+        { isFolder: false, path: 'a/x.md' },
+        { isFolder: false, path: 'a/junk.tmp' },
+        { isFolder: false, path: 'b.md' }
+      ];
+      const recomputed = build(entries, matcher(['*.tmp']));
+      const persistedHidden = recomputed.getPathsByVisibility(false);
+
+      // A fresh model whose `isIgnored` always returns false (never consulted) is
+      // Seeded purely from the persisted set and must reproduce it exactly.
+      const seeded = new VaultModel(() => false);
+      seeded.seedHidden(persistedHidden);
+
+      expect(seeded.getPathsByVisibility(false)).toEqual(persistedHidden);
+    });
+  });
+
   describe('recomputeAll', () => {
     it('returns the visibility flips deepest-first', async () => {
       const ignored = new Set<string>();
