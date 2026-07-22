@@ -118,6 +118,21 @@ snapshot (hidden by a prior session) falls back to `reconcileFile`. That fallbac
 intact, so without dropping it `reconcileFile` compares disk against the stale record, sees
 no change, and re-adds nothing (the file would stay hidden forever).
 
+Disable and enable are both fast (issue #10). On disable, `restoreHiddenFilesOnUnload`
+re-inserts the hidden set from the in-memory `ManualIndexHider` snapshots synchronously in
+`onunload` (driven by `RestoreNoticeComponent`, added last so it unloads first) — ~9 ms at
+90k, no reload notice (T124). On a **warm re-enable** whose ignore config **and** file
+universe are unchanged, `IndexProjectionComponent.tryFastEnable` seeds the model from the
+persisted hidden set (`VaultModel.seedHidden`, O(hidden set)) and re-hides it directly —
+skipping the ~1.4 s 90k cached-verdict `getAll` (now split out of `loadDb` into
+`IgnorePatternsComponent.loadFingerprint` + a lazy `ensureVerdictsLoaded`) and the
+whole-vault `rebuild` + `recomputeAll`; the full model build is deferred to the next config
+change. A change to the vault **while disabled** — which the ignore-file mtime fingerprint
+cannot see — is caught by an order-independent universe signature (`universe-signature.ts`)
+persisted alongside the hidden set in `VaultPathStore`: a mismatch (or a changed config, or
+`FilesPane` mode) falls back to the proven full `applyFull` (T125). Covered live by
+`src/fast-enable-reenable.desktop-performance.integration.test.ts` on a linked synthetic vault.
+
 Scaling is covered at three levels.
 
 `src/vault-size-scaling.desktop.integration.test.ts` (real Obsidian, `Full` mode,
