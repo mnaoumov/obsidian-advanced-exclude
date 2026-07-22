@@ -38,6 +38,11 @@ const VAULT_CONTROL = 'keep-real.md';
 // The first folder the populate spec creates (FILES_PER_FOLDER notes under it).
 const HIDDEN_DIR = 'big/dir-0';
 const INTRUDER_PATH = 'big/dir-0/intruder-while-disabled.md';
+// A visible note (outside the hidden folder) whose inbound link points INTO it — the
+// Populate spec makes `big/dir-N/file-0.md` link to `big/dir-0/file-0`. Hiding the folder
+// Must demote this link to unresolved; restoring it must promote it back.
+const LINK_SOURCE = 'big/dir-1/file-0.md';
+const LINK_TARGET = 'big/dir-0/file-0.md';
 
 const SETTLE_POLL_IN_MS = 2000;
 const SETTLE_MAX_POLLS = 60;
@@ -59,6 +64,8 @@ interface ReEnableResult {
   readonly hiddenAfterFastReEnable?: number;
   readonly hiddenAfterFullReEnable?: number;
   readonly intruderHiddenAfterFull?: boolean;
+  readonly linkStateAfterFastReEnable?: 'none' | 'resolved' | 'unresolved';
+  readonly linkStateWhenRestored?: 'none' | 'resolved' | 'unresolved';
   readonly loadedBefore?: number;
   readonly restoredAfterDisable?: number;
 }
@@ -95,6 +102,8 @@ describe('Fast enable — re-hides the persisted set directly on unchanged confi
         fullMode: ExcludeMode.Full,
         HIDDEN_DIR,
         INTRUDER_PATH,
+        LINK_SOURCE,
+        LINK_TARGET,
         PLUGIN_ID,
         pollMs: REENABLE_POLL_IN_MS,
         reEnableMaxWaitMs: REENABLE_MAX_WAIT_IN_MS
@@ -105,6 +114,8 @@ describe('Fast enable — re-hides the persisted set directly on unchanged confi
         fullMode,
         HIDDEN_DIR: hiddenDir,
         INTRUDER_PATH: intruderPath,
+        LINK_SOURCE: linkSource,
+        LINK_TARGET: linkTarget,
         PLUGIN_ID: pluginId,
         pollMs,
         reEnableMaxWaitMs
@@ -131,15 +142,19 @@ describe('Fast enable — re-hides the persisted set directly on unchanged confi
         await ignorePatternsComponent.processConfigChanges();
         const hiddenAfterApply = countHidden();
 
-        // 2. Disable → restore from snapshots.
+        // 2. Disable → restore from snapshots. The inbound link into the folder is promoted
+        //    Back to resolved.
         await app.plugins.disablePlugin(pluginId);
         const restoredAfterDisable = countHidden();
+        const linkStateWhenRestored = linkState(linkSource, linkTarget);
 
-        // 3. Re-enable unchanged → FAST path.
+        // 3. Re-enable unchanged → FAST path. The folder is re-hidden and its inbound link
+        //    Demoted to unresolved again.
         await reEnableUntilHidden();
         const fastEnableAppliedOnFast = fastEnableAppliedOf();
         const hiddenAfterFastReEnable = countHidden();
         const controlVisibleAfterFast = isControlVisible();
+        const linkStateAfterFastReEnable = linkState(linkSource, linkTarget);
 
         // 4. Disable, change the universe on disk (a new ignored file the fingerprint
         //    Cannot detect), re-enable → the signature guard forces the FULL path.
@@ -159,6 +174,8 @@ describe('Fast enable — re-hides the persisted set directly on unchanged confi
           hiddenAfterFastReEnable,
           hiddenAfterFullReEnable,
           intruderHiddenAfterFull,
+          linkStateAfterFastReEnable,
+          linkStateWhenRestored,
           loadedBefore,
           restoredAfterDisable
         };
@@ -193,6 +210,17 @@ describe('Fast enable — re-hides the persisted set directly on unchanged confi
           }
         }
 
+        function linkState(source: string, target: string): 'none' | 'resolved' | 'unresolved' {
+          const { metadataCache } = app;
+          if ((metadataCache.resolvedLinks[source]?.[target] ?? 0) > 0) {
+            return 'resolved';
+          }
+          if ((metadataCache.unresolvedLinks[source]?.[target] ?? 0) > 0) {
+            return 'unresolved';
+          }
+          return 'none';
+        }
+
         function findComponent(root: object, className: string): unknown {
           if (root.constructor.name === className) {
             return root;
@@ -222,6 +250,11 @@ describe('Fast enable — re-hides the persisted set directly on unchanged confi
     expect(result.fastEnableAppliedOnFast).toBe(true);
     expect(result.hiddenAfterFastReEnable).toBe(0);
     expect(result.controlVisibleAfterFast).toBe(true);
+    // Inbound links into the folder were promoted back on disable, then demoted again by
+    // The fast re-hide — the `demoteInboundLinks`/`promoteInboundLinks` path a link-free
+    // Vault never exercised.
+    expect(result.linkStateWhenRestored).toBe('resolved');
+    expect(result.linkStateAfterFastReEnable).toBe('unresolved');
     // 4. After a change while disabled the universe signature no longer matches, so the
     //    Guard fell back to the full projection, which hid the new file too.
     expect(result.fastEnableAppliedOnFull).toBe(false);
