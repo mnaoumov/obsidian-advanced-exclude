@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## 3.3.0
+
+- fix: remove duplicate plugin name from the progress notice
+- feat: restore the index instantly on disable re #10
+
 ## 3.2.0
 
 - fix: re #11
