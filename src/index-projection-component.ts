@@ -24,6 +24,7 @@ import type { VaultPathStore } from './vault-path-store.ts';
 
 import { ROOT_PATH } from './constants.ts';
 import { ExcludeMode } from './plugin-settings.ts';
+import { computeUniverseSignature } from './universe-signature.ts';
 import { VaultModel } from './vault-model.ts';
 
 /**
@@ -100,11 +101,16 @@ export class IndexProjectionComponent extends ComponentEx {
   private readonly app: App;
   private applyingProjectionDepth = 0;
   private readonly deleteFromFilesPane: (normalizedPath: string) => void;
+  // Set once the fast-enable path applied the persisted hide directly (no full model
+  // Build). Suppresses the `onLayoutReady` re-`update()` that would otherwise trigger a
+  // Whole-vault `applyFull` and undo the win; cleared when a full build supersedes it.
+  private fastEnableApplied = false;
   private hasBuiltModel = false;
   // Guards `restoreHiddenFilesOnUnload` so the on-disable restore runs at most once
   // (it is invoked by both `RestoreNoticeComponent.onunload` and this component's own
   // `onunload` fallback — see `restoreHiddenFilesOnUnload`).
   private hasRestoredOnUnload = false;
+  private readonly ignorePatternsComponent: IgnorePatternsComponent;
   // Set once Obsidian starts quitting: an unload during app shutdown must not spend
   // Time restoring the index/explorer (both are being torn down). See the `'quit'`
   // Registration in `onloadAsync` and the guard in `restoreHiddenFilesOnUnload`.
@@ -131,6 +137,7 @@ export class IndexProjectionComponent extends ComponentEx {
   public constructor(params: IndexProjectionComponentConstructorParams) {
     super();
     this.app = params.app;
+    this.ignorePatternsComponent = params.ignorePatternsComponent;
     this.pluginSettingsComponent = params.pluginSettingsComponent;
     this.vaultLoadPatch = params.vaultLoadPatch;
     this.vaultPathStore = params.vaultPathStore;
@@ -187,6 +194,9 @@ export class IndexProjectionComponent extends ComponentEx {
    * index (e.g. one hidden by a prior session before a disable/enable).
    */
   public async applyFull(abortSignal?: AbortSignal): Promise<void> {
+    // A full build replaces any fast-enable seed, so the `onLayoutReady` guard no
+    // Longer applies.
+    this.fastEnableApplied = false;
     await this.rebuildModel(abortSignal);
     this.lastApplyYieldInMilliseconds = performance.now();
     const adapter = getDataAdapterEx(this.app);
@@ -224,6 +234,11 @@ export class IndexProjectionComponent extends ComponentEx {
   }
 
   public async onLayoutReady(): Promise<void> {
+    // The fast-enable path already applied the persisted hide; a full `update()` here
+    // Would trigger a whole-vault `applyFull` and undo the win.
+    if (this.fastEnableApplied) {
+      return;
+    }
     if (!this.vaultLoadPatch.vaultLoadCalled) {
       await this.update();
     }
@@ -236,7 +251,22 @@ export class IndexProjectionComponent extends ComponentEx {
     this.registerEvent(this.app.workspace.on('quit', () => {
       this.isQuitting = true;
     }));
-    await this.update();
+    // Own an abort controller for the whole enable up front so an `onunload` during the
+    // Fast-enable check (its `await` on the persisted store) still aborts the enable —
+    // Otherwise `update()` would set the controller too late and hide into a torn-down
+    // Component. `update()` replaces it with its own on the fall-back path.
+    const abortController = new AbortController();
+    this.updateAbortController = abortController;
+    // Fast path: on a warm re-enable with an unchanged config and file universe,
+    // Re-hide the persisted set directly and defer the whole-vault build. Falls back
+    // To the proven full `update()` when not eligible.
+    const didFastEnable = await this.tryFastEnable(abortController.signal);
+    if (abortController.signal.aborted) {
+      return;
+    }
+    if (!didFastEnable) {
+      await this.update();
+    }
     this.addChild(new CallbackLayoutReadyComponent(this.app, this.onLayoutReady.bind(this)));
   }
 
@@ -354,7 +384,7 @@ export class IndexProjectionComponent extends ComponentEx {
         }
         await this.applyDelta(changes, abortSignal);
         // Persist the post-change hidden set so a later reload (which does not re-scan disk) can reconstruct and re-show it.
-        this.vaultPathStore.save(this.vaultModel.getPathsByVisibility(false));
+        this.persistHiddenSet();
       }
 
       if (abortSignal.aborted) {
@@ -377,6 +407,26 @@ export class IndexProjectionComponent extends ComponentEx {
 
   private beginProjection(): void {
     this.applyingProjectionDepth++;
+  }
+
+  /**
+   * A stable, order-independent signature of the whole loaded-file universe
+   * (`hidden ∪ loaded`, deduplicated) used to guard the fast-enable path: it detects
+   * files created/deleted on disk while the plugin was disabled, which the ignore
+   * fingerprint cannot. Computed identically at persist time and at enable time
+   * (see {@link computeUniverseSignature}).
+   */
+  private computeUniverseSignature(hiddenEntries: readonly VaultModelEntry[]): string {
+    const paths: string[] = [];
+    for (const file of this.app.vault.getAllLoadedFiles()) {
+      if (file.path !== ROOT_PATH) {
+        paths.push(file.path);
+      }
+    }
+    for (const entry of hiddenEntries) {
+      paths.push(entry.path);
+    }
+    return computeUniverseSignature(paths);
   }
 
   private createRecomputeOptions(abortSignal?: AbortSignal): VaultModelRecomputeAllOptions {
@@ -441,9 +491,25 @@ export class IndexProjectionComponent extends ComponentEx {
     }
   }
 
+  /**
+   * Persists the current hidden set plus its universe signature. Persisting only the
+   * hidden set (merged with Obsidian's loaded tree on the next build) reconstructs the
+   * full tree without storing all ~90k paths; the signature lets the next enable verify
+   * the vault is unchanged before taking the fast path.
+   */
+  private persistHiddenSet(): void {
+    const hidden = this.vaultModel.getPathsByVisibility(false);
+    this.vaultPathStore.save(hidden, this.computeUniverseSignature(hidden));
+  }
+
   private async rebuildModel(abortSignal?: AbortSignal): Promise<void> {
+    // A full recompute evaluates every node's ignore verdict, so warm the persisted
+    // Verdict cache first (deferred off the fast-enable path). A no-op after a config
+    // Reset, whose recompute is intentionally cold.
+    await this.ignorePatternsComponent.ensureVerdictsLoaded();
     const byPath = new Map<string, VaultModelEntry>();
-    for (const entry of await this.vaultPathStore.load()) {
+    const stored = await this.vaultPathStore.load();
+    for (const entry of stored.entries) {
       byPath.set(entry.path, entry);
     }
     for (const file of this.app.vault.getAllLoadedFiles()) {
@@ -453,9 +519,7 @@ export class IndexProjectionComponent extends ComponentEx {
       byPath.set(file.path, { isFolder: isFolder(file), path: file.path });
     }
     await this.vaultModel.rebuild([...byPath.values()], this.createRecomputeOptions(abortSignal));
-    // Persist only the hidden set: merged with Obsidian's loaded (visible) tree on
-    // The next build, this reconstructs the full tree without storing all ~90k paths.
-    this.vaultPathStore.save(this.vaultModel.getPathsByVisibility(false));
+    this.persistHiddenSet();
   }
 
   /**
@@ -515,6 +579,57 @@ export class IndexProjectionComponent extends ComponentEx {
     } else {
       this.addToFilesPane(entry.path);
     }
+  }
+
+  /**
+   * Fast enable: on a warm re-enable whose ignore config **and** file universe are
+   * unchanged, re-hide the persisted set directly instead of rebuilding and
+   * recomputing the whole ~90k model. Seeds the model with just the persisted hidden
+   * set (so `getPathsByVisibility(false)` — hence a later disable-restore — still sees
+   * it), then hides those paths from the index in one batched pass. The full model
+   * build and verdict-cache warm-up are deferred to the next config change (which
+   * takes the `!hasBuiltModel` → `applyFull` branch).
+   *
+   * Returns whether the fast path was taken. Ineligible — and the caller falls back to
+   * the proven full `update()` — when not in `Full` mode, the config fingerprint
+   * changed, there is no persisted hidden set, or the universe signature does not match
+   * (files changed on disk while disabled, or a cold start where the vault is not yet
+   * loaded so the signature cannot match).
+   */
+  private async tryFastEnable(abortSignal: AbortSignal): Promise<boolean> {
+    if (this.excludeMode !== ExcludeMode.Full || !this.ignorePatternsComponent.isConfigUnchanged()) {
+      return false;
+    }
+
+    const stored = await this.vaultPathStore.load();
+    // A disable during the `load()` above unloaded the component; do not mutate the index.
+    if (abortSignal.aborted) {
+      return false;
+    }
+    if (stored.universeSignature === null || stored.entries.length === 0) {
+      return false;
+    }
+    if (this.computeUniverseSignature(stored.entries) !== stored.universeSignature) {
+      return false;
+    }
+
+    this.beginProjection();
+    try {
+      this.vaultModel.seedHidden(stored.entries);
+      const targets = [...stored.entries].sort((a, b) => pathDepth(b.path) - pathDepth(a.path));
+      const hiddenPaths: string[] = [];
+      for (const target of targets) {
+        this.deleteFromFilesPane(target.path);
+        hiddenPaths.push(target.path);
+      }
+      this.hideFromIndex(hiddenPaths);
+      this.refreshLinkViews();
+    } finally {
+      this.endProjection();
+    }
+
+    this.fastEnableApplied = true;
+    return true;
   }
 }
 

@@ -795,7 +795,7 @@ describe('IgnorePatternsComponent', () => {
     });
   });
 
-  describe('loadDb', () => {
+  describe('config fingerprint and lazy verdict loading', () => {
     it('should open IndexedDB with correct name', async () => {
       const { openFn } = setupIndexedDb();
       const app = createApp();
@@ -821,9 +821,9 @@ describe('IgnorePatternsComponent', () => {
       expect(mockDb.createObjectStore).not.toHaveBeenCalled();
     });
 
-    it('should load cached file entries when mtime matches', async () => {
+    it('marks the config unchanged and defers the verdict getAll when mtime matches', async () => {
       vi.mocked(deepEqual).mockReturnValue(true);
-      setupIndexedDb({
+      const { filesStore } = setupIndexedDb({
         filesEntries: [
           { isIgnored: true, path: 'ignored.md' },
           { isIgnored: false, path: 'visible.md' }
@@ -832,12 +832,29 @@ describe('IgnorePatternsComponent', () => {
       const component = createComponent();
       await component.loadWithPromises();
 
-      // The cached entries should be loaded
+      // Load validates the fingerprint but does NOT eagerly read the (up to ~90k) verdicts.
+      expect(component.isConfigUnchanged()).toBe(true);
+      expect(filesStore.getAll).not.toHaveBeenCalled();
+
+      // The cached verdicts hydrate only on demand.
+      await component.ensureVerdictsLoaded();
+      expect(filesStore.getAll).toHaveBeenCalledTimes(1);
       expect(component.isIgnored({ isFolder: false, normalizedPath: 'ignored.md' })).toBe(true);
       expect(component.isIgnored({ isFolder: false, normalizedPath: 'visible.md' })).toBe(false);
     });
 
-    it('should reset DB when mtime does not match', async () => {
+    it('hydrates persisted verdicts at most once', async () => {
+      vi.mocked(deepEqual).mockReturnValue(true);
+      const { filesStore } = setupIndexedDb({ filesEntries: [{ isIgnored: true, path: 'ignored.md' }] });
+      const component = createComponent();
+      await component.loadWithPromises();
+
+      await component.ensureVerdictsLoaded();
+      await component.ensureVerdictsLoaded();
+      expect(filesStore.getAll).toHaveBeenCalledTimes(1);
+    });
+
+    it('resets the DB and reports the config changed when mtime does not match', async () => {
       vi.mocked(deepEqual).mockReturnValue(false);
       const { filesStore } = setupIndexedDb({
         filesEntries: [{ isIgnored: true, path: 'old.md' }]
@@ -846,6 +863,10 @@ describe('IgnorePatternsComponent', () => {
       await component.loadWithPromises();
 
       expect(filesStore.clear).toHaveBeenCalled();
+      expect(component.isConfigUnchanged()).toBe(false);
+      // A reset leaves nothing to hydrate, so a later ensure is a no-op (no getAll).
+      await component.ensureVerdictsLoaded();
+      expect(filesStore.getAll).not.toHaveBeenCalled();
     });
 
     it('should use default mtime entry when none stored', async () => {

@@ -50,6 +50,13 @@ interface DbMtimeEntry {
   userIgnoreFiltersStr: string;
 }
 
+const DEFAULT_MTIME_ENTRY: DbMtimeEntry = {
+  gitIgnoreMtime: 0,
+  matcherVersion: IGNORE_MATCHER_VERSION,
+  obsidianIgnoreMtime: 0,
+  userIgnoreFiltersStr: ''
+};
+
 interface IgnorePatternsComponentConstructorParams {
   readonly app: App;
   onUpdateFileTree(this: void): Promise<void>;
@@ -68,6 +75,9 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
   private cachedGitIgnoreContent = '';
   private cachedIgnoreTester: ignore.Ignore | null = null;
   private cachedObsidianIgnoreContent = '';
+  // Whether the config fingerprint matched the persisted one at load (see
+  // `loadFingerprint`/`isConfigUnchanged`) — the gate for the fast-enable path.
+  private configFingerprintMatched = false;
   private readonly fileIgnoreMap = new Map<string, boolean>();
   private hadConfigChanges = false;
   private readonly onUpdateFileTree: () => Promise<void>;
@@ -79,6 +89,10 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
   }, PROCESS_STORE_ACTIONS_DEBOUNCE_INTERVAL_IN_MILLISECONDS);
 
   private readonly vaultLoadPatch: VaultLoadPatchComponent;
+  // Whether the persisted per-path verdicts have been hydrated into `fileIgnoreMap`
+  // (or there is nothing left to hydrate after a reset). Deferred off the enable
+  // Path; see `ensureVerdictsLoaded`.
+  private verdictsLoaded = false;
 
   private get db(): IDBDatabase {
     if (!this._db) {
@@ -118,6 +132,34 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
     }
   }
 
+  /**
+   * Loads the persisted per-path verdicts into {@link fileIgnoreMap} on first
+   * need — the deferred half of the old `loadDb`. A no-op after the first call or
+   * once a fingerprint mismatch has already reset (and thus emptied) the cache.
+   * The fast-enable path never calls this; a full recompute calls it first to keep
+   * its per-node verdict lookups warm.
+   */
+  public async ensureVerdictsLoaded(): Promise<void> {
+    if (this.verdictsLoaded) {
+      return;
+    }
+    this.verdictsLoaded = true;
+    const dbFileEntries = await getResult(this.getFileStore().getAll()) as DbFileEntry[];
+    for (const entry of dbFileEntries) {
+      this.fileIgnoreMap.set(entry.path, entry.isIgnored);
+    }
+  }
+
+  /**
+   * Whether the ignore-config fingerprint matched the persisted one at load — i.e.
+   * `.obsidianignore` / `.gitignore` / `userIgnoreFilters` / the matcher version are
+   * unchanged since the hidden set was persisted. The fast-enable path requires this:
+   * the persisted hidden set is only trustworthy under an unchanged config.
+   */
+  public isConfigUnchanged(): boolean {
+    return this.configFingerprintMatched;
+  }
+
   public isIgnored(params: IgnorePatternsComponentIsIgnoredParams): boolean {
     const { isFolder, normalizedPath } = params;
     if (normalizedPath === ROOT_PATH) {
@@ -153,7 +195,7 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
   }
 
   public override async onloadAsync(): Promise<void> {
-    await this.loadDb();
+    await this.loadFingerprint();
     await this.reload();
     registerAsyncEvent(
       this,
@@ -273,7 +315,14 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
     return (this.app.vault.getConfig('userIgnoreFilters') ?? []) as string[];
   }
 
-  private async loadDb(): Promise<void> {
+  /**
+   * Opens the verdict DB and validates the config fingerprint, but does **not**
+   * eagerly load the (up to ~90k) cached per-path verdicts — that `getAll` was the
+   * dominant enable cost and is deferred to {@link ensureVerdictsLoaded}, run only
+   * when a full recompute actually needs a warm cache. On a fingerprint mismatch the
+   * stale cache is reset here (nothing then remains to load).
+   */
+  private async loadFingerprint(): Promise<void> {
     const request = window.indexedDB.open(`${this.app.appId}/advanced-exclude`, DB_VERSION);
     request.addEventListener('upgradeneeded', (event) => {
       if (event.newVersion !== 1) {
@@ -292,25 +341,18 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
     const transaction = db.transaction([MTIME_STORE_NAME], 'readonly');
     const mtimeStore = transaction.objectStore(MTIME_STORE_NAME);
 
-    const DEFAULT_MTIME_ENTRY: DbMtimeEntry = {
-      gitIgnoreMtime: 0,
-      matcherVersion: IGNORE_MATCHER_VERSION,
-      obsidianIgnoreMtime: 0,
-      userIgnoreFiltersStr: ''
-    };
-
     const mtimeEntry = await getResult(mtimeStore.get(0)) as DbMtimeEntry | undefined ?? DEFAULT_MTIME_ENTRY;
     const currentMtimeEntry = await this.getCurrentMtimeEntry();
 
     if (!deepEqual(currentMtimeEntry, mtimeEntry)) {
+      // Config changed: drop the stale verdicts now (this also marks the cache
+      // "Loaded" — empty — so `ensureVerdictsLoaded` becomes a no-op).
       await this.resetDb();
+      this.configFingerprintMatched = false;
       return;
     }
 
-    const dbFileEntries = await getResult(this.getFileStore().getAll()) as DbFileEntry[];
-    for (const entry of dbFileEntries) {
-      this.fileIgnoreMap.set(entry.path, entry.isIgnored);
-    }
+    this.configFingerprintMatched = true;
   }
 
   private processStoreActions(): void {
@@ -378,6 +420,9 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
     // Drop any queued writes: they target the store we just cleared and would
     // Otherwise repopulate it with stale entries.
     this.pendingStoreActions.clear();
+    // The store is now empty, so there is nothing left for `ensureVerdictsLoaded`
+    // To hydrate — `fileIgnoreMap` (empty) is authoritative and repopulates on miss.
+    this.verdictsLoaded = true;
     mtimeStore.put(currentMtimeEntry, 0);
   }
 

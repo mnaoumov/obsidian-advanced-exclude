@@ -33,6 +33,7 @@ import type { VaultModel } from './vault-model.ts';
 
 import { IndexProjectionComponent } from './index-projection-component.ts';
 import { ExcludeMode } from './plugin-settings.ts';
+import { computeUniverseSignature } from './universe-signature.ts';
 
 vi.mock('@obsidian-typings/obsidian-public-latest/implementations', () => ({
   getDataAdapterEx: vi.fn()
@@ -73,10 +74,12 @@ interface MockManualIndexHider {
 }
 
 interface SetupParams {
+  readonly configUnchanged?: boolean;
   readonly entries: readonly MockEntry[];
   readonly excludeMode?: ExcludeMode;
   isIgnored(normalizedPath: string): boolean;
   readonly persistedEntries?: readonly MockEntry[];
+  readonly persistedUniverseSignature?: null | string;
   readonly vaultLoadCalled?: boolean;
 }
 
@@ -107,7 +110,15 @@ function hiddenPaths(manualIndexHider: MockManualIndexHider): string[] {
 }
 
 function setup(params: SetupParams): SetupResult {
-  const { entries, excludeMode = ExcludeMode.Full, isIgnored, persistedEntries = [], vaultLoadCalled = false } = params;
+  const {
+    configUnchanged = false,
+    entries,
+    excludeMode = ExcludeMode.Full,
+    isIgnored,
+    persistedEntries = [],
+    persistedUniverseSignature = null,
+    vaultLoadCalled = false
+  } = params;
 
   // Mirror the real adapter: its internal stat record lists every path on disk —
   // The loaded entries plus any persisted (prior-session-hidden, still-on-disk) paths.
@@ -153,6 +164,8 @@ function setup(params: SetupParams): SetupResult {
   });
 
   const ignorePatternsComponent = strictProxy<IgnorePatternsComponent>({
+    ensureVerdictsLoaded: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+    isConfigUnchanged: vi.fn<() => boolean>().mockReturnValue(configUnchanged),
     isIgnored: vi.fn((isIgnoredParams: IsIgnoredParams) => isIgnored(isIgnoredParams.normalizedPath))
   });
 
@@ -165,7 +178,7 @@ function setup(params: SetupParams): SetupResult {
   const persisted = persistedEntries.map((entry) => ({ isFolder: entry.isFolderFlag, path: entry.path }));
   const save = vi.fn();
   const vaultPathStore = {
-    load: vi.fn().mockResolvedValue(persisted),
+    load: vi.fn().mockResolvedValue({ entries: persisted, universeSignature: persistedUniverseSignature }),
     save
   };
 
@@ -856,6 +869,183 @@ describe('IndexProjectionComponent', () => {
       await component.applyFull();
 
       expect(component.getHiddenCount()).toBe(1);
+    });
+  });
+
+  describe('fast enable', () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    // The universe signature the component computes on enable, over `loaded ∪ hidden`.
+    function matchingSignature(loaded: readonly MockEntry[], hidden: readonly MockEntry[]): string {
+      return computeUniverseSignature([...loaded.map((entry) => entry.path), ...hidden.map((entry) => entry.path)]);
+    }
+
+    async function runLoad(component: IndexProjectionComponent): Promise<void> {
+      const loadPromise = component.loadWithPromises();
+      await vi.runAllTimersAsync();
+      await loadPromise;
+    }
+
+    it('re-hides the persisted set directly without a full recompute', async () => {
+      const loaded: MockEntry[] = [
+        { isFolderFlag: false, path: 'a.md' },
+        { isFolderFlag: false, path: 'junk.tmp' }
+      ];
+      const hidden: MockEntry[] = [{ isFolderFlag: false, path: 'junk.tmp' }];
+      const { component, deleteFromFilesPane, manualIndexHider, save } = setup({
+        configUnchanged: true,
+        entries: loaded,
+        // Never consulted on the fast path (no recompute).
+        isIgnored: () => false,
+        persistedEntries: hidden,
+        persistedUniverseSignature: matchingSignature(loaded, hidden)
+      });
+
+      await runLoad(component);
+
+      expect(manualIndexHider.hide).toHaveBeenCalledExactlyOnceWith(['junk.tmp']);
+      expect(deleteFromFilesPane).toHaveBeenCalledWith('junk.tmp');
+      // The fast path seeds only the hidden set, so the model never holds the whole vault…
+      const model = castTo<TestableIndexProjectionComponent>(component).vaultModel;
+      expect(model.getPathsByVisibility(false)).toEqual([{ isFolder: false, path: 'junk.tmp' }]);
+      expect(model.isVisible('a.md')).toBeUndefined();
+      // …and it does not persist (nothing was recomputed).
+      expect(save).not.toHaveBeenCalled();
+    });
+
+    it('does not re-project on layout ready after a fast enable', async () => {
+      const loaded: MockEntry[] = [
+        { isFolderFlag: false, path: 'a.md' },
+        { isFolderFlag: false, path: 'junk.tmp' }
+      ];
+      const hidden: MockEntry[] = [{ isFolderFlag: false, path: 'junk.tmp' }];
+      const { component, fireWorkspaceLayoutReady, manualIndexHider } = setup({
+        configUnchanged: true,
+        entries: loaded,
+        isIgnored: () => false,
+        persistedEntries: hidden,
+        persistedUniverseSignature: matchingSignature(loaded, hidden),
+        vaultLoadCalled: false
+      });
+
+      await runLoad(component);
+      manualIndexHider.hide.mockClear();
+
+      fireWorkspaceLayoutReady();
+      await vi.runAllTimersAsync();
+
+      expect(manualIndexHider.hide).not.toHaveBeenCalled();
+    });
+
+    it('restores the fast-hidden set from snapshots on disable', async () => {
+      const loaded: MockEntry[] = [
+        { isFolderFlag: false, path: 'a.md' },
+        { isFolderFlag: false, path: 'junk.tmp' }
+      ];
+      const hidden: MockEntry[] = [{ isFolderFlag: false, path: 'junk.tmp' }];
+      const { addToFilesPane, component, manualIndexHider } = setup({
+        configUnchanged: true,
+        entries: loaded,
+        isIgnored: () => false,
+        persistedEntries: hidden,
+        persistedUniverseSignature: matchingSignature(loaded, hidden)
+      });
+
+      await runLoad(component);
+
+      expect(component.restoreHiddenFilesOnUnload()).toBe(true);
+      expect(manualIndexHider.show).toHaveBeenCalledWith(['junk.tmp']);
+      expect(addToFilesPane).toHaveBeenCalledWith('junk.tmp');
+    });
+
+    it('falls back to a full projection when the universe signature does not match', async () => {
+      const loaded: MockEntry[] = [
+        { isFolderFlag: false, path: 'a.md' },
+        { isFolderFlag: false, path: 'junk.tmp' }
+      ];
+      const { component, manualIndexHider, save } = setup({
+        configUnchanged: true,
+        entries: loaded,
+        isIgnored: (path) => path === 'junk.tmp',
+        persistedEntries: [{ isFolderFlag: false, path: 'junk.tmp' }],
+        persistedUniverseSignature: 'stale:signature'
+      });
+
+      await runLoad(component);
+
+      // The proven full path ran: it recomputed and persisted.
+      expect(save).toHaveBeenCalled();
+      expect(manualIndexHider.hide).toHaveBeenCalledWith(['junk.tmp']);
+    });
+
+    it('falls back to a full projection when the config fingerprint changed', async () => {
+      const loaded: MockEntry[] = [{ isFolderFlag: false, path: 'junk.tmp' }];
+      const hidden: MockEntry[] = [{ isFolderFlag: false, path: 'junk.tmp' }];
+      const { component, save } = setup({
+        configUnchanged: false,
+        entries: loaded,
+        isIgnored: (path) => path === 'junk.tmp',
+        persistedEntries: hidden,
+        persistedUniverseSignature: matchingSignature(loaded, hidden)
+      });
+
+      await runLoad(component);
+
+      expect(save).toHaveBeenCalled();
+    });
+
+    it('falls back to a full projection for a legacy record with no signature', async () => {
+      const { component, save } = setup({
+        configUnchanged: true,
+        entries: [{ isFolderFlag: false, path: 'junk.tmp' }],
+        isIgnored: (path) => path === 'junk.tmp',
+        persistedEntries: [{ isFolderFlag: false, path: 'junk.tmp' }],
+        persistedUniverseSignature: null
+      });
+
+      await runLoad(component);
+
+      expect(save).toHaveBeenCalled();
+    });
+
+    it('does not fast-enable in FilesPane mode', async () => {
+      const loaded: MockEntry[] = [{ isFolderFlag: false, path: 'junk.tmp' }];
+      const hidden: MockEntry[] = [{ isFolderFlag: false, path: 'junk.tmp' }];
+      const { component, manualIndexHider, save } = setup({
+        configUnchanged: true,
+        entries: loaded,
+        excludeMode: ExcludeMode.FilesPane,
+        isIgnored: (path) => path === 'junk.tmp',
+        persistedEntries: hidden,
+        persistedUniverseSignature: matchingSignature(loaded, hidden)
+      });
+
+      await runLoad(component);
+
+      // The full path ran (persisted); FilesPane never mutates the index.
+      expect(save).toHaveBeenCalled();
+      expect(manualIndexHider.hide).not.toHaveBeenCalled();
+    });
+
+    it('falls back to a full projection when there is no persisted hidden set', async () => {
+      const { component, save } = setup({
+        configUnchanged: true,
+        entries: [{ isFolderFlag: false, path: 'a.md' }],
+        isIgnored: () => false,
+        persistedEntries: [],
+        persistedUniverseSignature: matchingSignature([{ isFolderFlag: false, path: 'a.md' }], [])
+      });
+
+      await runLoad(component);
+
+      // Nothing to fast-hide, so the normal path runs and persists.
+      expect(save).toHaveBeenCalled();
     });
   });
 
