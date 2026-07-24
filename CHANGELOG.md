@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## 3.3.2
+
+- chore: update libs
+
 ## 3.3.1
 
 - perf(enable): fast-enable big vaults from the persisted hidden set re #10
