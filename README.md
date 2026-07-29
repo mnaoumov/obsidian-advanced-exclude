@@ -28,7 +28,7 @@ The plugin adds the following features:
 A demo vault with usage examples ships with every release. You can access it via any of the following:
 
 1. Running the **Advanced Exclude: Open demo vault** command.
-2. Downloading `advanced-exclude.demo-vault.zip` from the [Releases](https://github.com/mnaoumov/obsidian-advanced-exclude/releases).
+2. Downloading `advanced-exclude-demo-vault-<version>.zip` (`<version>` is the release version) from the [Releases](https://github.com/mnaoumov/obsidian-advanced-exclude/releases).
 3. Browsing its source in [`demo-vault/`](./demo-vault/README.md) in this repository.
 
 ## Pattern examples
