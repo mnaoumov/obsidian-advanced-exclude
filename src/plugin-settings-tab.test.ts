@@ -1,9 +1,13 @@
-import type { Plugin } from 'obsidian';
+import type {
+  Plugin,
+  SettingGroup
+} from 'obsidian';
 import type { GenericVoidFunction } from 'obsidian-dev-utils/function';
 import type { PluginSettingsComponentBase } from 'obsidian-dev-utils/obsidian/components/plugin-settings-component';
 
 import { noopAsync } from 'obsidian-dev-utils/function';
 import { castTo } from 'obsidian-dev-utils/object-utils';
+import { SettingEx } from 'obsidian-dev-utils/obsidian/setting-ex';
 import { strictProxy } from 'obsidian-dev-utils/strict-proxy';
 import {
   App,
@@ -42,7 +46,7 @@ vi.mock('obsidian-dev-utils/html-element', () => ({
  * an unmocked property read (a real Obsidian component would yield `undefined` and the
  * probe would simply move on), so the read blows up before `bind` can continue. Stubbing
  * the probe's return value to `null` (its real result for a non-text-based component)
- * lets the REAL base `displayLegacy`/`bind` run end to end over the REAL test-mocks
+ * lets the REAL base `bind` run end to end over the REAL test-mocks
  * `Setting` controls. This only neutralizes a dev-utils-internal text-placeholder branch
  * that is covered by dev-utils' own tests; the lines under test here merely call
  * `this.bind(...)` and are exercised regardless.
@@ -50,6 +54,20 @@ vi.mock('obsidian-dev-utils/html-element', () => ({
 vi.mock('obsidian-dev-utils/obsidian/setting-components/text-based-component', () => ({
   getTextBasedComponentValue: vi.fn(() => null)
 }));
+
+/**
+ * Invokes every declared row's `render` callback the way Obsidian does when the tab is opened, so the
+ * bindings are still exercised now that the rows are declarative.
+ *
+ * @param tab - The settings tab.
+ */
+function renderRows(tab: PluginSettingsTab): void {
+  for (const definition of tab.getSettingDefinitions()) {
+    if ('render' in definition) {
+      definition.render(new SettingEx(tab.containerEl), castTo<SettingGroup>(null));
+    }
+  }
+}
 
 describe('PluginSettingsTab', () => {
   let app: App;
@@ -99,16 +117,16 @@ describe('PluginSettingsTab', () => {
 
   describe('display', () => {
     it('should create settings UI elements in containerEl', () => {
-      tab.displayLegacy();
+      renderRows(tab);
 
-      // Display creates 4 Setting elements as children
+      // Rendering the declared rows creates a Setting element per row.
       expect(tab.containerEl.children.length).toBeGreaterThan(0);
     });
 
-    it('should render a Hide empty folders setting', () => {
-      tab.displayLegacy();
+    it('should declare a Hide empty folders setting', () => {
+      const names = tab.getSettingDefinitions().map((definition) => 'name' in definition ? definition.name : '');
 
-      expect(tab.containerEl.textContent).toContain('Hide empty folders');
+      expect(names).toContain('Hide empty folders');
     });
   });
 
@@ -122,7 +140,7 @@ describe('PluginSettingsTab', () => {
           handlersByText.set(this.buttonEl.textContent, callback);
           return this;
         });
-      tab.displayLegacy();
+      renderRows(tab);
       onClickSpy.mockRestore();
 
       const applyHandler = handlersByText.get('Apply');
