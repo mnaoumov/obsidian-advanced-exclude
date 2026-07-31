@@ -42,7 +42,6 @@ afterEach(async () => {
         if (settingTab) {
           app.setting.open();
           app.setting.openTabById(pluginId);
-          settingTab.displayLegacy();
           const items = Array.from(settingTab.containerEl.querySelectorAll('.setting-item'));
           const item = items.find((el) => el.querySelector('.setting-item-name')?.textContent === settingName);
           const toggle = item?.querySelector('.checkbox-container');
@@ -109,7 +108,6 @@ describe('Hide empty folders — Full mode', () => {
           }
           app.setting.open();
           app.setting.openTabById(pluginId);
-          settingTab.displayLegacy();
           const items = Array.from(settingTab.containerEl.querySelectorAll('.setting-item'));
           const item = items.find((el) => el.querySelector('.setting-item-name')?.textContent === settingName);
           const toggle = item?.querySelector('.checkbox-container');
