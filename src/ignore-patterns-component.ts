@@ -108,6 +108,24 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
     this.vaultLoadPatch = params.vaultLoadPatch;
   }
 
+  /**
+   * Loads the persisted per-path verdicts into {@link fileIgnoreMap} on first
+   * need — the deferred half of the old `loadDb`. A no-op after the first call or
+   * once a fingerprint mismatch has already reset (and thus emptied) the cache.
+   * The fast-enable path never calls this; a full recompute calls it first to keep
+   * its per-node verdict lookups warm.
+   */
+  public async ensureVerdictsLoaded(): Promise<void> {
+    if (this.verdictsLoaded) {
+      return;
+    }
+    this.verdictsLoaded = true;
+    const dbFileEntries = await getResult(this.getFileStore().getAll()) as DbFileEntry[];
+    for (const entry of dbFileEntries) {
+      this.fileIgnoreMap.set(entry.path, entry.isIgnored);
+    }
+  }
+
   public async handleDeletedOrDotFile(normalizedPath: string): Promise<void> {
     if (this.fileIgnoreMap.has(normalizedPath)) {
       this.fileIgnoreMap.delete(normalizedPath);
@@ -129,24 +147,6 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
       invokeAsyncSafelyAfterDelay({
         asyncFn: () => this.processConfigChanges()
       });
-    }
-  }
-
-  /**
-   * Loads the persisted per-path verdicts into {@link fileIgnoreMap} on first
-   * need — the deferred half of the old `loadDb`. A no-op after the first call or
-   * once a fingerprint mismatch has already reset (and thus emptied) the cache.
-   * The fast-enable path never calls this; a full recompute calls it first to keep
-   * its per-node verdict lookups warm.
-   */
-  public async ensureVerdictsLoaded(): Promise<void> {
-    if (this.verdictsLoaded) {
-      return;
-    }
-    this.verdictsLoaded = true;
-    const dbFileEntries = await getResult(this.getFileStore().getAll()) as DbFileEntry[];
-    for (const entry of dbFileEntries) {
-      this.fileIgnoreMap.set(entry.path, entry.isIgnored);
     }
   }
 

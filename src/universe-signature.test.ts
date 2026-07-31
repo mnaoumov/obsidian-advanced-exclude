@@ -16,8 +16,8 @@ describe('computeUniverseSignature', () => {
   it('collapses duplicates so hidden ∪ loaded matches whether or not they overlap', () => {
     // Persist time: hidden and loaded are disjoint. Warm enable: loaded already
     // Includes the restored hidden files. Both must yield the same signature.
-    const persistTime = computeUniverseSignature(['a.md', 'junk.tmp']); // loaded=[a.md] + hidden=[junk.tmp]
-    const warmEnable = computeUniverseSignature(['a.md', 'junk.tmp', 'junk.tmp']); // loaded=[a.md, junk.tmp] + hidden=[junk.tmp]
+    const persistTime = computeUniverseSignature(['a.md', 'junk.tmp']); // Loaded=[a.md] + hidden=[junk.tmp]
+    const warmEnable = computeUniverseSignature(['a.md', 'junk.tmp', 'junk.tmp']); // Loaded=[a.md, junk.tmp] + hidden=[junk.tmp]
     expect(warmEnable).toBe(persistTime);
   });
 

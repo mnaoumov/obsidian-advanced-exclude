@@ -16,6 +16,12 @@
  * same set (and signature) it produced at persist time, when the hidden files
  * were absent from the loaded tree.
  */
+/* eslint-disable no-bitwise -- FNV-1a and the unsigned 32-bit accumulation are defined in terms of XOR and unsigned shifts; expressing them without bitwise operators would obscure the algorithm. */
+
+const BASE_36 = 36;
+const FNV_OFFSET_BASIS_32 = 0x811c9dc5;
+const FNV_PRIME_32 = 0x01000193;
+
 export function computeUniverseSignature(paths: Iterable<string>): string {
   let sum = 0;
   let count = 0;
@@ -30,7 +36,7 @@ export function computeUniverseSignature(paths: Iterable<string>): string {
     sum = (sum + fnv1a32(path)) >>> 0;
     count++;
   }
-  return `${count.toString(36)}:${sum.toString(36)}`;
+  return `${count.toString(BASE_36)}:${sum.toString(BASE_36)}`;
 }
 
 /**
@@ -39,10 +45,12 @@ export function computeUniverseSignature(paths: Iterable<string>): string {
  * adversary.
  */
 function fnv1a32(text: string): number {
-  let hash = 0x811c9dc5;
+  let hash = FNV_OFFSET_BASIS_32;
   for (let index = 0; index < text.length; index++) {
     hash ^= text.charCodeAt(index);
-    hash = Math.imul(hash, 0x01000193);
+    hash = Math.imul(hash, FNV_PRIME_32);
   }
   return hash >>> 0;
 }
+
+/* eslint-enable no-bitwise -- Restores the rule for anything appended below. */
