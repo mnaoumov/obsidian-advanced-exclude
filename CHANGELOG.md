@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## 3.4.0
+
+- test(index-projection): cover the fast-enable abort and depth sort
+- style: satisfy the lint gate
+- refactor(settings): move the settings tab onto the declarative settings API
+- chore: update libs and clear the npm audit
+- docs: fix the demo vault download instructions
+
 ## 3.3.2
 
 - chore: update libs
