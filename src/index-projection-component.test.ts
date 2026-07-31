@@ -919,6 +919,56 @@ describe('IndexProjectionComponent', () => {
       expect(save).not.toHaveBeenCalled();
     });
 
+    it('re-hides the deepest persisted paths first', async () => {
+      const loaded: MockEntry[] = [
+        { isFolderFlag: false, path: 'a.md' },
+        { isFolderFlag: true, path: 'nested' },
+        { isFolderFlag: false, path: 'nested/deep.tmp' }
+      ];
+      const hidden: MockEntry[] = [
+        { isFolderFlag: true, path: 'nested' },
+        { isFolderFlag: false, path: 'nested/deep.tmp' }
+      ];
+      const { component, deleteFromFilesPane, manualIndexHider } = setup({
+        configUnchanged: true,
+        entries: loaded,
+        isIgnored: () => false,
+        persistedEntries: hidden,
+        persistedUniverseSignature: matchingSignature(loaded, hidden)
+      });
+
+      await runLoad(component);
+
+      // A child has to leave the Files pane before its folder does, so the fast path sorts by depth.
+      expect(deleteFromFilesPane.mock.calls.map((call) => call[0])).toEqual(['nested/deep.tmp', 'nested']);
+      expect(manualIndexHider.hide).toHaveBeenCalledExactlyOnceWith(['nested/deep.tmp', 'nested']);
+    });
+
+    it('does not touch the index when a disable lands while the persisted set is loading', async () => {
+      const loaded: MockEntry[] = [
+        { isFolderFlag: false, path: 'a.md' },
+        { isFolderFlag: false, path: 'junk.tmp' }
+      ];
+      const hidden: MockEntry[] = [{ isFolderFlag: false, path: 'junk.tmp' }];
+      const { component, manualIndexHider, save } = setup({
+        configUnchanged: true,
+        entries: loaded,
+        isIgnored: () => false,
+        persistedEntries: hidden,
+        persistedUniverseSignature: matchingSignature(loaded, hidden)
+      });
+
+      // Unloading before the store's promise settles aborts the signal the fast path checks
+      // Right after the `await`, so it must bail out instead of mutating the index.
+      const loadPromise = component.loadWithPromises();
+      component.unload();
+      await vi.runAllTimersAsync();
+      await loadPromise;
+
+      expect(manualIndexHider.hide).not.toHaveBeenCalled();
+      expect(save).not.toHaveBeenCalled();
+    });
+
     it('does not re-project on layout ready after a fast enable', async () => {
       const loaded: MockEntry[] = [
         { isFolderFlag: false, path: 'a.md' },
