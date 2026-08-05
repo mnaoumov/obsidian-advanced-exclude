@@ -7,7 +7,7 @@ import {
 } from 'vitest';
 
 import type {
-  IsIgnoredFn,
+  IsIgnoredFunction,
   VaultModelEntry
 } from './vault-model.ts';
 
@@ -159,7 +159,7 @@ describe('VaultModel', () => {
     it('re-shows the folder chain when its last excluded file becomes visible again', () => {
       const ignored = new Set<string>(['alpha/bravo/charlie/hidden.md']);
       const model = new VaultModel((path) => ignored.has(path), () => true);
-      // eslint-disable-next-line @typescript-eslint/no-floating-promises -- settles synchronously without a yieldFn.
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises -- settles synchronously without a yieldFunction.
       model.rebuild(ENTRIES);
       expect(model.isVisible('alpha')).toBe(false);
 
@@ -450,7 +450,7 @@ describe('VaultModel', () => {
       ]);
     });
 
-    it('yields and reports progress when a yieldFn is supplied for a large model', async () => {
+    it('yields and reports progress when a yieldFunction is supplied for a large model', async () => {
       // A model larger than the yield chunk so a chunk boundary is reached.
       const model = build(largeFolderEntries(6000), () => false);
 
@@ -460,7 +460,7 @@ describe('VaultModel', () => {
         onProgress: (processed, total) => {
           progress.push([processed, total]);
         },
-        yieldFn: async () => {
+        yieldFunction: async () => {
           yieldCount++;
           await noopAsync();
         }
@@ -480,7 +480,7 @@ describe('VaultModel', () => {
 
       const changes = await model.recomputeAll({
         abortSignal: controller.signal,
-        yieldFn: async () => {
+        yieldFunction: async () => {
           controller.abort();
           await noopAsync();
         }
@@ -500,7 +500,7 @@ describe('VaultModel', () => {
 
       const changes = await model.recomputeAll({
         abortSignal: controller.signal,
-        yieldFn: async () => {
+        yieldFunction: async () => {
           yieldCount++;
           // The second boundary falls in the visibility pass.
           if (yieldCount === 2) {
@@ -546,18 +546,18 @@ describe('VaultModel', () => {
   });
 });
 
-function build(entries: readonly VaultModelEntry[], isIgnored: IsIgnoredFn): VaultModel {
+function build(entries: readonly VaultModelEntry[], isIgnored: IsIgnoredFunction): VaultModel {
   const model = new VaultModel(isIgnored);
-  // Without a `yieldFn` the async recompute never suspends, so the model is fully
+  // Without a `yieldFunction` the async recompute never suspends, so the model is fully
   // Built synchronously by the time `rebuild` returns its (already resolved) promise.
-  // eslint-disable-next-line @typescript-eslint/no-floating-promises -- settles synchronously without a yieldFn.
+  // eslint-disable-next-line @typescript-eslint/no-floating-promises -- settles synchronously without a yieldFunction.
   model.rebuild(entries);
   return model;
 }
 
-function buildHidingEmpty(entries: readonly VaultModelEntry[], isIgnored: IsIgnoredFn): VaultModel {
+function buildHidingEmpty(entries: readonly VaultModelEntry[], isIgnored: IsIgnoredFunction): VaultModel {
   const model = new VaultModel(isIgnored, () => true);
-  // eslint-disable-next-line @typescript-eslint/no-floating-promises -- settles synchronously without a yieldFn.
+  // eslint-disable-next-line @typescript-eslint/no-floating-promises -- settles synchronously without a yieldFunction.
   model.rebuild(entries);
   return model;
 }
@@ -570,7 +570,7 @@ function largeFolderEntries(count: number): VaultModelEntry[] {
   return entries;
 }
 
-function matcher(patterns: readonly string[]): IsIgnoredFn {
+function matcher(patterns: readonly string[]): IsIgnoredFunction {
   const ig = ignore({ ignoreCase: true }).add([...patterns]);
   return (normalizedPath: string, isFolder: boolean): boolean => {
     const pathsToCheck = isFolder ? [normalizedPath, `${normalizedPath}/`] : [normalizedPath];

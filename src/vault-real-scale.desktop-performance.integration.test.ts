@@ -43,6 +43,7 @@ const SCENARIO_TIMEOUT_IN_MS = 480_000;
 describe('Real-scale vault — FilesPane mode', () => {
   it('hides the whole pre-populated vault folder from the explorer', async () => {
     const result = await evalInObsidian({
+      // eslint-disable-next-line unicorn/name-replacements -- `args` is an `obsidian-integration-testing` parameter name.
       args: {
         filesPaneMode: ExcludeMode.FilesPane,
         INDEX_POLL_IN_MS,
@@ -52,6 +53,7 @@ describe('Real-scale vault — FilesPane mode', () => {
         VAULT_CONTROL,
         VAULT_FOLDER
       },
+      // eslint-disable-next-line unicorn/name-replacements -- `fn` is an `obsidian-integration-testing` parameter name.
       async fn({
         app,
         filesPaneMode,
@@ -116,11 +118,13 @@ describe('Real-scale vault — FilesPane mode', () => {
             return root;
           }
           for (const child of (root as TraversableComponent)._children ?? []) {
-            if (typeof child === 'object' && child !== null) {
-              const found = findComponent(child, className);
-              if (found) {
-                return found;
-              }
+            if (typeof child !== 'object' || child === null) {
+              continue;
+            }
+
+            const found = findComponent(child, className);
+            if (found) {
+              return found;
             }
           }
           return undefined;

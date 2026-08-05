@@ -27,6 +27,7 @@ const ALL_TEST_FOLDERS = [
 
 afterEach(async () => {
   await evalInObsidian({
+    // eslint-disable-next-line unicorn/name-replacements -- `args` is an `obsidian-integration-testing` parameter name.
     args: {
       ALL_TEST_FILES,
       ALL_TEST_FOLDERS,
@@ -34,6 +35,7 @@ afterEach(async () => {
       PLUGIN_ID,
       SETTLE_DELAY_IN_MS
     },
+    // eslint-disable-next-line unicorn/name-replacements -- `fn` is an `obsidian-integration-testing` parameter name.
     async fn({ ALL_TEST_FILES: files, ALL_TEST_FOLDERS: folders, app, HIDE_EMPTY_FOLDERS_SETTING_NAME: settingName, PLUGIN_ID: pluginId, SETTLE_DELAY_IN_MS: settleDelay }) {
       // Toggle the setting back off so it does not leak into other suites sharing
       // The temp vault, then remove the scratch files/folders.
@@ -42,7 +44,7 @@ afterEach(async () => {
         if (settingTab) {
           app.setting.open();
           app.setting.openTabById(pluginId);
-          const items = Array.from(settingTab.containerEl.querySelectorAll('.setting-item'));
+          const items = [...settingTab.containerEl.querySelectorAll('.setting-item')];
           const item = items.find((el) => el.querySelector('.setting-item-name')?.textContent === settingName);
           const toggle = item?.querySelector('.checkbox-container');
           if (toggle?.classList.contains('is-enabled')) {
@@ -79,11 +81,13 @@ afterEach(async () => {
 describe('Hide empty folders — Full mode', () => {
   it('hides a folder chain emptied by exclusion and restores it when the setting is toggled off', async () => {
     const result = await evalInObsidian({
+      // eslint-disable-next-line unicorn/name-replacements -- `args` is an `obsidian-integration-testing` parameter name.
       args: {
         HIDE_EMPTY_FOLDERS_SETTING_NAME,
         PLUGIN_ID,
         SETTLE_DELAY_IN_MS
       },
+      // eslint-disable-next-line unicorn/name-replacements -- `fn` is an `obsidian-integration-testing` parameter name.
       async fn({ app, HIDE_EMPTY_FOLDERS_SETTING_NAME: settingName, PLUGIN_ID: pluginId, SETTLE_DELAY_IN_MS: settleDelay }) {
         const plugin = app.plugins.getPlugin(pluginId);
         if (!plugin) {
@@ -101,20 +105,20 @@ describe('Hide empty folders — Full mode', () => {
 
         // Flip the "Hide empty folders" toggle through the real settings UI, then
         // Close the tab so its `hideAsync` runs the projection over the live model.
-        async function setHideEmptyFolders(enabled: boolean): Promise<void> {
+        async function setHideEmptyFolders(isEnabled: boolean): Promise<void> {
           const settingTab = app.setting.pluginTabs.find((tab) => tab.id === pluginId) as PluginSettingsTab | undefined;
           if (!settingTab) {
             throw new Error('Settings tab not found');
           }
           app.setting.open();
           app.setting.openTabById(pluginId);
-          const items = Array.from(settingTab.containerEl.querySelectorAll('.setting-item'));
+          const items = [...settingTab.containerEl.querySelectorAll('.setting-item')];
           const item = items.find((el) => el.querySelector('.setting-item-name')?.textContent === settingName);
           const toggle = item?.querySelector('.checkbox-container');
           if (!toggle) {
             throw new Error('Hide empty folders toggle not found');
           }
-          if (toggle.classList.contains('is-enabled') !== enabled) {
+          if (toggle.classList.contains('is-enabled') !== isEnabled) {
             (toggle as HTMLElement).click();
           }
           app.setting.close();

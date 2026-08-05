@@ -34,10 +34,12 @@ const ALL_TEST_FOLDERS = [
 
 afterEach(async () => {
   await evalInObsidian({
+    // eslint-disable-next-line unicorn/name-replacements -- `args` is an `obsidian-integration-testing` parameter name.
     args: {
       ALL_TEST_FILES,
       ALL_TEST_FOLDERS
     },
+    // eslint-disable-next-line unicorn/name-replacements -- `fn` is an `obsidian-integration-testing` parameter name.
     async fn({ ALL_TEST_FILES: files, ALL_TEST_FOLDERS: folders, app }) {
       for (const path of files) {
         try {
@@ -69,10 +71,12 @@ afterEach(async () => {
 describe('Ignore patterns — Full mode (vault-level exclusion)', () => {
   it('should exclude files matching .obsidianignore patterns from the vault', async () => {
     const result = await evalInObsidian({
+      // eslint-disable-next-line unicorn/name-replacements -- `args` is an `obsidian-integration-testing` parameter name.
       args: {
         PLUGIN_ID,
         SETTLE_DELAY_IN_MS
       },
+      // eslint-disable-next-line unicorn/name-replacements -- `fn` is an `obsidian-integration-testing` parameter name.
       async fn({ app, PLUGIN_ID: pluginId, SETTLE_DELAY_IN_MS: settleDelay }) {
         const plugin = app.plugins.getPlugin(pluginId);
         if (!plugin) {
@@ -130,10 +134,12 @@ describe('Ignore patterns — Full mode (vault-level exclusion)', () => {
 
   it('should include .gitignore patterns when shouldIncludeGitIgnorePatterns is enabled', async () => {
     const result = await evalInObsidian({
+      // eslint-disable-next-line unicorn/name-replacements -- `args` is an `obsidian-integration-testing` parameter name.
       args: {
         PLUGIN_ID,
         SETTLE_DELAY_IN_MS
       },
+      // eslint-disable-next-line unicorn/name-replacements -- `fn` is an `obsidian-integration-testing` parameter name.
       async fn({ app, PLUGIN_ID: pluginId, SETTLE_DELAY_IN_MS: settleDelay }) {
         const plugin = app.plugins.getPlugin(pluginId);
         if (!plugin) {
@@ -171,10 +177,12 @@ describe('Ignore patterns — Full mode (vault-level exclusion)', () => {
 describe('Ignore patterns — File explorer exclusion', () => {
   it('should hide ignored files from the file explorer in Full mode', async () => {
     const result = await evalInObsidian({
+      // eslint-disable-next-line unicorn/name-replacements -- `args` is an `obsidian-integration-testing` parameter name.
       args: {
         PLUGIN_ID,
         SETTLE_DELAY_IN_MS
       },
+      // eslint-disable-next-line unicorn/name-replacements -- `fn` is an `obsidian-integration-testing` parameter name.
       async fn({ app, PLUGIN_ID: pluginId, SETTLE_DELAY_IN_MS: settleDelay }) {
         const plugin = app.plugins.getPlugin(pluginId);
         if (!plugin) {
@@ -217,10 +225,12 @@ describe('Ignore patterns — File explorer exclusion', () => {
 describe('Ignore patterns — Settings round-trip', () => {
   it('should apply new ignore patterns when settings are changed', async () => {
     const result = await evalInObsidian({
+      // eslint-disable-next-line unicorn/name-replacements -- `args` is an `obsidian-integration-testing` parameter name.
       args: {
         PLUGIN_ID,
         SETTLE_DELAY_IN_MS
       },
+      // eslint-disable-next-line unicorn/name-replacements -- `fn` is an `obsidian-integration-testing` parameter name.
       async fn({ app, PLUGIN_ID: pluginId, SETTLE_DELAY_IN_MS: settleDelay }) {
         const plugin = app.plugins.getPlugin(pluginId);
         if (!plugin) {

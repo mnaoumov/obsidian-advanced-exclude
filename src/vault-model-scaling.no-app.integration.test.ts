@@ -53,8 +53,10 @@ describe('VaultModel scaling — many independently-ignored folders', () => {
       const model = new VaultModel((path) => ignoredFolder.test(path));
       const entries: VaultModelEntry[] = [];
       for (let index = 0; index < count; index++) {
-        entries.push({ isFolder: true, path: `dir-${String(index)}` });
-        entries.push({ isFolder: false, path: `dir-${String(index)}/file.md` });
+        entries.push(
+          { isFolder: true, path: `dir-${String(index)}` },
+          { isFolder: false, path: `dir-${String(index)}/file.md` }
+        );
       }
 
       await model.rebuild(entries);

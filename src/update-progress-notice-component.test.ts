@@ -92,7 +92,7 @@ describe('UpdateProgressNoticeComponent', () => {
 
 function getFragment(value: unknown): DocumentFragment {
   if (!(value instanceof DocumentFragment)) {
-    throw new Error('Expected createFragment to return a DocumentFragment');
+    throw new TypeError('Expected createFragment to return a DocumentFragment');
   }
   return value;
 }

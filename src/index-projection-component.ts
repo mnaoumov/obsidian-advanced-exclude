@@ -239,7 +239,7 @@ export class IndexProjectionComponent extends ComponentEx {
     if (this.fastEnableApplied) {
       return;
     }
-    if (!this.vaultLoadPatch.vaultLoadCalled) {
+    if (!this.vaultLoadPatch.wasVaultLoadCalled) {
       await this.update();
     }
   }
@@ -437,7 +437,7 @@ export class IndexProjectionComponent extends ComponentEx {
       // Yield aligned to a paint frame so the progress bar actually repaints
       // Between chunks. `requestAnimationFrameAsync` falls back to a timeout so
       // An unfocused/hidden window (where rAF is paused) keeps progressing.
-      yieldFn: requestAnimationFrameAsync
+      yieldFunction: requestAnimationFrameAsync
     };
     return abortSignal ? { ...options, abortSignal } : options;
   }

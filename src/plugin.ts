@@ -17,7 +17,7 @@ import { PluginSettingsTab } from './plugin-settings-tab.ts';
 import { PublishCompatibilityWarningComponent } from './publish-compatibility-warning-component.ts';
 import { RestoreNoticeComponent } from './restore-notice-component.ts';
 import { UpdateProgressNoticeComponent } from './update-progress-notice-component.ts';
-import { IndexedDbVaultPathStore } from './vault-path-store.ts';
+import { IndexedDatabaseVaultPathStore } from './vault-path-store.ts';
 
 export class Plugin extends PluginBase {
   protected override onloadImpl(): void {
@@ -56,7 +56,7 @@ export class Plugin extends PluginBase {
         pluginSettingsComponent,
         updateProgressNotice,
         vaultLoadPatch,
-        vaultPathStore: new IndexedDbVaultPathStore(this.app.appId)
+        vaultPathStore: new IndexedDatabaseVaultPathStore(this.app.appId)
       })
     );
 
@@ -108,7 +108,7 @@ export class Plugin extends PluginBase {
       })
     );
 
-    this.commandHandlerComponent.registerCommandHandlers([
+    this.commandHandlerComponent.registerCommandHandlers(() => [
       new OpenSettingsCommandHandler({
         app: this.app,
         settingTab: pluginSettingsTab

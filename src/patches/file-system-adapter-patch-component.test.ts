@@ -51,15 +51,17 @@ describe('FileSystemAdapterPatchComponent', () => {
   function createComponent(): FileSystemAdapterPatchComponent {
     const fsAdapter = FileSystemAdapter.create__('/vault');
     const adapterOriginal = fsAdapter.asOriginalType__();
-    Object.defineProperty(adapterOriginal, 'reconcileFileCreation', {
-      configurable: true,
-      value: vi.fn().mockResolvedValue(undefined),
-      writable: true
-    });
-    Object.defineProperty(adapterOriginal, 'reconcileFolderCreation', {
-      configurable: true,
-      value: vi.fn().mockResolvedValue(undefined),
-      writable: true
+    Object.defineProperties(adapterOriginal, {
+      reconcileFileCreation: {
+        configurable: true,
+        value: vi.fn().mockResolvedValue(undefined),
+        writable: true
+      },
+      reconcileFolderCreation: {
+        configurable: true,
+        value: vi.fn().mockResolvedValue(undefined),
+        writable: true
+      }
     });
 
     return new FileSystemAdapterPatchComponent({
@@ -93,15 +95,17 @@ describe('FileSystemAdapterPatchComponent', () => {
     // We verify through isIgnored being called with isFolder=false
     const fsAdapter = FileSystemAdapter.create__('/vault');
     const adapter = fsAdapter.asOriginalType__();
-    Object.defineProperty(adapter, 'reconcileFileCreation', {
-      configurable: true,
-      value: vi.fn().mockResolvedValue(undefined),
-      writable: true
-    });
-    Object.defineProperty(adapter, 'reconcileFolderCreation', {
-      configurable: true,
-      value: vi.fn().mockResolvedValue(undefined),
-      writable: true
+    Object.defineProperties(adapter, {
+      reconcileFileCreation: {
+        configurable: true,
+        value: vi.fn().mockResolvedValue(undefined),
+        writable: true
+      },
+      reconcileFolderCreation: {
+        configurable: true,
+        value: vi.fn().mockResolvedValue(undefined),
+        writable: true
+      }
     });
 
     const component2 = new FileSystemAdapterPatchComponent({
@@ -123,15 +127,17 @@ describe('FileSystemAdapterPatchComponent', () => {
   it('should pass isFolder=true for reconcileFolderCreation', async () => {
     const fsAdapter = FileSystemAdapter.create__('/vault');
     const adapter = fsAdapter.asOriginalType__();
-    Object.defineProperty(adapter, 'reconcileFileCreation', {
-      configurable: true,
-      value: vi.fn().mockResolvedValue(undefined),
-      writable: true
-    });
-    Object.defineProperty(adapter, 'reconcileFolderCreation', {
-      configurable: true,
-      value: vi.fn().mockResolvedValue(undefined),
-      writable: true
+    Object.defineProperties(adapter, {
+      reconcileFileCreation: {
+        configurable: true,
+        value: vi.fn().mockResolvedValue(undefined),
+        writable: true
+      },
+      reconcileFolderCreation: {
+        configurable: true,
+        value: vi.fn().mockResolvedValue(undefined),
+        writable: true
+      }
     });
 
     const component = new FileSystemAdapterPatchComponent({

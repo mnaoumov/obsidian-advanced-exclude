@@ -1,6 +1,6 @@
 import type { VaultModelEntry } from './vault-model.ts';
 
-import { getResult } from './indexed-db-utils.ts';
+import { getResult } from './indexed-database-utils.ts';
 
 const DB_VERSION = 1;
 const STORE_NAME = 'paths';
@@ -34,12 +34,12 @@ export interface VaultPathStore {
  */
 type PersistedValue = StoredVaultPaths | VaultModelEntry[];
 
-export class IndexedDbVaultPathStore implements VaultPathStore {
+export class IndexedDatabaseVaultPathStore implements VaultPathStore {
   private database: IDBDatabase | null = null;
-  private readonly dbName: string;
+  private readonly databaseName: string;
 
   public constructor(appId: string) {
-    this.dbName = `${appId}/advanced-exclude-vault-paths`;
+    this.databaseName = `${appId}/advanced-exclude-vault-paths`;
   }
 
   public async load(): Promise<StoredVaultPaths> {
@@ -70,7 +70,7 @@ export class IndexedDbVaultPathStore implements VaultPathStore {
       return this.database;
     }
 
-    const request = window.indexedDB.open(this.dbName, DB_VERSION);
+    const request = window.indexedDB.open(this.databaseName, DB_VERSION);
     request.addEventListener('upgradeneeded', () => {
       request.result.createObjectStore(STORE_NAME);
     });

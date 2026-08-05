@@ -57,15 +57,17 @@ describe('CapacitorAdapterPatchComponent', () => {
   function createAdapter(): ReturnType<typeof CapacitorAdapter.create__> {
     const capAdapter = CapacitorAdapter.create__('/vault', {});
     const adapter = capAdapter.asOriginalType__();
-    Object.defineProperty(adapter, 'reconcileFileCreation', {
-      configurable: true,
-      value: vi.fn().mockResolvedValue(undefined),
-      writable: true
-    });
-    Object.defineProperty(adapter, 'reconcileFolderCreation', {
-      configurable: true,
-      value: vi.fn().mockResolvedValue(undefined),
-      writable: true
+    Object.defineProperties(adapter, {
+      reconcileFileCreation: {
+        configurable: true,
+        value: vi.fn().mockResolvedValue(undefined),
+        writable: true
+      },
+      reconcileFolderCreation: {
+        configurable: true,
+        value: vi.fn().mockResolvedValue(undefined),
+        writable: true
+      }
     });
     return capAdapter;
   }
@@ -98,8 +100,8 @@ describe('CapacitorAdapterPatchComponent', () => {
       pluginSettingsComponent
     });
 
-    const grandParentProto = Object.getPrototypeOf(Object.getPrototypeOf(component) as object) as OnloadAccessor;
-    const superOnloadSpy = vi.spyOn(grandParentProto, 'onload');
+    const grandParentPrototype = Object.getPrototypeOf(Object.getPrototypeOf(component) as object) as OnloadAccessor;
+    const superOnloadSpy = vi.spyOn(grandParentPrototype, 'onload');
     component.load();
 
     expect(superOnloadSpy).toHaveBeenCalled();

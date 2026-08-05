@@ -134,11 +134,6 @@ export class PublishCompatibilityWarningComponent extends LayoutReadyComponent {
     });
 
     this.notice = this.pluginNoticeComponent.showNotice(fragment, { isPermanent: true });
-
-    function addButton(params: AddButtonParams): void {
-      const { containerEl, listener, text } = params;
-      containerEl.createEl('button', { text }).addEventListener('click', listener);
-    }
   }
 
   private async switchToFilesPaneMode(): Promise<void> {
@@ -162,4 +157,9 @@ export class PublishCompatibilityWarningComponent extends LayoutReadyComponent {
 
     this.showWarning();
   }
+}
+
+function addButton(params: AddButtonParams): void {
+  const { containerEl, listener, text } = params;
+  containerEl.createEl('button', { text }).addEventListener('click', listener);
 }

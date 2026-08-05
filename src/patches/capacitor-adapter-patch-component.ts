@@ -2,7 +2,7 @@ import type { CapacitorAdapter } from 'obsidian';
 
 import type {
   AdapterPatchBaseComponentConstructorParams,
-  GenericReconcileFn
+  GenericReconcileFunction
 } from './adapter-patch-base-component.ts';
 
 import { AdapterPatchBaseComponent } from './adapter-patch-base-component.ts';
@@ -23,24 +23,24 @@ export class CapacitorAdapterPatchComponent extends AdapterPatchBaseComponent {
     super.onload();
 
     this.registerMethodPatch({
+      $object: this.adapter,
       methodName: 'reconcileFileCreation',
-      obj: this.adapter,
       patchHandler: async ({
-        originalArgs,
+        originalArguments,
         originalMethod
       }) => {
-        await this.generateReconcileWrapper(originalMethod as GenericReconcileFn, false)(...originalArgs);
+        await this.generateReconcileWrapper(originalMethod as GenericReconcileFunction, false)(...originalArguments);
       }
     });
 
     this.registerMethodPatch({
+      $object: this.adapter,
       methodName: 'reconcileFolderCreation',
-      obj: this.adapter,
       patchHandler: async ({
-        originalArgs,
+        originalArguments,
         originalMethod
       }) => {
-        await this.generateReconcileWrapper(originalMethod as GenericReconcileFn, true)(...originalArgs);
+        await this.generateReconcileWrapper(originalMethod as GenericReconcileFunction, true)(...originalArguments);
       }
     });
   }

@@ -37,6 +37,7 @@ const SCENARIO_TIMEOUT_IN_MS = 595_000;
 describe('Full-mode hide fires no updateRelatedLinks cascade', () => {
   it('issues zero real updateRelatedLinks calls for a whole-folder hide', async () => {
     const result = await evalInObsidian({
+      // eslint-disable-next-line unicorn/name-replacements -- `args` is an `obsidian-integration-testing` parameter name.
       args: {
         fullMode: ExcludeMode.Full,
         INDEX_POLL_IN_MS,
@@ -45,6 +46,7 @@ describe('Full-mode hide fires no updateRelatedLinks cascade', () => {
         SETTLE_DELAY_IN_MS,
         VAULT_FOLDER
       },
+      // eslint-disable-next-line unicorn/name-replacements -- `fn` is an `obsidian-integration-testing` parameter name.
       async fn({
         app,
         fullMode,
@@ -118,11 +120,13 @@ describe('Full-mode hide fires no updateRelatedLinks cascade', () => {
             return root;
           }
           for (const child of (root as TraversableComponent)._children ?? []) {
-            if (typeof child === 'object' && child !== null) {
-              const found = findComponent(child, className);
-              if (found) {
-                return found;
-              }
+            if (typeof child !== 'object' || child === null) {
+              continue;
+            }
+
+            const found = findComponent(child, className);
+            if (found) {
+              return found;
             }
           }
           return undefined;

@@ -41,11 +41,11 @@ export class AdapterPatchComponent extends MonkeyAroundComponent {
 
   public override onload(): void {
     this.registerMethodPatch({
+      $object: getDataAdapterEx(this.app),
       methodName: 'reconcileDeletion',
-      obj: getDataAdapterEx(this.app),
       patchHandler: ({
         fallback,
-        originalArgs: [normalizedPath]
+        originalArguments: [normalizedPath]
       }) => {
         return this.reconcileDeletion(fallback, normalizedPath);
       }

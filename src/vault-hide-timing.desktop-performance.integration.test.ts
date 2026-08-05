@@ -60,7 +60,9 @@ describe('Full-mode hide-almost-everything scales with work, not vault size (iss
     let previous = -1;
     for (let poll = 0; poll < SETTLE_MAX_POLLS; poll++) {
       const count = await evalInObsidian({
+        // eslint-disable-next-line unicorn/name-replacements -- `args` is an `obsidian-integration-testing` parameter name.
         args: { pollMs: SETTLE_POLL_IN_MS },
+        // eslint-disable-next-line unicorn/name-replacements -- `fn` is an `obsidian-integration-testing` parameter name.
         async fn({ app, pollMs }): Promise<number> {
           await sleep(pollMs);
           return app.vault.getAllLoadedFiles().length;
@@ -74,7 +76,9 @@ describe('Full-mode hide-almost-everything scales with work, not vault size (iss
     }
 
     const result = await evalInObsidian({
+      // eslint-disable-next-line unicorn/name-replacements -- `args` is an `obsidian-integration-testing` parameter name.
       args: { fullMode: ExcludeMode.Full, PLUGIN_ID },
+      // eslint-disable-next-line unicorn/name-replacements -- `fn` is an `obsidian-integration-testing` parameter name.
       async fn({ app, fullMode, PLUGIN_ID: pluginId }): Promise<HideResult> {
         const plugin = app.plugins.getPlugin(pluginId);
         if (!plugin) {
@@ -110,11 +114,13 @@ describe('Full-mode hide-almost-everything scales with work, not vault size (iss
             return root;
           }
           for (const child of (root as TraversableComponent)._children ?? []) {
-            if (typeof child === 'object' && child !== null) {
-              const found = findComponent(child, className);
-              if (found) {
-                return found;
-              }
+            if (typeof child !== 'object' || child === null) {
+              continue;
+            }
+
+            const found = findComponent(child, className);
+            if (found) {
+              return found;
             }
           }
           return undefined;

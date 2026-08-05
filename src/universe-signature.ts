@@ -19,8 +19,8 @@
 /* eslint-disable no-bitwise -- FNV-1a and the unsigned 32-bit accumulation are defined in terms of XOR and unsigned shifts; expressing them without bitwise operators would obscure the algorithm. */
 
 const BASE_36 = 36;
-const FNV_OFFSET_BASIS_32 = 0x811c9dc5;
-const FNV_PRIME_32 = 0x01000193;
+const FNV_OFFSET_BASIS_32 = 0x81_1C_9D_C5;
+const FNV_PRIME_32 = 0x01_00_01_93;
 
 export function computeUniverseSignature(paths: Iterable<string>): string {
   let sum = 0;
@@ -47,6 +47,7 @@ export function computeUniverseSignature(paths: Iterable<string>): string {
 function fnv1a32(text: string): number {
   let hash = FNV_OFFSET_BASIS_32;
   for (let index = 0; index < text.length; index++) {
+    // eslint-disable-next-line unicorn/prefer-code-point -- FNV-1a hashes UTF-16 code units, and the index steps by code unit.
     hash ^= text.charCodeAt(index);
     hash = Math.imul(hash, FNV_PRIME_32);
   }

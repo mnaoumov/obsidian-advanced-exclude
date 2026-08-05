@@ -5,7 +5,7 @@ import { ROOT_PATH } from './constants.ts';
 /**
  * Predicate matching the matcher in `IgnorePatternsComponent.isIgnored`.
  */
-export type IsIgnoredFn = (normalizedPath: string, isFolder: boolean) => boolean;
+export type IsIgnoredFunction = (normalizedPath: string, isFolder: boolean) => boolean;
 
 /**
  * An entry used to seed the model: a vault-relative normalized path and whether
@@ -20,13 +20,13 @@ export interface VaultModelEntry {
  * Options for {@link VaultModel.recomputeAll} / {@link VaultModel.rebuild}.
  *
  * A full recompute evaluates every node (~90k on a large vault), which would
- * block the main thread for ~1 s. Supplying `yieldFn` makes the work cooperative:
+ * block the main thread for ~1 s. Supplying `yieldFunction` makes the work cooperative:
  * the model yields to the event loop every {@link RECOMPUTE_YIELD_CHUNK_SIZE}
  * nodes so the UI stays responsive and a progress indicator can repaint.
  */
 export interface VaultModelRecomputeAllOptions {
   /**
-   * Aborts the recompute between chunks. Only honored together with `yieldFn`.
+   * Aborts the recompute between chunks. Only honored together with `yieldFunction`.
    */
   readonly abortSignal?: AbortSignal;
 
@@ -41,7 +41,7 @@ export interface VaultModelRecomputeAllOptions {
    * thread. Omit for a straight-through synchronous-style run (used by tests and
    * benchmarks).
    */
-  yieldFn?(this: void): Promise<void>;
+  yieldFunction?(this: void): Promise<void>;
 }
 
 /**
@@ -109,12 +109,12 @@ interface VaultModelSetPathParams {
  * `b`, and `a`).
  */
 export class VaultModel {
-  private readonly isIgnored: IsIgnoredFn;
+  private readonly isIgnored: IsIgnoredFunction;
   private readonly nodes = new Map<string, VaultModelNode>();
   private readonly root: VaultModelNode;
   private readonly shouldHideEmptyFolders: () => boolean;
 
-  public constructor(isIgnored: IsIgnoredFn, shouldHideEmptyFolders: () => boolean = () => false) {
+  public constructor(isIgnored: IsIgnoredFunction, shouldHideEmptyFolders: () => boolean = () => false) {
     this.isIgnored = isIgnored;
     this.shouldHideEmptyFolders = shouldHideEmptyFolders;
     this.root = {
@@ -202,7 +202,7 @@ export class VaultModel {
 
   /**
    * Clears the model and rebuilds it from `entries`, then computes visibility
-   * for the whole tree. Yields cooperatively when `options.yieldFn` is supplied
+   * for the whole tree. Yields cooperatively when `options.yieldFunction` is supplied
    * (see {@link VaultModelRecomputeAllOptions}).
    */
   public async rebuild(entries: readonly VaultModelEntry[], options?: VaultModelRebuildOptions): Promise<VisibilityChange[]> {
@@ -223,7 +223,7 @@ export class VaultModel {
    * config / pattern change). Processes deepest nodes first so a folder sees its
    * children's final visibility. Returns the visibility flips.
    *
-   * Cooperative: with `options.yieldFn` it yields to the event loop every
+   * Cooperative: with `options.yieldFunction` it yields to the event loop every
    * {@link RECOMPUTE_YIELD_CHUNK_SIZE} nodes so the UI stays responsive. If
    * aborted between chunks it returns the flips collected so far (the caller
    * discards them, since a superseding recompute will redo the whole tree).
@@ -237,12 +237,12 @@ export class VaultModel {
     for (const node of sorted) {
       this.evaluateIgnored(node);
       processed++;
-      // `await` is reached only on a chunk boundary (and only with a `yieldFn`),
-      // So a small model — or any caller without `yieldFn` — runs straight through
+      // `await` is reached only on a chunk boundary (and only with a `yieldFunction`),
+      // So a small model — or any caller without `yieldFunction` — runs straight through
       // Without suspending per node.
       if (processed % RECOMPUTE_YIELD_CHUNK_SIZE === 0) {
         options?.onProgress?.(processed, total);
-        if (options?.yieldFn && await yieldAndCheckAbort(options)) {
+        if (options?.yieldFunction && await hasAbortedAfterYield(options)) {
           return changes;
         }
       }
@@ -257,7 +257,7 @@ export class VaultModel {
       processed++;
       if (processed % RECOMPUTE_YIELD_CHUNK_SIZE === 0) {
         options?.onProgress?.(processed, total);
-        if (options?.yieldFn && await yieldAndCheckAbort(options)) {
+        if (options?.yieldFunction && await hasAbortedAfterYield(options)) {
           return changes;
         }
       }
@@ -384,12 +384,12 @@ export class VaultModel {
     const changes: VisibilityChange[] = [];
     let current = start;
     while (current) {
-      const newVisible = this.computeVisible(current);
-      if (newVisible === current.isVisible) {
+      const isNewVisible = this.computeVisible(current);
+      if (isNewVisible === current.isVisible) {
         break;
       }
-      current.isVisible = newVisible;
-      changes.push({ isFolder: current.isFolder, isVisible: newVisible, path: current.path });
+      current.isVisible = isNewVisible;
+      changes.push({ isFolder: current.isFolder, isVisible: isNewVisible, path: current.path });
       current = current.parent;
     }
     return changes;
@@ -422,10 +422,10 @@ function getParentPath(normalizedPath: string): string {
 }
 
 /**
- * Yields the main thread via `options.yieldFn`, then reports whether the
+ * Yields the main thread via `options.yieldFunction`, then reports whether the
  * recompute was aborted during the yield (so the caller should stop).
  */
-async function yieldAndCheckAbort(options: VaultModelRecomputeAllOptions): Promise<boolean> {
-  await options.yieldFn?.();
+async function hasAbortedAfterYield(options: VaultModelRecomputeAllOptions): Promise<boolean> {
+  await options.yieldFunction?.();
   return options.abortSignal?.aborted ?? false;
 }

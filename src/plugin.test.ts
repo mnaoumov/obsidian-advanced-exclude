@@ -117,7 +117,7 @@ vi.mock('./publish-compatibility-warning-component.ts', () => ({
 }));
 
 vi.mock('./vault-path-store.ts', () => ({
-  IndexedDbVaultPathStore: vi.fn()
+  IndexedDatabaseVaultPathStore: vi.fn()
 }));
 
 function resetCapturedOnUpdateFileTree(): void {
@@ -160,12 +160,13 @@ describe('Plugin', () => {
 
   it('should call addChild the expected number of times', async () => {
     /*
-     * The real `PluginBase` registers 8 universal child components before
-     * `onloadImpl` (including its own `commandHandlerComponent` and the
-     * `MenuEventRegistrarComponent` it wires into it), then the plugin's
-     * `onloadImpl` adds its own 11 children.
+     * The real `PluginBase` registers 9 universal child components before
+     * `onloadImpl` (including its own `commandHandlerComponent`, the
+     * `MenuEventRegistrarComponent` it wires into it, and — since
+     * `obsidian-dev-utils` 89.0.0 — the Notebook Navigator menu-event registrar),
+     * then the plugin's `onloadImpl` adds its own 11 children.
      */
-    const EXPECTED_BASE_ADD_CHILD_CALLS = 8;
+    const EXPECTED_BASE_ADD_CHILD_CALLS = 9;
     const EXPECTED_PLUGIN_ADD_CHILD_CALLS = 11;
     const EXPECTED_ADD_CHILD_CALLS = EXPECTED_BASE_ADD_CHILD_CALLS + EXPECTED_PLUGIN_ADD_CHILD_CALLS;
     const appOriginal = app.asOriginalType__();

@@ -7,7 +7,7 @@ import {
 import { getPrototypeOf } from 'obsidian-dev-utils/object-utils';
 import { CallbackLayoutReadyComponent } from 'obsidian-dev-utils/obsidian/components/layout-ready-component';
 import { MonkeyAroundComponent } from 'obsidian-dev-utils/obsidian/components/monkey-around-component';
-import { isFolder as isFolderFn } from 'obsidian-dev-utils/obsidian/file-system';
+import { isFolder as isFolderFunction } from 'obsidian-dev-utils/obsidian/file-system';
 
 import type { IgnorePatternsComponent } from '../ignore-patterns-component.ts';
 import type { PluginSettingsComponent } from '../plugin-settings-component.ts';
@@ -20,7 +20,7 @@ interface FileExplorerViewOnCreatePatchComponentConstructorParams {
   readonly pluginSettingsComponent: PluginSettingsComponent;
 }
 
-type OnCreateFn = FileExplorerView['onCreate'];
+type OnCreateFunction = FileExplorerView['onCreate'];
 
 export class FileExplorerViewOnCreatePatchComponent extends MonkeyAroundComponent {
   private readonly app: App;
@@ -38,10 +38,10 @@ export class FileExplorerViewOnCreatePatchComponent extends MonkeyAroundComponen
     const view = this.getFileExplorerView();
     if (view) {
       this.registerMethodPatch({
+        $object: getPrototypeOf(view),
         methodName: 'onCreate',
-        obj: getPrototypeOf(view),
         patchHandler: ({
-          originalArgs: [file],
+          originalArguments: [file],
           originalMethod,
           originalThis
         }) => {
@@ -59,16 +59,16 @@ export class FileExplorerViewOnCreatePatchComponent extends MonkeyAroundComponen
     return this.app.workspace.getLeavesOfType('file-explorer')[0]?.view as FileExplorerView | undefined;
   }
 
-  private onCreate(originalFn: OnCreateFn, view: FileExplorerView, file: TAbstractFile): void {
+  private onCreate(originalFunction: OnCreateFunction, view: FileExplorerView, file: TAbstractFile): void {
     if (this.pluginSettingsComponent.settings.excludeMode !== ExcludeMode.FilesPane) {
-      originalFn.call(view, file);
+      originalFunction.call(view, file);
       return;
     }
 
-    const isIgnored = this.ignorePatternsComponent.isIgnored({ isFolder: isFolderFn(file), normalizedPath: file.path });
+    const isIgnored = this.ignorePatternsComponent.isIgnored({ isFolder: isFolderFunction(file), normalizedPath: file.path });
     if (isIgnored) {
       return;
     }
-    originalFn.call(view, file);
+    originalFunction.call(view, file);
   }
 }
