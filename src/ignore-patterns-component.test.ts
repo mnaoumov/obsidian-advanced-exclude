@@ -74,7 +74,7 @@ interface FileIgnoreEntry {
   path: string;
 }
 
-type MockCallEntry = [string, (...arguments_: unknown[]) => unknown];
+type MockCallEntry = [string, (...$arguments: unknown[]) => unknown];
 
 interface MockIDBObjectStore {
   clear: ReturnType<typeof vi.fn>;
@@ -214,7 +214,7 @@ function setupIndexedDatabase(params?: SetupIndexedDatabaseParams): SetupIndexed
 
   const newVersion = params?.upgradeNewVersion ?? 1;
 
-  const mockAddEventListener = vi.fn((event: string, handler: (event_: UpgradeEvent) => void) => {
+  const mockAddEventListener = vi.fn((event: string, handler: ($event: UpgradeEvent) => void) => {
     if (event === 'upgradeneeded') {
       handler({ newVersion });
     }
@@ -1272,7 +1272,7 @@ describe('IgnorePatternsComponent', () => {
         result: mockDatabase
       });
       Object.defineProperty(pendingOpenRequest, 'addEventListener', {
-        value: vi.fn((event: string, handler: (event_: UpgradeEvent) => void) => {
+        value: vi.fn((event: string, handler: ($event: UpgradeEvent) => void) => {
           // `success` fires immediately so the open promise resolves.
           if (event === 'upgradeneeded' || event === 'success') {
             handler({ newVersion: 1 });

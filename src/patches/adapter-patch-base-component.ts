@@ -16,7 +16,7 @@ export interface AdapterPatchBaseComponentConstructorParams {
   readonly indexProjectionComponent: IndexProjectionComponent;
   readonly pluginSettingsComponent: PluginSettingsComponent;
 }
-export type GenericReconcileFunction = (normalizedPath: string, ...arguments_: unknown[]) => Promise<void>;
+export type GenericReconcileFunction = (normalizedPath: string, ...$arguments: unknown[]) => Promise<void>;
 
 export class AdapterPatchBaseComponent extends MonkeyAroundComponent {
   private readonly app: App;
@@ -35,7 +35,7 @@ export class AdapterPatchBaseComponent extends MonkeyAroundComponent {
   }
 
   protected generateReconcileWrapper(originalFunction: GenericReconcileFunction, isFolder: boolean): GenericReconcileFunction {
-    return async (normalizedPath: string, ...arguments_: unknown[]) => {
+    return async (normalizedPath: string, ...$arguments: unknown[]) => {
       this.indexProjectionComponent.recordCreate({ isFolderPath: isFolder, normalizedPath });
       let shouldRemoveFromFilesPane = false;
       if (this.ignorePatternsComponent.isIgnored({ isFolder, normalizedPath })) {
@@ -44,7 +44,7 @@ export class AdapterPatchBaseComponent extends MonkeyAroundComponent {
         }
         shouldRemoveFromFilesPane = true;
       }
-      await originalFunction.call(this.app.vault.adapter, normalizedPath, ...arguments_);
+      await originalFunction.call(this.app.vault.adapter, normalizedPath, ...$arguments);
       if (shouldRemoveFromFilesPane) {
         this.fileTreeComponent.deleteFromFilesPane(normalizedPath);
       }

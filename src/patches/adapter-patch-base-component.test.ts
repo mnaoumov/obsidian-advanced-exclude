@@ -25,9 +25,9 @@ interface CreateComponentOverrides {
 
 class TestAdapterPatchBaseComponent extends AdapterPatchBaseComponent {
   public callGenerateReconcileWrapper(
-    originalFunction: (normalizedPath: string, ...arguments_: unknown[]) => Promise<void>,
+    originalFunction: (normalizedPath: string, ...$arguments: unknown[]) => Promise<void>,
     isFolder: boolean
-  ): (normalizedPath: string, ...arguments_: unknown[]) => Promise<void> {
+  ): (normalizedPath: string, ...$arguments: unknown[]) => Promise<void> {
     return this.generateReconcileWrapper(originalFunction, isFolder);
   }
 }

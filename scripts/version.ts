@@ -5,6 +5,6 @@ import {
   updateVersion
 } from 'obsidian-dev-utils/script-utils/version';
 
-const [, , ...arguments_] = process.argv;
-const { options, versionUpdateType } = parseVersionArguments(arguments_);
+const [, , ...$arguments] = process.argv;
+const { options, versionUpdateType } = parseVersionArguments($arguments);
 await wrapCliTask(() => updateVersion(versionUpdateType, options));

@@ -9,11 +9,11 @@ import {
   formatOverExposureFindings
 } from 'obsidian-dev-utils/script-utils/linters/over-exposure';
 
-const [, , ...arguments_] = process.argv;
+const [, , ...$arguments] = process.argv;
 
 const { values } = parseArgs({
   // eslint-disable-next-line unicorn/name-replacements -- `args` is a `node:util` `parseArgs` option name.
-  args: arguments_,
+  args: $arguments,
   options: {
     force: { type: 'boolean' }
   }
