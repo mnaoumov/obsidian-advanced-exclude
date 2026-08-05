@@ -6,7 +6,7 @@ import type {
 import { invokeAsyncSafelyAfterDelay } from 'obsidian-dev-utils/async';
 import {
   castTo,
-  deepEqual
+  isDeepEqual
 } from 'obsidian-dev-utils/object-utils';
 import { registerAsyncEvent } from 'obsidian-dev-utils/obsidian/components/async-events-component';
 import { ensureMetadataCacheReady } from 'obsidian-dev-utils/obsidian/metadata-cache';
@@ -59,7 +59,7 @@ vi.mock('obsidian-dev-utils/async', async (importOriginal) => {
 
 vi.mock('obsidian-dev-utils/object-utils', async (importOriginal) => ({
   ...await importOriginal<typeof import('obsidian-dev-utils/object-utils')>(),
-  deepEqual: vi.fn().mockReturnValue(true)
+  isDeepEqual: vi.fn().mockReturnValue(true)
 }));
 
 interface CreateComponentOverrides {
@@ -74,7 +74,7 @@ interface FileIgnoreEntry {
   path: string;
 }
 
-type MockCallEntry = [string, (...args: unknown[]) => unknown];
+type MockCallEntry = [string, (...$arguments: unknown[]) => unknown];
 
 interface MockIDBObjectStore {
   clear: ReturnType<typeof vi.fn>;
@@ -98,7 +98,7 @@ interface MtimeEntryWithObsidianIgnore {
 }
 
 interface MtimeEntryWithUserIgnoreFilters {
-  userIgnoreFiltersStr: string;
+  userIgnoreFiltersString: string;
 }
 
 interface SaveSettingsEffectiveValues {
@@ -109,17 +109,17 @@ interface SaveSettingsState {
   effectiveValues: SaveSettingsEffectiveValues;
 }
 
-interface SetupIndexedDbParams {
+interface SetupIndexedDatabaseParams {
   readonly filesEntries?: FileIgnoreEntry[];
   readonly mtimeEntry?: unknown;
   readonly upgradeNewVersion?: number;
 }
 
-interface SetupIndexedDbResult {
+interface SetupIndexedDatabaseResult {
   readonly filesStore: MockIDBObjectStore;
-  readonly mockDb: IDBDatabase;
+  readonly mockDatabase: IDBDatabase;
   readonly mtimeStore: MockIDBObjectStore;
-  readonly openFn: ReturnType<typeof vi.fn>;
+  readonly openFunction: ReturnType<typeof vi.fn>;
 }
 
 interface TestableIgnorePatternsComponent {
@@ -195,47 +195,47 @@ function createPluginSettingsComponent(settings?: Partial<PluginSettings>): Plug
   });
 }
 
-function createVaultLoadPatch(vaultLoadCalled = false): VaultLoadPatchComponent {
+function createVaultLoadPatch(wasVaultLoadCalled = false): VaultLoadPatchComponent {
   return strictProxy<VaultLoadPatchComponent>({
-    vaultLoadCalled
+    wasVaultLoadCalled
   });
 }
 
-function setupIndexedDb(params?: SetupIndexedDbParams): SetupIndexedDbResult {
+function setupIndexedDatabase(params?: SetupIndexedDatabaseParams): SetupIndexedDatabaseResult {
   const filesStore = createMockObjectStore(params?.filesEntries ?? []);
   const mtimeStore = createMockObjectStore();
   mtimeStore.get.mockReturnValue(createMockRequest(params?.mtimeEntry));
 
-  const mockDb = strictProxy<IDBDatabase>({
+  const mockDatabase = strictProxy<IDBDatabase>({
     createObjectStore: vi.fn()
   });
-  const mockTransactionFn = vi.fn(() => createMockTransaction({ files: filesStore, mtime: mtimeStore }));
-  Object.defineProperty(mockDb, 'transaction', { value: mockTransactionFn });
+  const mockTransactionFunction = vi.fn(() => createMockTransaction({ files: filesStore, mtime: mtimeStore }));
+  Object.defineProperty(mockDatabase, 'transaction', { value: mockTransactionFunction });
 
   const newVersion = params?.upgradeNewVersion ?? 1;
 
-  const mockAddEventListener = vi.fn((event: string, handler: (ev: UpgradeEvent) => void) => {
+  const mockAddEventListener = vi.fn((event: string, handler: ($event: UpgradeEvent) => void) => {
     if (event === 'upgradeneeded') {
       handler({ newVersion });
     }
   });
   const openRequestProxy = strictProxy<IDBOpenDBRequest>({
     readyState: 'done',
-    result: mockDb
+    result: mockDatabase
   });
   Object.defineProperty(openRequestProxy, 'addEventListener', { value: mockAddEventListener });
 
-  const openFn = vi.fn().mockReturnValue(openRequestProxy);
+  const openFunction = vi.fn().mockReturnValue(openRequestProxy);
 
   Object.defineProperty(window, 'indexedDB', {
     configurable: true,
     value: strictProxy<IDBFactory>({
-      open: openFn
+      open: openFunction
     }),
     writable: true
   });
 
-  return { filesStore, mockDb, mtimeStore, openFn };
+  return { filesStore, mockDatabase, mtimeStore, openFunction };
 }
 
 describe('IgnorePatternsComponent', () => {
@@ -254,7 +254,7 @@ describe('IgnorePatternsComponent', () => {
 
   describe('constructor', () => {
     it('should create an instance', () => {
-      setupIndexedDb();
+      setupIndexedDatabase();
       const component = createComponent();
       expect(component).toBeInstanceOf(IgnorePatternsComponent);
     });
@@ -262,27 +262,27 @@ describe('IgnorePatternsComponent', () => {
 
   describe('isIgnored', () => {
     it('should return false for ROOT_PATH', () => {
-      setupIndexedDb();
+      setupIndexedDatabase();
       const component = createComponent();
       expect(component.isIgnored({ isFolder: false, normalizedPath: '/' })).toBe(false);
     });
 
     it('should return cached result when available', async () => {
-      setupIndexedDb();
+      setupIndexedDatabase();
       const component = createComponent();
       await component.loadWithPromises();
 
       // First call caches the result
-      const result1 = component.isIgnored({ isFolder: false, normalizedPath: 'some/file.md' });
+      const isResult1 = component.isIgnored({ isFolder: false, normalizedPath: 'some/file.md' });
       // Second call should return the same result from cache
-      const result2 = component.isIgnored({ isFolder: false, normalizedPath: 'some/file.md' });
+      const isResult2 = component.isIgnored({ isFolder: false, normalizedPath: 'some/file.md' });
 
-      expect(result1).toBe(result2);
-      expect(result2).toBe(false);
+      expect(isResult1).toBe(isResult2);
+      expect(isResult2).toBe(false);
     });
 
     it('should test against ignore patterns for files', async () => {
-      setupIndexedDb();
+      setupIndexedDatabase();
       const pluginSettingsComponent = createPluginSettingsComponent();
       vi.mocked(readSafe).mockResolvedValueOnce('*.log');
       const component = createComponent({ pluginSettingsComponent });
@@ -293,7 +293,7 @@ describe('IgnorePatternsComponent', () => {
     });
 
     it('should test both path and path/ for folders', async () => {
-      setupIndexedDb();
+      setupIndexedDatabase();
       vi.mocked(readSafe).mockResolvedValueOnce('build/');
       const component = createComponent();
       await component.loadWithPromises();
@@ -302,7 +302,7 @@ describe('IgnorePatternsComponent', () => {
     });
 
     it('should test exclude regexps when shouldIgnoreExcludedFiles is true', async () => {
-      setupIndexedDb();
+      setupIndexedDatabase();
       const app = createApp();
       vi.mocked(app.vault.getConfig as ReturnType<typeof vi.fn>).mockReturnValue(['secret']);
       const pluginSettingsComponent = createPluginSettingsComponent({
@@ -315,9 +315,9 @@ describe('IgnorePatternsComponent', () => {
     });
 
     it('should handle regex exclude filters wrapped in slashes', async () => {
-      setupIndexedDb();
+      setupIndexedDatabase();
       const app = createApp();
-      vi.mocked(app.vault.getConfig as ReturnType<typeof vi.fn>).mockReturnValue(['/\\.tmp$/']);
+      vi.mocked(app.vault.getConfig as ReturnType<typeof vi.fn>).mockReturnValue([String.raw`/\.tmp$/`]);
       const pluginSettingsComponent = createPluginSettingsComponent({
         shouldIgnoreExcludedFiles: true
       });
@@ -329,7 +329,7 @@ describe('IgnorePatternsComponent', () => {
     });
 
     it('should handle invalid regex filters gracefully', async () => {
-      setupIndexedDb();
+      setupIndexedDatabase();
       const app = createApp();
       vi.mocked(app.vault.getConfig as ReturnType<typeof vi.fn>).mockReturnValue(['/[invalid/']);
       const pluginSettingsComponent = createPluginSettingsComponent({
@@ -344,7 +344,7 @@ describe('IgnorePatternsComponent', () => {
     });
 
     it('should not use exclude regexps when shouldIgnoreExcludedFiles is false', async () => {
-      setupIndexedDb();
+      setupIndexedDatabase();
       const app = createApp();
       vi.mocked(app.vault.getConfig as ReturnType<typeof vi.fn>).mockReturnValue(['secret']);
       const pluginSettingsComponent = createPluginSettingsComponent({
@@ -357,7 +357,7 @@ describe('IgnorePatternsComponent', () => {
     });
 
     it('should return cached exclude regexps on subsequent calls', async () => {
-      setupIndexedDb();
+      setupIndexedDatabase();
       const app = createApp();
       const getConfigMock = vi.mocked(app.vault.getConfig as ReturnType<typeof vi.fn>);
       getConfigMock.mockReturnValue(['secret']);
@@ -377,7 +377,7 @@ describe('IgnorePatternsComponent', () => {
     });
 
     it('should handle single-character filter that looks like regex delimiter', async () => {
-      setupIndexedDb();
+      setupIndexedDatabase();
       const app = createApp();
       vi.mocked(app.vault.getConfig as ReturnType<typeof vi.fn>).mockReturnValue(['/']);
       const pluginSettingsComponent = createPluginSettingsComponent({
@@ -392,7 +392,7 @@ describe('IgnorePatternsComponent', () => {
     });
 
     it('should store results in IndexedDB via addStoreAction', async () => {
-      const { filesStore } = setupIndexedDb();
+      const { filesStore } = setupIndexedDatabase();
       const component = createComponent();
       await component.loadWithPromises();
 
@@ -405,7 +405,7 @@ describe('IgnorePatternsComponent', () => {
     });
 
     it('should not ignore a folder re-included by the negation whitelist idiom', async () => {
-      setupIndexedDb();
+      setupIndexedDatabase();
       vi.mocked(readSafe).mockResolvedValueOnce('*\n!*/\n!*.md\n!*.canvas\n!*.base');
       const component = createComponent();
       await component.loadWithPromises();
@@ -416,7 +416,7 @@ describe('IgnorePatternsComponent', () => {
     });
 
     it('should re-include whitelisted file extensions and ignore the rest under the negation idiom', async () => {
-      setupIndexedDb();
+      setupIndexedDatabase();
       vi.mocked(readSafe).mockResolvedValueOnce('*\n!*/\n!*.md\n!*.canvas\n!*.base');
       const component = createComponent();
       await component.loadWithPromises();
@@ -429,7 +429,7 @@ describe('IgnorePatternsComponent', () => {
     });
 
     it('should still ignore a folder matched by a dir-only or plain pattern', async () => {
-      setupIndexedDb();
+      setupIndexedDatabase();
       vi.mocked(readSafe).mockResolvedValueOnce('build/\nnode_modules\n');
       const component = createComponent();
       await component.loadWithPromises();
@@ -441,7 +441,7 @@ describe('IgnorePatternsComponent', () => {
 
   describe('clearCachedExcludeRegExps', () => {
     it('should clear cached regexps', async () => {
-      setupIndexedDb();
+      setupIndexedDatabase();
       const pluginSettingsComponent = createPluginSettingsComponent({
         shouldIgnoreExcludedFiles: false
       });
@@ -454,7 +454,7 @@ describe('IgnorePatternsComponent', () => {
     });
 
     it('should clear fileIgnoreMap and trigger processConfigChanges when shouldIgnoreExcludedFiles is true', async () => {
-      setupIndexedDb();
+      setupIndexedDatabase();
       const pluginSettingsComponent = createPluginSettingsComponent({
         shouldIgnoreExcludedFiles: true
       });
@@ -473,7 +473,7 @@ describe('IgnorePatternsComponent', () => {
 
   describe('handleDeletedOrDotFile', () => {
     it('should remove path from fileIgnoreMap if present', async () => {
-      setupIndexedDb();
+      setupIndexedDatabase();
       const component = createComponent();
       await component.loadWithPromises();
 
@@ -486,7 +486,7 @@ describe('IgnorePatternsComponent', () => {
     });
 
     it('should not add store action when path is not in fileIgnoreMap', async () => {
-      const { filesStore } = setupIndexedDb();
+      const { filesStore } = setupIndexedDatabase();
       const component = createComponent();
       await component.loadWithPromises();
 
@@ -498,7 +498,7 @@ describe('IgnorePatternsComponent', () => {
     });
 
     it('should re-read obsidian ignore when path matches', async () => {
-      setupIndexedDb();
+      setupIndexedDatabase();
       vi.mocked(readSafe).mockResolvedValue('');
       const component = createComponent();
       await component.loadWithPromises();
@@ -510,7 +510,7 @@ describe('IgnorePatternsComponent', () => {
     });
 
     it('should re-read git ignore when path matches', async () => {
-      setupIndexedDb();
+      setupIndexedDatabase();
       const pluginSettingsComponent = createPluginSettingsComponent({
         shouldIncludeGitIgnorePatterns: true
       });
@@ -525,7 +525,7 @@ describe('IgnorePatternsComponent', () => {
     });
 
     it('should not trigger processConfigChanges when ignore file content is unchanged', async () => {
-      setupIndexedDb();
+      setupIndexedDatabase();
       vi.mocked(readSafe).mockResolvedValue('');
       const component = createComponent();
       await component.loadWithPromises();
@@ -539,7 +539,7 @@ describe('IgnorePatternsComponent', () => {
     });
 
     it('should handle a path that is in the fileIgnoreMap and also an ignore file', async () => {
-      setupIndexedDb();
+      setupIndexedDatabase();
       vi.mocked(readSafe).mockResolvedValue('');
       const component = createComponent();
       await component.loadWithPromises();
@@ -559,7 +559,7 @@ describe('IgnorePatternsComponent', () => {
 
   describe('processConfigChanges', () => {
     it('should no-op when hadConfigChanges is false', async () => {
-      setupIndexedDb();
+      setupIndexedDatabase();
       const onUpdateFileTree = vi.fn().mockResolvedValue(undefined);
       const component = createComponent({ onUpdateFileTree });
       await component.loadWithPromises();
@@ -570,7 +570,7 @@ describe('IgnorePatternsComponent', () => {
     });
 
     it('should reset DB and call onUpdateFileTree when hadConfigChanges is true', async () => {
-      setupIndexedDb();
+      setupIndexedDatabase();
       const onUpdateFileTree = vi.fn().mockResolvedValue(undefined);
       const pluginSettingsComponent = createPluginSettingsComponent();
       const component = createComponent({ onUpdateFileTree, pluginSettingsComponent });
@@ -594,7 +594,7 @@ describe('IgnorePatternsComponent', () => {
 
   describe('writeObsidianIgnore', () => {
     it('should no-op when content is unchanged', async () => {
-      setupIndexedDb();
+      setupIndexedDatabase();
       vi.mocked(readSafe).mockResolvedValue('existing-content');
       const component = createComponent();
       await component.loadWithPromises();
@@ -606,7 +606,7 @@ describe('IgnorePatternsComponent', () => {
     });
 
     it('should write file and update settings when content changes', async () => {
-      setupIndexedDb();
+      setupIndexedDatabase();
       vi.mocked(readSafe).mockResolvedValue('');
       const pluginSettingsComponent = createPluginSettingsComponent();
       const component = createComponent({ pluginSettingsComponent });
@@ -619,7 +619,7 @@ describe('IgnorePatternsComponent', () => {
     });
 
     it('should not write again if called with the same new content twice', async () => {
-      setupIndexedDb();
+      setupIndexedDatabase();
       vi.mocked(readSafe).mockResolvedValue('');
       const component = createComponent();
       await component.loadWithPromises();
@@ -635,7 +635,7 @@ describe('IgnorePatternsComponent', () => {
 
   describe('onLayoutReady', () => {
     it('should call ensureMetadataCacheReady', async () => {
-      setupIndexedDb();
+      setupIndexedDatabase();
       const component = createComponent();
       await component.loadWithPromises();
       await component.invokeOnLayoutReady();
@@ -643,8 +643,8 @@ describe('IgnorePatternsComponent', () => {
       expect(ensureMetadataCacheReady).toHaveBeenCalled();
     });
 
-    it('should call onUpdateFileTree when vaultLoadCalled is false', async () => {
-      setupIndexedDb();
+    it('should call onUpdateFileTree when wasVaultLoadCalled is false', async () => {
+      setupIndexedDatabase();
       const onUpdateFileTree = vi.fn().mockResolvedValue(undefined);
       const vaultLoadPatch = createVaultLoadPatch(false);
       const component = createComponent({ onUpdateFileTree, vaultLoadPatch });
@@ -654,8 +654,8 @@ describe('IgnorePatternsComponent', () => {
       expect(onUpdateFileTree).toHaveBeenCalled();
     });
 
-    it('should not call onUpdateFileTree when vaultLoadCalled is true', async () => {
-      setupIndexedDb();
+    it('should not call onUpdateFileTree when wasVaultLoadCalled is true', async () => {
+      setupIndexedDatabase();
       const onUpdateFileTree = vi.fn().mockResolvedValue(undefined);
       const vaultLoadPatch = createVaultLoadPatch(true);
       const component = createComponent({ onUpdateFileTree, vaultLoadPatch });
@@ -666,7 +666,7 @@ describe('IgnorePatternsComponent', () => {
     });
 
     it('should register config-changed event handler', async () => {
-      setupIndexedDb();
+      setupIndexedDatabase();
       const app = createApp();
       const vaultOnSpy = vi.spyOn(app.vault, 'on');
       const component = createComponent({ app });
@@ -677,7 +677,7 @@ describe('IgnorePatternsComponent', () => {
     });
 
     it('should call clearCachedExcludeRegExps when config-changed fires with userIgnoreFilters', async () => {
-      setupIndexedDb();
+      setupIndexedDatabase();
       const app = createApp();
       const vaultOnSpy = vi.spyOn(app.vault, 'on');
       const pluginSettingsComponent = createPluginSettingsComponent({
@@ -699,7 +699,7 @@ describe('IgnorePatternsComponent', () => {
     });
 
     it('should not call clearCachedExcludeRegExps for other config keys', async () => {
-      setupIndexedDb();
+      setupIndexedDatabase();
       const app = createApp();
       const vaultOnSpy = vi.spyOn(app.vault, 'on');
       const component = createComponent({ app });
@@ -720,16 +720,16 @@ describe('IgnorePatternsComponent', () => {
 
   describe('onload', () => {
     it('should load DB and reload ignore files', async () => {
-      const { openFn } = setupIndexedDb();
+      const { openFunction } = setupIndexedDatabase();
       const component = createComponent();
       await component.loadWithPromises();
 
-      expect(openFn).toHaveBeenCalled();
+      expect(openFunction).toHaveBeenCalled();
       expect(readSafe).toHaveBeenCalled();
     });
 
     it('should register loadSettings and saveSettings event handlers', async () => {
-      setupIndexedDb();
+      setupIndexedDatabase();
       const pluginSettingsComponent = createPluginSettingsComponent();
       const component = createComponent({ pluginSettingsComponent });
       await component.loadWithPromises();
@@ -742,7 +742,7 @@ describe('IgnorePatternsComponent', () => {
     });
 
     it('should handle loadSettings event on non-initial load', async () => {
-      setupIndexedDb();
+      setupIndexedDatabase();
       const pluginSettingsComponent = createPluginSettingsComponent();
       const component = createComponent({ pluginSettingsComponent });
       await component.loadWithPromises();
@@ -759,7 +759,7 @@ describe('IgnorePatternsComponent', () => {
     });
 
     it('should skip readObsidianIgnore on initial loadSettings', async () => {
-      setupIndexedDb();
+      setupIndexedDatabase();
       const pluginSettingsComponent = createPluginSettingsComponent();
       const component = createComponent({ pluginSettingsComponent });
       await component.loadWithPromises();
@@ -776,7 +776,7 @@ describe('IgnorePatternsComponent', () => {
     });
 
     it('should handle saveSettings event', async () => {
-      setupIndexedDb();
+      setupIndexedDatabase();
       const pluginSettingsComponent = createPluginSettingsComponent();
       const component = createComponent({ pluginSettingsComponent });
       await component.loadWithPromises();
@@ -797,33 +797,33 @@ describe('IgnorePatternsComponent', () => {
 
   describe('config fingerprint and lazy verdict loading', () => {
     it('should open IndexedDB with correct name', async () => {
-      const { openFn } = setupIndexedDb();
+      const { openFunction } = setupIndexedDatabase();
       const app = createApp();
       const component = createComponent({ app });
       await component.loadWithPromises();
 
-      expect(openFn).toHaveBeenCalledWith('test-app/advanced-exclude', 1);
+      expect(openFunction).toHaveBeenCalledWith('test-app/advanced-exclude', 1);
     });
 
     it('should create object stores on upgradeneeded with newVersion 1', async () => {
-      const { mockDb } = setupIndexedDb();
+      const { mockDatabase } = setupIndexedDatabase();
       const component = createComponent();
       await component.loadWithPromises();
 
-      expect(mockDb.createObjectStore).toHaveBeenCalledTimes(2);
+      expect(mockDatabase.createObjectStore).toHaveBeenCalledTimes(2);
     });
 
     it('should skip object store creation when newVersion is not 1', async () => {
-      const { mockDb } = setupIndexedDb({ upgradeNewVersion: 2 });
+      const { mockDatabase } = setupIndexedDatabase({ upgradeNewVersion: 2 });
       const component = createComponent();
       await component.loadWithPromises();
 
-      expect(mockDb.createObjectStore).not.toHaveBeenCalled();
+      expect(mockDatabase.createObjectStore).not.toHaveBeenCalled();
     });
 
     it('marks the config unchanged and defers the verdict getAll when mtime matches', async () => {
-      vi.mocked(deepEqual).mockReturnValue(true);
-      const { filesStore } = setupIndexedDb({
+      vi.mocked(isDeepEqual).mockReturnValue(true);
+      const { filesStore } = setupIndexedDatabase({
         filesEntries: [
           { isIgnored: true, path: 'ignored.md' },
           { isIgnored: false, path: 'visible.md' }
@@ -844,8 +844,8 @@ describe('IgnorePatternsComponent', () => {
     });
 
     it('hydrates persisted verdicts at most once', async () => {
-      vi.mocked(deepEqual).mockReturnValue(true);
-      const { filesStore } = setupIndexedDb({ filesEntries: [{ isIgnored: true, path: 'ignored.md' }] });
+      vi.mocked(isDeepEqual).mockReturnValue(true);
+      const { filesStore } = setupIndexedDatabase({ filesEntries: [{ isIgnored: true, path: 'ignored.md' }] });
       const component = createComponent();
       await component.loadWithPromises();
 
@@ -855,8 +855,8 @@ describe('IgnorePatternsComponent', () => {
     });
 
     it('resets the DB and reports the config changed when mtime does not match', async () => {
-      vi.mocked(deepEqual).mockReturnValue(false);
-      const { filesStore } = setupIndexedDb({
+      vi.mocked(isDeepEqual).mockReturnValue(false);
+      const { filesStore } = setupIndexedDatabase({
         filesEntries: [{ isIgnored: true, path: 'old.md' }]
       });
       const component = createComponent();
@@ -870,18 +870,18 @@ describe('IgnorePatternsComponent', () => {
     });
 
     it('should use default mtime entry when none stored', async () => {
-      vi.mocked(deepEqual).mockReturnValue(true);
-      setupIndexedDb({ mtimeEntry: undefined });
+      vi.mocked(isDeepEqual).mockReturnValue(true);
+      setupIndexedDatabase({ mtimeEntry: undefined });
       const component = createComponent();
       await component.loadWithPromises();
 
-      expect(deepEqual).toHaveBeenCalled();
+      expect(isDeepEqual).toHaveBeenCalled();
     });
   });
 
   describe('readGitIgnore', () => {
     it('should not read git ignore when shouldIncludeGitIgnorePatterns is false', async () => {
-      setupIndexedDb();
+      setupIndexedDatabase();
       const pluginSettingsComponent = createPluginSettingsComponent({
         shouldIncludeGitIgnorePatterns: false
       });
@@ -896,7 +896,7 @@ describe('IgnorePatternsComponent', () => {
     });
 
     it('should read git ignore when shouldIncludeGitIgnorePatterns is true', async () => {
-      setupIndexedDb();
+      setupIndexedDatabase();
       const pluginSettingsComponent = createPluginSettingsComponent({
         shouldIncludeGitIgnorePatterns: true
       });
@@ -908,7 +908,7 @@ describe('IgnorePatternsComponent', () => {
     });
 
     it('should detect git ignore content changes', async () => {
-      setupIndexedDb();
+      setupIndexedDatabase();
       const pluginSettingsComponent = createPluginSettingsComponent({
         shouldIncludeGitIgnorePatterns: true
       });
@@ -926,7 +926,7 @@ describe('IgnorePatternsComponent', () => {
 
   describe('readObsidianIgnore', () => {
     it('should read obsidian ignore and update settings on content change', async () => {
-      setupIndexedDb();
+      setupIndexedDatabase();
       const pluginSettingsComponent = createPluginSettingsComponent();
       vi.mocked(readSafe).mockResolvedValue('initial-content');
       const component = createComponent({ pluginSettingsComponent });
@@ -936,7 +936,7 @@ describe('IgnorePatternsComponent', () => {
     });
 
     it('should return false when content is unchanged', async () => {
-      setupIndexedDb();
+      setupIndexedDatabase();
       vi.mocked(readSafe).mockResolvedValue('');
       const component = createComponent();
       await component.loadWithPromises();
@@ -954,7 +954,7 @@ describe('IgnorePatternsComponent', () => {
 
   describe('reload', () => {
     it('should call writeObsidianIgnore when obsidianIgnoreContent is provided', async () => {
-      setupIndexedDb();
+      setupIndexedDatabase();
       const pluginSettingsComponent = createPluginSettingsComponent();
       const component = createComponent({ pluginSettingsComponent });
       await component.loadWithPromises();
@@ -972,7 +972,7 @@ describe('IgnorePatternsComponent', () => {
     });
 
     it('should call readObsidianIgnore when obsidianIgnoreContent is undefined', async () => {
-      setupIndexedDb();
+      setupIndexedDatabase();
       vi.mocked(readSafe).mockResolvedValue('');
       const component = createComponent();
       vi.mocked(readSafe).mockClear();
@@ -983,7 +983,7 @@ describe('IgnorePatternsComponent', () => {
     });
 
     it('should clear fileIgnoreMap when obsidianignore patterns change', async () => {
-      setupIndexedDb();
+      setupIndexedDatabase();
       vi.mocked(readSafe).mockResolvedValue('');
       const pluginSettingsComponent = createPluginSettingsComponent();
       const component = createComponent({ pluginSettingsComponent });
@@ -1010,7 +1010,7 @@ describe('IgnorePatternsComponent', () => {
 
   describe('processStoreActions', () => {
     it('should batch pending store operations', async () => {
-      const { filesStore } = setupIndexedDb();
+      const { filesStore } = setupIndexedDatabase();
       const component = createComponent();
       await component.loadWithPromises();
 
@@ -1025,7 +1025,7 @@ describe('IgnorePatternsComponent', () => {
     });
 
     it('should clear pending actions after processing', async () => {
-      const { filesStore } = setupIndexedDb();
+      const { filesStore } = setupIndexedDatabase();
       const component = createComponent();
       await component.loadWithPromises();
 
@@ -1041,7 +1041,7 @@ describe('IgnorePatternsComponent', () => {
     });
 
     it('should dedupe queued actions by path so the queue stays bounded', async () => {
-      const { filesStore } = setupIndexedDb();
+      const { filesStore } = setupIndexedDatabase();
       const component = createComponent();
       await component.loadWithPromises();
 
@@ -1061,8 +1061,8 @@ describe('IgnorePatternsComponent', () => {
 
   describe('resetDb', () => {
     it('should clear files store and fileIgnoreMap', async () => {
-      vi.mocked(deepEqual).mockReturnValue(false);
-      const { filesStore } = setupIndexedDb();
+      vi.mocked(isDeepEqual).mockReturnValue(false);
+      const { filesStore } = setupIndexedDatabase();
       const component = createComponent();
       await component.loadWithPromises();
 
@@ -1071,8 +1071,8 @@ describe('IgnorePatternsComponent', () => {
     });
 
     it('should update mtime entry', async () => {
-      vi.mocked(deepEqual).mockReturnValue(false);
-      const { mtimeStore } = setupIndexedDb();
+      vi.mocked(isDeepEqual).mockReturnValue(false);
+      const { mtimeStore } = setupIndexedDatabase();
       const component = createComponent();
       await component.loadWithPromises();
 
@@ -1082,12 +1082,12 @@ describe('IgnorePatternsComponent', () => {
 
   describe('getCurrentMtimeEntry', () => {
     it('should include gitIgnoreMtime when shouldIncludeGitIgnorePatterns is true', async () => {
-      vi.mocked(deepEqual).mockReturnValue(false);
-      vi.mocked(statSafe).mockResolvedValue({ ctime: 0, mtime: 12345, size: 10, type: 'file' });
+      vi.mocked(isDeepEqual).mockReturnValue(false);
+      vi.mocked(statSafe).mockResolvedValue({ ctime: 0, mtime: 12_345, size: 10, type: 'file' });
       const pluginSettingsComponent = createPluginSettingsComponent({
         shouldIncludeGitIgnorePatterns: true
       });
-      setupIndexedDb();
+      setupIndexedDatabase();
       const component = createComponent({ pluginSettingsComponent });
       await component.loadWithPromises();
 
@@ -1096,11 +1096,11 @@ describe('IgnorePatternsComponent', () => {
     });
 
     it('should set gitIgnoreMtime to 0 when shouldIncludeGitIgnorePatterns is false', async () => {
-      vi.mocked(deepEqual).mockReturnValue(false);
+      vi.mocked(isDeepEqual).mockReturnValue(false);
       const pluginSettingsComponent = createPluginSettingsComponent({
         shouldIncludeGitIgnorePatterns: false
       });
-      const { mtimeStore } = setupIndexedDb();
+      const { mtimeStore } = setupIndexedDatabase();
       const component = createComponent({ pluginSettingsComponent });
       await component.loadWithPromises();
 
@@ -1114,9 +1114,9 @@ describe('IgnorePatternsComponent', () => {
     });
 
     it('should handle null stat result for obsidian ignore', async () => {
-      vi.mocked(deepEqual).mockReturnValue(false);
+      vi.mocked(isDeepEqual).mockReturnValue(false);
       vi.mocked(statSafe).mockResolvedValue(null);
-      const { mtimeStore } = setupIndexedDb();
+      const { mtimeStore } = setupIndexedDatabase();
       const component = createComponent();
       await component.loadWithPromises();
 
@@ -1130,58 +1130,58 @@ describe('IgnorePatternsComponent', () => {
     });
 
     it('should include userIgnoreFilters in mtime entry', async () => {
-      vi.mocked(deepEqual).mockReturnValue(false);
+      vi.mocked(isDeepEqual).mockReturnValue(false);
       const app = createApp();
       vi.mocked(app.vault.getConfig as ReturnType<typeof vi.fn>).mockReturnValue(['filter1', 'filter2']);
       const pluginSettingsComponent = createPluginSettingsComponent({
         shouldIgnoreExcludedFiles: true
       });
-      const { mtimeStore } = setupIndexedDb();
+      const { mtimeStore } = setupIndexedDatabase();
       const component = createComponent({ app, pluginSettingsComponent });
       await component.loadWithPromises();
 
       const putCall = mtimeStore.put.mock.calls[0];
       if (putCall) {
         const entry = putCall[0] as MtimeEntryWithUserIgnoreFilters;
-        expect(entry.userIgnoreFiltersStr).toBe('filter1\nfilter2');
+        expect(entry.userIgnoreFiltersString).toBe('filter1\nfilter2');
       } else {
         expect.fail('mtimeStore.put was not called');
       }
     });
 
     it('should return empty userIgnoreFilters when shouldIgnoreExcludedFiles is false', async () => {
-      vi.mocked(deepEqual).mockReturnValue(false);
+      vi.mocked(isDeepEqual).mockReturnValue(false);
       const pluginSettingsComponent = createPluginSettingsComponent({
         shouldIgnoreExcludedFiles: false
       });
-      const { mtimeStore } = setupIndexedDb();
+      const { mtimeStore } = setupIndexedDatabase();
       const component = createComponent({ pluginSettingsComponent });
       await component.loadWithPromises();
 
       const putCall = mtimeStore.put.mock.calls[0];
       if (putCall) {
         const entry = putCall[0] as MtimeEntryWithUserIgnoreFilters;
-        expect(entry.userIgnoreFiltersStr).toBe('');
+        expect(entry.userIgnoreFiltersString).toBe('');
       } else {
         expect.fail('mtimeStore.put was not called');
       }
     });
 
     it('should handle null userIgnoreFilters from vault config', async () => {
-      vi.mocked(deepEqual).mockReturnValue(false);
+      vi.mocked(isDeepEqual).mockReturnValue(false);
       const app = createApp();
       vi.mocked(app.vault.getConfig as ReturnType<typeof vi.fn>).mockReturnValue(null);
       const pluginSettingsComponent = createPluginSettingsComponent({
         shouldIgnoreExcludedFiles: true
       });
-      const { mtimeStore } = setupIndexedDb();
+      const { mtimeStore } = setupIndexedDatabase();
       const component = createComponent({ app, pluginSettingsComponent });
       await component.loadWithPromises();
 
       const putCall = mtimeStore.put.mock.calls[0];
       if (putCall) {
         const entry = putCall[0] as MtimeEntryWithUserIgnoreFilters;
-        expect(entry.userIgnoreFiltersStr).toBe('');
+        expect(entry.userIgnoreFiltersString).toBe('');
       } else {
         expect.fail('mtimeStore.put was not called');
       }
@@ -1190,7 +1190,7 @@ describe('IgnorePatternsComponent', () => {
 
   describe('getIgnoreTester', () => {
     it('should build tester from obsidian and git ignore content', async () => {
-      setupIndexedDb();
+      setupIndexedDatabase();
       vi.mocked(readSafe)
         .mockResolvedValueOnce('*.log') // Obsidian ignore
         .mockResolvedValueOnce('node_modules'); // Git ignore
@@ -1206,7 +1206,7 @@ describe('IgnorePatternsComponent', () => {
     });
 
     it('should cache the ignore tester', async () => {
-      setupIndexedDb();
+      setupIndexedDatabase();
       vi.mocked(readSafe).mockResolvedValue('*.log');
       const component = createComponent();
       await component.loadWithPromises();
@@ -1221,7 +1221,7 @@ describe('IgnorePatternsComponent', () => {
   });
 
   describe('db getter', () => {
-    it('should throw when db is not set', () => {
+    it('should throw when database is not set', () => {
       const component = createComponent();
       // Accessing isIgnored before onload means db is not initialized,
       // But isIgnored only touches db via addStoreAction which is debounced.
@@ -1233,13 +1233,13 @@ describe('IgnorePatternsComponent', () => {
         component.isIgnored({ isFolder: false, normalizedPath: 'test.md' });
         // Manually trigger the debounce
         vi.runAllTimers();
-      }).toThrow('db is not set');
+      }).toThrow('database is not set');
     });
   });
 
   describe('handleDeletedOrDotFile with store action for cached path', () => {
     it('should add a delete store action when path was cached', async () => {
-      const { filesStore } = setupIndexedDb();
+      const { filesStore } = setupIndexedDatabase();
       const component = createComponent();
       await component.loadWithPromises();
 
@@ -1259,25 +1259,22 @@ describe('IgnorePatternsComponent', () => {
       const mtimeStore = createMockObjectStore();
       mtimeStore.get.mockReturnValue(createMockRequest(undefined));
 
-      const mockDb = strictProxy<IDBDatabase>({
+      const mockDatabase = strictProxy<IDBDatabase>({
         createObjectStore: vi.fn()
       });
-      Object.defineProperty(mockDb, 'transaction', {
+      Object.defineProperty(mockDatabase, 'transaction', {
         value: vi.fn(() => createMockTransaction({ files: filesStore, mtime: mtimeStore }))
       });
 
       // Create an open request that is pending (not done)
       const pendingOpenRequest = strictProxy<IDBOpenDBRequest>({
         readyState: 'pending',
-        result: mockDb
+        result: mockDatabase
       });
       Object.defineProperty(pendingOpenRequest, 'addEventListener', {
-        value: vi.fn((event: string, handler: (ev: UpgradeEvent) => void) => {
-          if (event === 'upgradeneeded') {
-            handler({ newVersion: 1 });
-          }
-          if (event === 'success') {
-            // Fire success immediately to resolve the promise
+        value: vi.fn((event: string, handler: ($event: UpgradeEvent) => void) => {
+          // `success` fires immediately so the open promise resolves.
+          if (event === 'upgradeneeded' || event === 'success') {
             handler({ newVersion: 1 });
           }
         })
@@ -1357,7 +1354,7 @@ describe('IgnorePatternsComponent', () => {
 
   describe('getExcludeRegExps edge cases', () => {
     it('should treat filter starting and ending with / but length > 1 as regex', async () => {
-      setupIndexedDb();
+      setupIndexedDatabase();
       const app = createApp();
       vi.mocked(app.vault.getConfig as ReturnType<typeof vi.fn>).mockReturnValue(['/test.*/']);
       const pluginSettingsComponent = createPluginSettingsComponent({
@@ -1370,7 +1367,7 @@ describe('IgnorePatternsComponent', () => {
     });
 
     it('should treat plain filter as anchored prefix match', async () => {
-      setupIndexedDb();
+      setupIndexedDatabase();
       const app = createApp();
       vi.mocked(app.vault.getConfig as ReturnType<typeof vi.fn>).mockReturnValue(['docs']);
       const pluginSettingsComponent = createPluginSettingsComponent({

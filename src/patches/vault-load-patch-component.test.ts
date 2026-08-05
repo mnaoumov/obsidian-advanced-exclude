@@ -13,14 +13,14 @@ interface OnloadAccessor {
 }
 
 describe('VaultLoadPatchComponent', () => {
-  it('should have vaultLoadCalled initially false', () => {
+  it('should have wasVaultLoadCalled initially false', () => {
     const app = App.createConfigured__();
     const component = new VaultLoadPatchComponent(app.asOriginalType__());
 
-    expect(component.vaultLoadCalled).toBe(false);
+    expect(component.wasVaultLoadCalled).toBe(false);
   });
 
-  it('should set vaultLoadCalled to true when vault.load is called', async () => {
+  it('should set wasVaultLoadCalled to true when vault.load is called', async () => {
     const app = App.createConfigured__();
     const appOriginal = app.asOriginalType__();
     appOriginal.vault.load = vi.fn().mockResolvedValue(undefined);
@@ -31,7 +31,7 @@ describe('VaultLoadPatchComponent', () => {
     // Call the patched vault.load
     await appOriginal.vault.load();
 
-    expect(component.vaultLoadCalled).toBe(true);
+    expect(component.wasVaultLoadCalled).toBe(true);
   });
 
   it('should call super.onload', () => {
@@ -40,8 +40,8 @@ describe('VaultLoadPatchComponent', () => {
     appOriginal.vault.load = vi.fn().mockResolvedValue(undefined);
     const component = new VaultLoadPatchComponent(appOriginal);
 
-    const grandParentProto = Object.getPrototypeOf(Object.getPrototypeOf(component) as object) as OnloadAccessor;
-    const superOnloadSpy = vi.spyOn(grandParentProto, 'onload');
+    const grandParentPrototype = Object.getPrototypeOf(Object.getPrototypeOf(component) as object) as OnloadAccessor;
+    const superOnloadSpy = vi.spyOn(grandParentPrototype, 'onload');
     component.load();
 
     expect(superOnloadSpy).toHaveBeenCalled();

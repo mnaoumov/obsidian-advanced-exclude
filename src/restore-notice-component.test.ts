@@ -22,11 +22,11 @@ const showNoticeMock = vi.fn((message: DocumentFragment | string, _options?: Plu
 
 // The restore normally runs (and succeeds) first, suppressing the notice; the notice
 // Path is only reached when it reports the index NOT fully restored, so these notice
-// Tests default `restored` to false. A dedicated test covers the restore-succeeds path.
-function createComponent(hiddenCount: number, restored = false): RestoreNoticeComponent {
+// Tests default `wasRestored` to false. A dedicated test covers the restore-succeeds path.
+function createComponent(hiddenCount: number, wasRestored = false): RestoreNoticeComponent {
   const indexProjectionComponent = strictProxy<IndexProjectionComponent>({
     getHiddenCount: vi.fn().mockReturnValue(hiddenCount),
-    restoreHiddenFilesOnUnload: vi.fn().mockReturnValue(restored)
+    restoreHiddenFilesOnUnload: vi.fn().mockReturnValue(wasRestored)
   });
   const pluginNoticeComponent = strictProxy<PluginNoticeComponent>({ showNotice: showNoticeMock });
   return new RestoreNoticeComponent({ indexProjectionComponent, pluginNoticeComponent });

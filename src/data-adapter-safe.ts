@@ -16,7 +16,7 @@ interface WriteSafeParams {
 }
 
 export async function readSafe(app: App, path: string): Promise<string> {
-  if (!await existsSafe(app, path)) {
+  if (!await doesExistSafe(app, path)) {
     return '';
   }
 
@@ -24,7 +24,7 @@ export async function readSafe(app: App, path: string): Promise<string> {
   const fullPath = adapter.getFullPath(path);
 
   if (adapter instanceof FileSystemAdapter) {
-    return await adapter.fsPromises.readFile(fullPath, 'utf8');
+    return await adapter.fsPromises.readFile(fullPath, 'utf-8');
   }
   if (adapter instanceof CapacitorAdapter) {
     return await adapter.fs.read(fullPath);
@@ -34,7 +34,7 @@ export async function readSafe(app: App, path: string): Promise<string> {
 }
 
 export async function statSafe(app: App, path: string): Promise<null | Stat> {
-  if (!await existsSafe(app, path)) {
+  if (!await doesExistSafe(app, path)) {
     return null;
   }
 
@@ -79,7 +79,7 @@ export async function writeSafe(params: WriteSafeParams): Promise<void> {
   throw new Error('Unknown adapter');
 }
 
-async function existsSafe(app: App, path: string): Promise<boolean> {
+async function doesExistSafe(app: App, path: string): Promise<boolean> {
   const adapter = getDataAdapterEx(app);
   const fullPath = adapter.getFullPath(path);
 

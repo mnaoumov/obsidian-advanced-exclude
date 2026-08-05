@@ -83,7 +83,9 @@ describe('Fast enable — re-hides the persisted set directly on unchanged confi
     let previous = -1;
     for (let poll = 0; poll < SETTLE_MAX_POLLS; poll++) {
       const count = await evalInObsidian({
+        // eslint-disable-next-line unicorn/name-replacements -- `args` is an `obsidian-integration-testing` parameter name.
         args: { pollMs: SETTLE_POLL_IN_MS },
+        // eslint-disable-next-line unicorn/name-replacements -- `fn` is an `obsidian-integration-testing` parameter name.
         async fn({ app, pollMs }): Promise<number> {
           await sleep(pollMs);
           return app.vault.getAllLoadedFiles().length;
@@ -97,6 +99,7 @@ describe('Fast enable — re-hides the persisted set directly on unchanged confi
     }
 
     const result = await evalInObsidian({
+      // eslint-disable-next-line unicorn/name-replacements -- `args` is an `obsidian-integration-testing` parameter name.
       args: {
         CONTROL: VAULT_CONTROL,
         fullMode: ExcludeMode.Full,
@@ -108,11 +111,12 @@ describe('Fast enable — re-hides the persisted set directly on unchanged confi
         pollMs: REENABLE_POLL_IN_MS,
         reEnableMaxWaitMs: REENABLE_MAX_WAIT_IN_MS
       },
+      // eslint-disable-next-line unicorn/name-replacements -- `fn` is an `obsidian-integration-testing` parameter name.
       async fn({
         app,
         CONTROL: controlPath,
         fullMode,
-        HIDDEN_DIR: hiddenDir,
+        HIDDEN_DIR: hiddenDirectory,
         INTRUDER_PATH: intruderPath,
         LINK_SOURCE: linkSource,
         LINK_TARGET: linkTarget,
@@ -120,7 +124,7 @@ describe('Fast enable — re-hides the persisted set directly on unchanged confi
         pollMs,
         reEnableMaxWaitMs
       }): Promise<ReEnableResult> {
-        const hiddenPrefix = `${hiddenDir}/`;
+        const hiddenPrefix = `${hiddenDirectory}/`;
 
         const loadedBefore = app.vault.getAllLoadedFiles().length;
 
@@ -151,9 +155,9 @@ describe('Fast enable — re-hides the persisted set directly on unchanged confi
         // 3. Re-enable unchanged → FAST path. The folder is re-hidden and its inbound link
         //    Demoted to unresolved again.
         await reEnableUntilHidden();
-        const fastEnableAppliedOnFast = fastEnableAppliedOf();
+        const isFastEnableAppliedOnFast = isFastEnableApplied();
         const hiddenAfterFastReEnable = countHidden();
-        const controlVisibleAfterFast = isControlVisible();
+        const isControlVisibleAfterFast = isControlVisible();
         const linkStateAfterFastReEnable = linkState(linkSource, linkTarget);
 
         // 4. Disable, change the universe on disk (a new ignored file the fingerprint
@@ -161,19 +165,19 @@ describe('Fast enable — re-hides the persisted set directly on unchanged confi
         await app.plugins.disablePlugin(pluginId);
         await app.vault.create(intruderPath, '');
         await reEnableUntilHidden();
-        const fastEnableAppliedOnFull = fastEnableAppliedOf();
+        const isFastEnableAppliedOnFull = isFastEnableApplied();
         const hiddenAfterFullReEnable = countHidden();
-        const intruderHiddenAfterFull = !isIntruderIndexed();
+        const isIntruderHiddenAfterFull = !isIntruderIndexed();
 
         return {
-          controlVisibleAfterFast,
+          controlVisibleAfterFast: isControlVisibleAfterFast,
           error: null,
-          fastEnableAppliedOnFast,
-          fastEnableAppliedOnFull,
+          fastEnableAppliedOnFast: isFastEnableAppliedOnFast,
+          fastEnableAppliedOnFull: isFastEnableAppliedOnFull,
           hiddenAfterApply,
           hiddenAfterFastReEnable,
           hiddenAfterFullReEnable,
-          intruderHiddenAfterFull,
+          intruderHiddenAfterFull: isIntruderHiddenAfterFull,
           linkStateAfterFastReEnable,
           linkStateWhenRestored,
           loadedBefore,
@@ -192,7 +196,7 @@ describe('Fast enable — re-hides the persisted set directly on unchanged confi
           return app.vault.getFiles().some((file) => file.path === intruderPath);
         }
 
-        function fastEnableAppliedOf(): boolean {
+        function isFastEnableApplied(): boolean {
           const reEnabledPlugin = app.plugins.getPlugin(pluginId);
           const component = reEnabledPlugin
             ? findComponent(reEnabledPlugin, 'IndexProjectionComponent') as IndexProjectionLike | undefined
@@ -226,11 +230,13 @@ describe('Fast enable — re-hides the persisted set directly on unchanged confi
             return root;
           }
           for (const child of (root as TraversableComponent)._children ?? []) {
-            if (typeof child === 'object' && child !== null) {
-              const found = findComponent(child, className);
-              if (found) {
-                return found;
-              }
+            if (typeof child !== 'object' || child === null) {
+              continue;
+            }
+
+            const found = findComponent(child, className);
+            if (found) {
+              return found;
             }
           }
           return undefined;

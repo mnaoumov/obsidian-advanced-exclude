@@ -6,7 +6,7 @@ import {
   debounce
 } from 'obsidian';
 import { invokeAsyncSafelyAfterDelay } from 'obsidian-dev-utils/async';
-import { deepEqual } from 'obsidian-dev-utils/object-utils';
+import { isDeepEqual } from 'obsidian-dev-utils/object-utils';
 import { registerAsyncEvent } from 'obsidian-dev-utils/obsidian/components/async-events-component';
 import { LayoutReadyComponent } from 'obsidian-dev-utils/obsidian/components/layout-ready-component';
 import { ensureMetadataCacheReady } from 'obsidian-dev-utils/obsidian/metadata-cache';
@@ -26,35 +26,35 @@ import {
   statSafe,
   writeSafe
 } from './data-adapter-safe.ts';
-import { getResult } from './indexed-db-utils.ts';
+import { getResult } from './indexed-database-utils.ts';
 
 const DB_VERSION = 1;
 // Bumped whenever the ignore-matching logic changes shape (e.g. the folder verdict
 // Now tests the trailing-slash form only). It rides in the mtime entry so an upgrade
-// Whose ignore-file modification times are unchanged still fails the `deepEqual` check in `loadDb`
+// Whose ignore-file modification times are unchanged still fails the `isDeepEqual` check in `loadDb`
 // And resets the persisted per-path verdicts instead of serving stale ones.
 const IGNORE_MATCHER_VERSION = 2;
 const MTIME_STORE_NAME = 'mtime';
 const FILES_STORE_NAME = 'files';
 const PROCESS_STORE_ACTIONS_DEBOUNCE_INTERVAL_IN_MILLISECONDS = 5000;
 
-interface DbFileEntry {
+interface DatabaseFileEntry {
   isIgnored: boolean;
   path: string;
 }
 
-interface DbMtimeEntry {
+interface DatabaseMtimeEntry {
   gitIgnoreMtime: number;
   matcherVersion: number;
   obsidianIgnoreMtime: number;
-  userIgnoreFiltersStr: string;
+  userIgnoreFiltersString: string;
 }
 
-const DEFAULT_MTIME_ENTRY: DbMtimeEntry = {
+const DEFAULT_MTIME_ENTRY: DatabaseMtimeEntry = {
   gitIgnoreMtime: 0,
   matcherVersion: IGNORE_MATCHER_VERSION,
   obsidianIgnoreMtime: 0,
-  userIgnoreFiltersStr: ''
+  userIgnoreFiltersString: ''
 };
 
 interface IgnorePatternsComponentConstructorParams {
@@ -70,7 +70,7 @@ interface IgnorePatternsComponentIsIgnoredParams {
 }
 
 export class IgnorePatternsComponent extends LayoutReadyComponent {
-  private _db?: IDBDatabase;
+  private _database?: IDBDatabase;
   private cachedExcludeRegExps: null | RegExp[] = null;
   private cachedGitIgnoreContent = '';
   private cachedIgnoreTester: ignore.Ignore | null = null;
@@ -94,11 +94,11 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
   // Path; see `ensureVerdictsLoaded`.
   private verdictsLoaded = false;
 
-  private get db(): IDBDatabase {
-    if (!this._db) {
-      throw new Error('db is not set');
+  private get database(): IDBDatabase {
+    if (!this._database) {
+      throw new Error('database is not set');
     }
-    return this._db;
+    return this._database;
   }
 
   public constructor(params: IgnorePatternsComponentConstructorParams) {
@@ -120,8 +120,8 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
       return;
     }
     this.verdictsLoaded = true;
-    const dbFileEntries = await getResult(this.getFileStore().getAll()) as DbFileEntry[];
-    for (const entry of dbFileEntries) {
+    const databaseFileEntries = await getResult(this.getFileStore().getAll()) as DatabaseFileEntry[];
+    for (const entry of databaseFileEntries) {
       this.fileIgnoreMap.set(entry.path, entry.isIgnored);
     }
   }
@@ -145,7 +145,7 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
     if (shouldRefresh) {
       this.cachedIgnoreTester = null;
       invokeAsyncSafelyAfterDelay({
-        asyncFn: () => this.processConfigChanges()
+        asyncFunction: () => this.processConfigChanges()
       });
     }
   }
@@ -220,7 +220,7 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
       return;
     }
     this.hadConfigChanges = false;
-    await this.resetDb();
+    await this.resetDatabase();
     await this.onUpdateFileTree();
   }
 
@@ -233,7 +233,7 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
       }
     }));
 
-    if (!this.vaultLoadPatch.vaultLoadCalled) {
+    if (!this.vaultLoadPatch.wasVaultLoadCalled) {
       await this.onUpdateFileTree();
     }
   }
@@ -251,17 +251,19 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
     if (this.pluginSettingsComponent.settings.shouldIgnoreExcludedFiles) {
       this.fileIgnoreMap.clear();
       invokeAsyncSafelyAfterDelay({
-        asyncFn: () => this.processConfigChanges()
+        asyncFunction: () => this.processConfigChanges()
       });
     }
   }
 
-  private async getCurrentMtimeEntry(): Promise<DbMtimeEntry> {
+  private async getCurrentMtimeEntry(): Promise<DatabaseMtimeEntry> {
+    const gitIgnoreStat = this.pluginSettingsComponent.settings.shouldIncludeGitIgnorePatterns ? await statSafe(this.app, GIT_IGNORE_FILE) : null;
+    const obsidianIgnoreStat = await statSafe(this.app, OBSIDIAN_IGNORE_FILE);
     return {
-      gitIgnoreMtime: this.pluginSettingsComponent.settings.shouldIncludeGitIgnorePatterns ? (await statSafe(this.app, GIT_IGNORE_FILE))?.mtime ?? 0 : 0,
+      gitIgnoreMtime: gitIgnoreStat?.mtime ?? 0,
       matcherVersion: IGNORE_MATCHER_VERSION,
-      obsidianIgnoreMtime: (await statSafe(this.app, OBSIDIAN_IGNORE_FILE))?.mtime ?? 0,
-      userIgnoreFiltersStr: this.getUserIgnoreFilters().join('\n')
+      obsidianIgnoreMtime: obsidianIgnoreStat?.mtime ?? 0,
+      userIgnoreFiltersString: this.getUserIgnoreFilters().join('\n')
     };
   }
 
@@ -291,7 +293,7 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
   }
 
   private getFileStore(): IDBObjectStore {
-    return this.db.transaction([FILES_STORE_NAME], 'readwrite').objectStore(FILES_STORE_NAME);
+    return this.database.transaction([FILES_STORE_NAME], 'readwrite').objectStore(FILES_STORE_NAME);
   }
 
   private getIgnoreTester(): ignore.Ignore {
@@ -299,11 +301,11 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
       return this.cachedIgnoreTester;
     }
 
-    const ignorePatternsStr = `${this.cachedObsidianIgnoreContent}\n${this.cachedGitIgnoreContent}`;
+    const ignorePatternsString = `${this.cachedObsidianIgnoreContent}\n${this.cachedGitIgnoreContent}`;
 
     this.cachedIgnoreTester = ignore({
       ignoreCase: true
-    }).add(ignorePatternsStr.split('\n'));
+    }).add(ignorePatternsString.split('\n'));
     return this.cachedIgnoreTester;
   }
 
@@ -328,26 +330,26 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
       if (event.newVersion !== 1) {
         return;
       }
-      const db = request.result;
-      db.createObjectStore(FILES_STORE_NAME, {
+      const database = request.result;
+      database.createObjectStore(FILES_STORE_NAME, {
         keyPath: 'path'
       });
-      db.createObjectStore(MTIME_STORE_NAME);
+      database.createObjectStore(MTIME_STORE_NAME);
     });
 
-    const db = await getResult(request);
+    const database = await getResult(request);
 
-    this._db = db;
-    const transaction = db.transaction([MTIME_STORE_NAME], 'readonly');
+    this._database = database;
+    const transaction = database.transaction([MTIME_STORE_NAME], 'readonly');
     const mtimeStore = transaction.objectStore(MTIME_STORE_NAME);
 
-    const mtimeEntry = await getResult(mtimeStore.get(0)) as DbMtimeEntry | undefined ?? DEFAULT_MTIME_ENTRY;
+    const mtimeEntry = await getResult(mtimeStore.get(0)) as DatabaseMtimeEntry | undefined ?? DEFAULT_MTIME_ENTRY;
     const currentMtimeEntry = await this.getCurrentMtimeEntry();
 
-    if (!deepEqual(currentMtimeEntry, mtimeEntry)) {
+    if (!isDeepEqual(currentMtimeEntry, mtimeEntry)) {
       // Config changed: drop the stale verdicts now (this also marks the cache
       // "Loaded" — empty — so `ensureVerdictsLoaded` becomes a no-op).
-      await this.resetDb();
+      await this.resetDatabase();
       this.configFingerprintMatched = false;
       return;
     }
@@ -359,7 +361,7 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
     const pendingStoreActions = this.pendingStoreActions;
     this.pendingStoreActions = new Map();
 
-    const transaction = this.db.transaction(FILES_STORE_NAME, 'readwrite');
+    const transaction = this.database.transaction(FILES_STORE_NAME, 'readwrite');
     const store = transaction.objectStore(FILES_STORE_NAME);
     for (const action of pendingStoreActions.values()) {
       action(store);
@@ -409,10 +411,10 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
     }
   }
 
-  private async resetDb(): Promise<void> {
+  private async resetDatabase(): Promise<void> {
     const currentMtimeEntry = await this.getCurrentMtimeEntry();
 
-    const transaction = this.db.transaction([FILES_STORE_NAME, MTIME_STORE_NAME], 'readwrite');
+    const transaction = this.database.transaction([FILES_STORE_NAME, MTIME_STORE_NAME], 'readwrite');
     const mtimeStore = transaction.objectStore(MTIME_STORE_NAME);
     const filesStore = transaction.objectStore(FILES_STORE_NAME);
     filesStore.clear();

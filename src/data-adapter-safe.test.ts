@@ -70,7 +70,7 @@ describe('data-adapter-safe', () => {
         const result = await readSafe(mockApp, 'test.md');
         expect(result).toBe('hello world');
         expect(mockFsPromises.access).toHaveBeenCalledWith('/vault/test.md');
-        expect(mockFsPromises.readFile).toHaveBeenCalledWith('/vault/test.md', 'utf8');
+        expect(mockFsPromises.readFile).toHaveBeenCalledWith('/vault/test.md', 'utf-8');
       });
 
       it('should return empty string when file does not exist', async () => {
@@ -227,7 +227,7 @@ describe('data-adapter-safe', () => {
       mockApp = strictProxy<AppOriginal>({ vault: { adapter: unknownAdapter } });
     });
 
-    it('readSafe should throw for unknown adapter after existsSafe throws', async () => {
+    it('readSafe should throw for unknown adapter after doesExistSafe throws', async () => {
       await expect(readSafe(mockApp, 'test.md')).rejects.toThrow('Unknown adapter');
     });
 
@@ -238,14 +238,14 @@ describe('data-adapter-safe', () => {
         getFullPath: (path: string): string => `/vault/${path}`
       });
       const unknownAdapter = strictProxy<DataAdapterEx>({ getFullPath: (path: string): string => `/vault/${path}` });
-      // First call (in existsSafe) returns FileSystemAdapter, second call (in readSafe) returns unknown
+      // First call (in doesExistSafe) returns FileSystemAdapter, second call (in readSafe) returns unknown
       mockGetDataAdapterEx
         .mockReturnValueOnce(fsAdapter.asOriginalType__())
         .mockReturnValueOnce(unknownAdapter);
       await expect(readSafe(mockApp, 'test.md')).rejects.toThrow('Unknown adapter');
     });
 
-    it('statSafe should throw for unknown adapter after existsSafe throws', async () => {
+    it('statSafe should throw for unknown adapter after doesExistSafe throws', async () => {
       await expect(statSafe(mockApp, 'test.md')).rejects.toThrow('Unknown adapter');
     });
 
@@ -256,7 +256,7 @@ describe('data-adapter-safe', () => {
         getFullPath: (path: string): string => `/vault/${path}`
       });
       const unknownAdapter = strictProxy<DataAdapterEx>({ getFullPath: (path: string): string => `/vault/${path}` });
-      // First call (in existsSafe) returns FileSystemAdapter, second call (in statSafe) returns unknown
+      // First call (in doesExistSafe) returns FileSystemAdapter, second call (in statSafe) returns unknown
       mockGetDataAdapterEx
         .mockReturnValueOnce(fsAdapter.asOriginalType__())
         .mockReturnValueOnce(unknownAdapter);

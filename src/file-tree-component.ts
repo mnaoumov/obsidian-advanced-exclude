@@ -25,7 +25,7 @@ export class FileTreeComponent extends ComponentEx {
       return;
     }
 
-    if (fileExplorerView.fileItems[normalizedPath]) {
+    if (Object.hasOwn(fileExplorerView.fileItems, normalizedPath)) {
       return;
     }
 
@@ -43,7 +43,7 @@ export class FileTreeComponent extends ComponentEx {
       return;
     }
 
-    if (!fileExplorerView.fileItems[normalizedPath]) {
+    if (!Object.hasOwn(fileExplorerView.fileItems, normalizedPath)) {
       return;
     }
 

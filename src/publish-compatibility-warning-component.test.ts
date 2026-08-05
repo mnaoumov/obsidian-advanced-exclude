@@ -321,7 +321,7 @@ function getButton(fragment: DocumentFragment, label: string): HTMLButtonElement
 }
 
 function getButtonElements(fragment: DocumentFragment): HTMLButtonElement[] {
-  return Array.from(fragment.querySelectorAll('button'));
+  return [...fragment.querySelectorAll('button')];
 }
 
 function getButtonLabels(fragment: DocumentFragment): string[] {

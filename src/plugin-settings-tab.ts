@@ -113,7 +113,7 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginSettings> {
               button.onClick(() => {
                 const tab = this.app.setting.openTabById('file');
                 const manageButtonCaption = window.i18next.t('interface.button-manage');
-                Array.from(tab.containerEl.querySelectorAll('button'))
+                [...tab.containerEl.querySelectorAll('button')]
                   .find((tabButton) => tabButton.textContent === manageButtonCaption)
                   ?.click();
               });

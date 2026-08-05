@@ -100,11 +100,13 @@ afterEach(async () => {
   const topFolders = [...FLAT_SIZES.map((size) => `bulk-${String(size)}`), NESTED_ROOT, MANY_PARENT];
   const controlFiles = [...FLAT_SIZES.map((size) => `control-${String(size)}.md`), 'control-nested.md', 'control-many.md'];
   await evalInObsidian({
+    // eslint-disable-next-line unicorn/name-replacements -- `args` is an `obsidian-integration-testing` parameter name.
     args: {
       controlFiles,
       OBSIDIAN_IGNORE_FILE,
       topFolders
     },
+    // eslint-disable-next-line unicorn/name-replacements -- `fn` is an `obsidian-integration-testing` parameter name.
     async fn({ app, controlFiles: controls, OBSIDIAN_IGNORE_FILE: ignoreFile, topFolders: folders }) {
       try {
         await app.vault.adapter.remove(ignoreFile);
@@ -243,12 +245,14 @@ async function runIgnoreScenario(spec: ScenarioSpec): Promise<VaultSizeScenarioR
 
   async function prepareBaseline(): Promise<void> {
     await evalInObsidian({
+      // eslint-disable-next-line unicorn/name-replacements -- `args` is an `obsidian-integration-testing` parameter name.
       args: {
         controlPath: spec.controlPath,
         folders: spec.folders,
         OBSIDIAN_IGNORE_FILE,
         PLUGIN_ID
       },
+      // eslint-disable-next-line unicorn/name-replacements -- `fn` is an `obsidian-integration-testing` parameter name.
       async fn({ app, controlPath, folders, OBSIDIAN_IGNORE_FILE: ignoreFile, PLUGIN_ID: pluginId }) {
         const topFolders = folders.filter((folder) => !folder.includes('/'));
 
@@ -295,10 +299,12 @@ async function runIgnoreScenario(spec: ScenarioSpec): Promise<VaultSizeScenarioR
     for (let start = 0; start < spec.files.length; start += FILES_PER_CALL) {
       const chunk = spec.files.slice(start, start + FILES_PER_CALL);
       await evalInObsidian({
+        // eslint-disable-next-line unicorn/name-replacements -- `args` is an `obsidian-integration-testing` parameter name.
         args: {
           chunk,
           CREATE_BATCH_SIZE
         },
+        // eslint-disable-next-line unicorn/name-replacements -- `fn` is an `obsidian-integration-testing` parameter name.
         async fn({ app, chunk: chunkFiles, CREATE_BATCH_SIZE: batchSize }) {
           for (let batchStart = 0; batchStart < chunkFiles.length; batchStart += batchSize) {
             const batch = chunkFiles.slice(batchStart, batchStart + batchSize).map((path) => app.vault.create(path, ''));
@@ -312,6 +318,7 @@ async function runIgnoreScenario(spec: ScenarioSpec): Promise<VaultSizeScenarioR
 
   function exerciseHideAndShow(): Promise<VaultSizeScenarioResult> {
     return evalInObsidian({
+      // eslint-disable-next-line unicorn/name-replacements -- `args` is an `obsidian-integration-testing` parameter name.
       args: {
         controlPath: spec.controlPath,
         fileCount: spec.fileCount,
@@ -320,6 +327,7 @@ async function runIgnoreScenario(spec: ScenarioSpec): Promise<VaultSizeScenarioR
         scopePrefix: spec.scopePrefix,
         SETTLE_DELAY_IN_MS
       },
+      // eslint-disable-next-line unicorn/name-replacements -- `fn` is an `obsidian-integration-testing` parameter name.
       async fn({
         app,
         controlPath,
@@ -429,11 +437,13 @@ async function runIgnoreScenario(spec: ScenarioSpec): Promise<VaultSizeScenarioR
             return root;
           }
           for (const child of (root as TraversableComponent)._children ?? []) {
-            if (typeof child === 'object' && child !== null) {
-              const found = findComponent(child, className);
-              if (found) {
-                return found;
-              }
+            if (typeof child !== 'object' || child === null) {
+              continue;
+            }
+
+            const found = findComponent(child, className);
+            if (found) {
+              return found;
             }
           }
           return undefined;

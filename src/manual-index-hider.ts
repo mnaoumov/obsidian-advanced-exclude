@@ -228,7 +228,7 @@ function removeFromParent(parent: null | TFolder, node: TAbstractFile): void {
     return;
   }
   const index = parent.children.indexOf(node);
-  if (index >= 0) {
+  if (index !== -1) {
     parent.children.splice(index, 1);
   }
 }

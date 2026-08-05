@@ -80,7 +80,7 @@ interface SetupParams {
   isIgnored(normalizedPath: string): boolean;
   readonly persistedEntries?: readonly MockEntry[];
   readonly persistedUniverseSignature?: null | string;
-  readonly vaultLoadCalled?: boolean;
+  readonly wasVaultLoadCalled?: boolean;
 }
 
 interface SetupResult {
@@ -117,7 +117,7 @@ function setup(params: SetupParams): SetupResult {
     isIgnored,
     persistedEntries = [],
     persistedUniverseSignature = null,
-    vaultLoadCalled = false
+    wasVaultLoadCalled = false
   } = params;
 
   // Mirror the real adapter: its internal stat record lists every path on disk —
@@ -166,14 +166,14 @@ function setup(params: SetupParams): SetupResult {
   const ignorePatternsComponent = strictProxy<IgnorePatternsComponent>({
     ensureVerdictsLoaded: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
     isConfigUnchanged: vi.fn<() => boolean>().mockReturnValue(configUnchanged),
-    isIgnored: vi.fn((isIgnoredParams: IsIgnoredParams) => isIgnored(isIgnoredParams.normalizedPath))
+    isIgnored: vi.fn((ignoreQuery: IsIgnoredParams) => isIgnored(ignoreQuery.normalizedPath))
   });
 
   const pluginSettingsComponent = strictProxy<PluginSettingsComponent>({
     settings: { excludeMode, shouldHideEmptyFolders: false }
   });
 
-  const vaultLoadPatch = strictProxy<VaultLoadPatchComponent>({ vaultLoadCalled });
+  const vaultLoadPatch = strictProxy<VaultLoadPatchComponent>({ wasVaultLoadCalled });
 
   const persisted = persistedEntries.map((entry) => ({ isFolder: entry.isFolderFlag, path: entry.path }));
   const save = vi.fn();
@@ -768,7 +768,7 @@ describe('IndexProjectionComponent', () => {
       const { component, fireWorkspaceLayoutReady, manualIndexHider } = setup({
         entries: [{ isFolderFlag: false, path: 'drop.md' }],
         isIgnored: (path) => ignored.has(path),
-        vaultLoadCalled: false
+        wasVaultLoadCalled: false
       });
 
       // Loading runs the onloadAsync projection (nothing ignored yet, so no hide) and
@@ -794,7 +794,7 @@ describe('IndexProjectionComponent', () => {
       const { component, fireWorkspaceLayoutReady, manualIndexHider } = setup({
         entries: [{ isFolderFlag: false, path: 'drop.md' }],
         isIgnored: (path) => ignored.has(path),
-        vaultLoadCalled: true
+        wasVaultLoadCalled: true
       });
 
       // The projection yields a (faked) paint frame, so advance timers to let load finish.
@@ -981,7 +981,7 @@ describe('IndexProjectionComponent', () => {
         isIgnored: () => false,
         persistedEntries: hidden,
         persistedUniverseSignature: matchingSignature(loaded, hidden),
-        vaultLoadCalled: false
+        wasVaultLoadCalled: false
       });
 
       await runLoad(component);
@@ -1111,9 +1111,9 @@ describe('IndexProjectionComponent', () => {
       await component.applyFull();
       addToFilesPane.mockClear();
 
-      const restored = component.restoreHiddenFilesOnUnload();
+      const isRestored = component.restoreHiddenFilesOnUnload();
 
-      expect(restored).toBe(true);
+      expect(isRestored).toBe(true);
       expect(manualIndexHider.show).toHaveBeenCalledWith(expect.arrayContaining(['a', 'a/x.md']));
       // Shallowest-first: the folder is re-inserted before the file it contains.
       expect(addToFilesPane.mock.calls.map((call) => call[0])).toEqual(['a', 'a/x.md']);
@@ -1133,9 +1133,9 @@ describe('IndexProjectionComponent', () => {
       // Restored synchronously, so the tree is not fully back and the notice must show.
       manualIndexHider.show.mockReturnValue(['a/x.md']);
 
-      const restored = component.restoreHiddenFilesOnUnload();
+      const isRestored = component.restoreHiddenFilesOnUnload();
 
-      expect(restored).toBe(false);
+      expect(isRestored).toBe(false);
       // Only the snapshot-backed path is re-added to the explorer.
       expect(addToFilesPane.mock.calls.map((call) => call[0])).toEqual(['a']);
     });
@@ -1152,9 +1152,9 @@ describe('IndexProjectionComponent', () => {
       await component.applyFull();
       addToFilesPane.mockClear();
 
-      const restored = component.restoreHiddenFilesOnUnload();
+      const isRestored = component.restoreHiddenFilesOnUnload();
 
-      expect(restored).toBe(true);
+      expect(isRestored).toBe(true);
       expect(manualIndexHider.show).not.toHaveBeenCalled();
       expect(addToFilesPane).not.toHaveBeenCalled();
     });
@@ -1194,9 +1194,9 @@ describe('IndexProjectionComponent', () => {
         manualIndexHider.show.mockClear();
 
         fireQuit();
-        const restored = component.restoreHiddenFilesOnUnload();
+        const isRestored = component.restoreHiddenFilesOnUnload();
 
-        expect(restored).toBe(true);
+        expect(isRestored).toBe(true);
         expect(manualIndexHider.show).not.toHaveBeenCalled();
       });
     });
