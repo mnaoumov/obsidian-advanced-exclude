@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## 3.4.1
+
+- fix: await the settings and ignore-pattern loads before the components that read them
+- chore: update libs
+- chore: update libs
+- chore(vitest): adopt the shared Obsidian plugin vitest configuration
+
 ## 3.4.0
 
 - test(index-projection): cover the fast-enable abort and depth sort
