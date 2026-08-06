@@ -20,7 +20,7 @@ import { UpdateProgressNoticeComponent } from './update-progress-notice-componen
 import { IndexedDatabaseVaultPathStore } from './vault-path-store.ts';
 
 export class Plugin extends PluginBase {
-  protected override onloadImpl(): void {
+  protected override async onloadImpl(): Promise<void> {
     const pluginSettingsComponent = this.addChild(
       new PluginSettingsComponent({
         dataHandler: new PluginDataHandler(this),
@@ -108,7 +108,7 @@ export class Plugin extends PluginBase {
       })
     );
 
-    this.commandHandlerComponent.registerCommandHandlers(() => [
+    await this.commandHandlerComponent.registerCommandHandlers(() => [
       new OpenSettingsCommandHandler({
         app: this.app,
         settingTab: pluginSettingsTab
