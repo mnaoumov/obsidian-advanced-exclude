@@ -29,6 +29,13 @@ export class Plugin extends PluginBase {
     );
     const vaultLoadPatch = this.addChild(new VaultLoadPatchComponent(this.app));
 
+    // Since obsidian-dev-utils 90 a child is loaded as it is added, so a component's async load tail runs
+    // In parallel with the components added after it instead of before them. IgnorePatternsComponent reads
+    // The settings while it loads — `loadFingerprint` fingerprints on `shouldIncludeGitIgnorePatterns` and
+    // `reload` writes `obsidianIgnoreContent` back — so without this wait it would fingerprint against the
+    // Defaults and persist a default-derived state over the stored one.
+    await pluginSettingsComponent.loadWithPromises();
+
     const ignorePatternsComponent: IgnorePatternsComponent = this.addChild(
       new IgnorePatternsComponent({
         app: this.app,
@@ -45,6 +52,13 @@ export class Plugin extends PluginBase {
     );
 
     const updateProgressNotice = this.addChild(new UpdateProgressNoticeComponent(this.pluginNoticeComponent));
+
+    // IndexProjectionComponent recomputes the model as it loads, and that reaches into the ignore
+    // Patterns component's verdict database, which `loadFingerprint` only opens partway through its own
+    // Async load. Without this wait the projection loads first and throws "database is not set", which
+    // Fails the whole plugin load. `onUpdateFileTree` below closes over `indexProjectionComponent` but is
+    // Only called from `onLayoutReady`/`processConfigChanges`, so awaiting here cannot reach it early.
+    await ignorePatternsComponent.loadWithPromises();
 
     const indexProjectionComponent = this.addChild(
       new IndexProjectionComponent({

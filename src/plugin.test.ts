@@ -1,6 +1,7 @@
 import type { PluginManifest } from 'obsidian';
 
 import { Component } from 'obsidian';
+import { ComponentEx } from 'obsidian-dev-utils/obsidian/components/component-ex';
 import { App } from 'obsidian-test-mocks/obsidian';
 import {
   beforeEach,
@@ -63,10 +64,11 @@ vi.mock('./index-projection-component.ts', () => ({
 
 let capturedOnUpdateFileTree: (() => Promise<void>) | undefined;
 vi.mock('./ignore-patterns-component.ts', () => ({
+  // A ComponentEx, not a plain Component: onloadImpl awaits its `loadWithPromises`.
   // eslint-disable-next-line prefer-arrow-callback, func-names -- mock must be constructable with `new` and return a real loadable Component.
   IgnorePatternsComponent: vi.fn(function (params: IgnorePatternsComponentConstructorParams) {
     capturedOnUpdateFileTree = params.onUpdateFileTree;
-    return new Component();
+    return new ComponentEx();
   })
 }));
 
@@ -92,9 +94,10 @@ vi.mock('./patches/vault-load-patch-component.ts', () => ({
 }));
 
 vi.mock('./plugin-settings-component.ts', () => ({
+  // A ComponentEx, not a plain Component: onloadImpl awaits its `loadWithPromises`.
   // eslint-disable-next-line prefer-arrow-callback, func-names -- mock must be constructable with `new` and return a real loadable Component.
   PluginSettingsComponent: vi.fn(function () {
-    return new Component();
+    return new ComponentEx();
   })
 }));
 
