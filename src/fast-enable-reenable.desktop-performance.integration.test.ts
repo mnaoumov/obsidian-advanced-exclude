@@ -1,5 +1,5 @@
 import { evalInObsidian } from 'obsidian-integration-testing';
-import { getTempVault } from 'obsidian-integration-testing/vitest-global-setup-plugin';
+import { getTemporaryVault } from 'obsidian-integration-testing/vitest-global-setup-plugin';
 import {
   describe,
   expect,
@@ -76,20 +76,18 @@ interface TraversableComponent {
 
 describe('Fast enable — re-hides the persisted set directly on unchanged config (issue #10)', () => {
   it('takes the fast path on an unchanged re-enable and falls back to full when the vault changed while disabled', async () => {
-    const vaultPath = getTempVault().path;
+    const vaultPath = getTemporaryVault().path;
 
     // Wait out Obsidian's startup scan (across short eval calls so no single call spans
     // The whole wait) until the loaded-file count is stable.
     let previous = -1;
     for (let poll = 0; poll < SETTLE_MAX_POLLS; poll++) {
       const count = await evalInObsidian({
-        // eslint-disable-next-line unicorn/name-replacements -- `args` is an `obsidian-integration-testing` parameter name.
-        args: { pollMs: SETTLE_POLL_IN_MS },
-        // eslint-disable-next-line unicorn/name-replacements -- `fn` is an `obsidian-integration-testing` parameter name.
-        async fn({ app, pollMs }): Promise<number> {
+        async callback({ app, pollMs }): Promise<number> {
           await sleep(pollMs);
           return app.vault.getAllLoadedFiles().length;
         },
+        input: { pollMs: SETTLE_POLL_IN_MS },
         vaultPath
       });
       if (count === previous) {
@@ -99,20 +97,7 @@ describe('Fast enable — re-hides the persisted set directly on unchanged confi
     }
 
     const result = await evalInObsidian({
-      // eslint-disable-next-line unicorn/name-replacements -- `args` is an `obsidian-integration-testing` parameter name.
-      args: {
-        CONTROL: VAULT_CONTROL,
-        fullMode: ExcludeMode.Full,
-        HIDDEN_DIR,
-        INTRUDER_PATH,
-        LINK_SOURCE,
-        LINK_TARGET,
-        PLUGIN_ID,
-        pollMs: REENABLE_POLL_IN_MS,
-        reEnableMaxWaitMs: REENABLE_MAX_WAIT_IN_MS
-      },
-      // eslint-disable-next-line unicorn/name-replacements -- `fn` is an `obsidian-integration-testing` parameter name.
-      async fn({
+      async callback({
         app,
         CONTROL: controlPath,
         fullMode,
@@ -241,6 +226,17 @@ describe('Fast enable — re-hides the persisted set directly on unchanged confi
           }
           return undefined;
         }
+      },
+      input: {
+        CONTROL: VAULT_CONTROL,
+        fullMode: ExcludeMode.Full,
+        HIDDEN_DIR,
+        INTRUDER_PATH,
+        LINK_SOURCE,
+        LINK_TARGET,
+        PLUGIN_ID,
+        pollMs: REENABLE_POLL_IN_MS,
+        reEnableMaxWaitMs: REENABLE_MAX_WAIT_IN_MS
       },
       vaultPath
     });

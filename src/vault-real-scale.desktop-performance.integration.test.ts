@@ -1,7 +1,7 @@
 import type { FileExplorerView } from '@obsidian-typings/obsidian-public-latest';
 
 import { evalInObsidian } from 'obsidian-integration-testing';
-import { getTempVault } from 'obsidian-integration-testing/vitest-global-setup-plugin';
+import { getTemporaryVault } from 'obsidian-integration-testing/vitest-global-setup-plugin';
 import {
   describe,
   expect,
@@ -43,18 +43,7 @@ const SCENARIO_TIMEOUT_IN_MS = 480_000;
 describe('Real-scale vault — FilesPane mode', () => {
   it('hides the whole pre-populated vault folder from the explorer', async () => {
     const result = await evalInObsidian({
-      // eslint-disable-next-line unicorn/name-replacements -- `args` is an `obsidian-integration-testing` parameter name.
-      args: {
-        filesPaneMode: ExcludeMode.FilesPane,
-        INDEX_POLL_IN_MS,
-        INDEX_WAIT_IN_MS,
-        PLUGIN_ID,
-        SETTLE_DELAY_IN_MS,
-        VAULT_CONTROL,
-        VAULT_FOLDER
-      },
-      // eslint-disable-next-line unicorn/name-replacements -- `fn` is an `obsidian-integration-testing` parameter name.
-      async fn({
+      async callback({
         app,
         filesPaneMode,
         INDEX_POLL_IN_MS: pollMs,
@@ -130,7 +119,16 @@ describe('Real-scale vault — FilesPane mode', () => {
           return undefined;
         }
       },
-      vaultPath: getTempVault().path
+      input: {
+        filesPaneMode: ExcludeMode.FilesPane,
+        INDEX_POLL_IN_MS,
+        INDEX_WAIT_IN_MS,
+        PLUGIN_ID,
+        SETTLE_DELAY_IN_MS,
+        VAULT_CONTROL,
+        VAULT_FOLDER
+      },
+      vaultPath: getTemporaryVault().path
     });
 
     expect(result.error).toBeNull();

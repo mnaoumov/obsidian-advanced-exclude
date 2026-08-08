@@ -27,7 +27,7 @@ const PERFORMANCE_VAULT_SIZE = Number(process.env['AE_PERF_VAULT_SIZE']) || DEFA
 const FILES_PER_FOLDER = 30;
 
 /**
- * Builds the file map for a large vault, written to disk by `TempVault.populate()`
+ * Builds the file map for a large vault, written to disk by `TemporaryVault.populate()`
  * before Obsidian opens it (so its startup scan indexes it in one pass — far
  * faster and more reliable than writing notes after open and forcing a re-scan).
  *

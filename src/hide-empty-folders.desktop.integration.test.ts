@@ -1,7 +1,7 @@
 import type { FileExplorerView } from '@obsidian-typings/obsidian-public-latest';
 
 import { evalInObsidian } from 'obsidian-integration-testing';
-import { getTempVault } from 'obsidian-integration-testing/vitest-global-setup-plugin';
+import { getTemporaryVault } from 'obsidian-integration-testing/vitest-global-setup-plugin';
 import {
   afterEach,
   describe,
@@ -27,16 +27,7 @@ const ALL_TEST_FOLDERS = [
 
 afterEach(async () => {
   await evalInObsidian({
-    // eslint-disable-next-line unicorn/name-replacements -- `args` is an `obsidian-integration-testing` parameter name.
-    args: {
-      ALL_TEST_FILES,
-      ALL_TEST_FOLDERS,
-      HIDE_EMPTY_FOLDERS_SETTING_NAME,
-      PLUGIN_ID,
-      SETTLE_DELAY_IN_MS
-    },
-    // eslint-disable-next-line unicorn/name-replacements -- `fn` is an `obsidian-integration-testing` parameter name.
-    async fn({ ALL_TEST_FILES: files, ALL_TEST_FOLDERS: folders, app, HIDE_EMPTY_FOLDERS_SETTING_NAME: settingName, PLUGIN_ID: pluginId, SETTLE_DELAY_IN_MS: settleDelay }) {
+    async callback({ ALL_TEST_FILES: files, ALL_TEST_FOLDERS: folders, app, HIDE_EMPTY_FOLDERS_SETTING_NAME: settingName, PLUGIN_ID: pluginId, SETTLE_DELAY_IN_MS: settleDelay }) {
       // Toggle the setting back off so it does not leak into other suites sharing
       // The temp vault, then remove the scratch files/folders.
       try {
@@ -74,21 +65,21 @@ afterEach(async () => {
         }
       }
     },
-    vaultPath: getTempVault().path
+    input: {
+      ALL_TEST_FILES,
+      ALL_TEST_FOLDERS,
+      HIDE_EMPTY_FOLDERS_SETTING_NAME,
+      PLUGIN_ID,
+      SETTLE_DELAY_IN_MS
+    },
+    vaultPath: getTemporaryVault().path
   });
 });
 
 describe('Hide empty folders — Full mode', () => {
   it('hides a folder chain emptied by exclusion and restores it when the setting is toggled off', async () => {
     const result = await evalInObsidian({
-      // eslint-disable-next-line unicorn/name-replacements -- `args` is an `obsidian-integration-testing` parameter name.
-      args: {
-        HIDE_EMPTY_FOLDERS_SETTING_NAME,
-        PLUGIN_ID,
-        SETTLE_DELAY_IN_MS
-      },
-      // eslint-disable-next-line unicorn/name-replacements -- `fn` is an `obsidian-integration-testing` parameter name.
-      async fn({ app, HIDE_EMPTY_FOLDERS_SETTING_NAME: settingName, PLUGIN_ID: pluginId, SETTLE_DELAY_IN_MS: settleDelay }) {
+      async callback({ app, HIDE_EMPTY_FOLDERS_SETTING_NAME: settingName, PLUGIN_ID: pluginId, SETTLE_DELAY_IN_MS: settleDelay }) {
         const plugin = app.plugins.getPlugin(pluginId);
         if (!plugin) {
           return { error: 'Plugin not loaded' };
@@ -158,7 +149,12 @@ describe('Hide empty folders — Full mode', () => {
           loadedWhenOn
         };
       },
-      vaultPath: getTempVault().path
+      input: {
+        HIDE_EMPTY_FOLDERS_SETTING_NAME,
+        PLUGIN_ID,
+        SETTLE_DELAY_IN_MS
+      },
+      vaultPath: getTemporaryVault().path
     });
 
     expect(result.error).toBeNull();

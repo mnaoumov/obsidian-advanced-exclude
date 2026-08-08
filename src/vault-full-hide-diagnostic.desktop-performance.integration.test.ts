@@ -1,5 +1,5 @@
 import { evalInObsidian } from 'obsidian-integration-testing';
-import { getTempVault } from 'obsidian-integration-testing/vitest-global-setup-plugin';
+import { getTemporaryVault } from 'obsidian-integration-testing/vitest-global-setup-plugin';
 import {
   describe,
   expect,
@@ -37,17 +37,7 @@ const SCENARIO_TIMEOUT_IN_MS = 595_000;
 describe('Full-mode hide fires no updateRelatedLinks cascade', () => {
   it('issues zero real updateRelatedLinks calls for a whole-folder hide', async () => {
     const result = await evalInObsidian({
-      // eslint-disable-next-line unicorn/name-replacements -- `args` is an `obsidian-integration-testing` parameter name.
-      args: {
-        fullMode: ExcludeMode.Full,
-        INDEX_POLL_IN_MS,
-        INDEX_WAIT_IN_MS,
-        PLUGIN_ID,
-        SETTLE_DELAY_IN_MS,
-        VAULT_FOLDER
-      },
-      // eslint-disable-next-line unicorn/name-replacements -- `fn` is an `obsidian-integration-testing` parameter name.
-      async fn({
+      async callback({
         app,
         fullMode,
         INDEX_POLL_IN_MS: pollMs,
@@ -132,7 +122,15 @@ describe('Full-mode hide fires no updateRelatedLinks cascade', () => {
           return undefined;
         }
       },
-      vaultPath: getTempVault().path
+      input: {
+        fullMode: ExcludeMode.Full,
+        INDEX_POLL_IN_MS,
+        INDEX_WAIT_IN_MS,
+        PLUGIN_ID,
+        SETTLE_DELAY_IN_MS,
+        VAULT_FOLDER
+      },
+      vaultPath: getTemporaryVault().path
     });
 
     expect(result.error).toBeNull();

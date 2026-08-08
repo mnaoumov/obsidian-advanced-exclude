@@ -4,7 +4,7 @@ import { generatePerformanceVault } from './helpers/generate-performance-vault.t
 
 /**
  * Vitest global setup for the `integration-tests:desktop-performance` project: it
- * pre-populates the vault with a large note tree via `TempVault.populate()` before
+ * pre-populates the vault with a large note tree via `TemporaryVault.populate()` before
  * Obsidian opens it, so the startup scan indexes everything in one pass.
  */
 export const { setup, teardown } = createSetup({ populate: generatePerformanceVault });

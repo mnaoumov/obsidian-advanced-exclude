@@ -1,5 +1,5 @@
 import { evalInObsidian } from 'obsidian-integration-testing';
-import { getTempVault } from 'obsidian-integration-testing/vitest-global-setup-plugin';
+import { getTemporaryVault } from 'obsidian-integration-testing/vitest-global-setup-plugin';
 import {
   describe,
   expect,
@@ -51,7 +51,7 @@ const MAX_MS_PER_PATH = 0.2;
 
 describe('Full-mode hide-almost-everything scales with work, not vault size (issue #8)', () => {
   it('hides the whole vault in bounded per-path time via the `*` whitelist idiom', async () => {
-    const vaultPath = getTempVault().path;
+    const vaultPath = getTemporaryVault().path;
 
     // Settle across short eval calls until the loaded-file count is stable. Each poll sleeps
     // In-page (harness `sleep`) then returns the count, so no single eval spans both the
@@ -60,13 +60,11 @@ describe('Full-mode hide-almost-everything scales with work, not vault size (iss
     let previous = -1;
     for (let poll = 0; poll < SETTLE_MAX_POLLS; poll++) {
       const count = await evalInObsidian({
-        // eslint-disable-next-line unicorn/name-replacements -- `args` is an `obsidian-integration-testing` parameter name.
-        args: { pollMs: SETTLE_POLL_IN_MS },
-        // eslint-disable-next-line unicorn/name-replacements -- `fn` is an `obsidian-integration-testing` parameter name.
-        async fn({ app, pollMs }): Promise<number> {
+        async callback({ app, pollMs }): Promise<number> {
           await sleep(pollMs);
           return app.vault.getAllLoadedFiles().length;
         },
+        input: { pollMs: SETTLE_POLL_IN_MS },
         vaultPath
       });
       if (count === previous) {
@@ -76,10 +74,7 @@ describe('Full-mode hide-almost-everything scales with work, not vault size (iss
     }
 
     const result = await evalInObsidian({
-      // eslint-disable-next-line unicorn/name-replacements -- `args` is an `obsidian-integration-testing` parameter name.
-      args: { fullMode: ExcludeMode.Full, PLUGIN_ID },
-      // eslint-disable-next-line unicorn/name-replacements -- `fn` is an `obsidian-integration-testing` parameter name.
-      async fn({ app, fullMode, PLUGIN_ID: pluginId }): Promise<HideResult> {
+      async callback({ app, fullMode, PLUGIN_ID: pluginId }): Promise<HideResult> {
         const plugin = app.plugins.getPlugin(pluginId);
         if (!plugin) {
           return { error: 'Plugin not loaded' };
@@ -126,6 +121,7 @@ describe('Full-mode hide-almost-everything scales with work, not vault size (iss
           return undefined;
         }
       },
+      input: { fullMode: ExcludeMode.Full, PLUGIN_ID },
       vaultPath
     });
 

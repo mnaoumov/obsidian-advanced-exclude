@@ -1,5 +1,5 @@
 import { evalInObsidian } from 'obsidian-integration-testing';
-import { getTempVault } from 'obsidian-integration-testing/vitest-global-setup-plugin';
+import { getTemporaryVault } from 'obsidian-integration-testing/vitest-global-setup-plugin';
 import {
   describe,
   expect,
@@ -9,8 +9,7 @@ import {
 describe('PluginSettingsTab', () => {
   it('should open the file settings tab when "Go to settings" button is clicked', async () => {
     const result = await evalInObsidian({
-      // eslint-disable-next-line unicorn/name-replacements -- `fn` is an `obsidian-integration-testing` parameter name.
-      fn({ app }) {
+      callback({ app }) {
         const plugin = app.plugins.getPlugin('advanced-exclude');
         if (!plugin) {
           return { error: 'Plugin not loaded' };
@@ -40,7 +39,7 @@ describe('PluginSettingsTab', () => {
           error: null
         };
       },
-      vaultPath: getTempVault().path
+      vaultPath: getTemporaryVault().path
     });
 
     expect(result.error).toBeNull();

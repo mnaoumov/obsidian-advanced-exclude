@@ -86,7 +86,7 @@ graph/backlinks refresh. The historical context below predates S6 — read it wi
 Real-vault-scale (~90k) end-to-end testing, via populate-before-open. The harness
 feature has shipped: `obsidian-integration-testing` (now `^4.3.0`) gained
 `coreSetup({ populate })` + `createSetup({ populate })` so a vault is written with
-`TempVault.populate()` **before** Obsidian opens it — its startup scan indexes
+`TemporaryVault.populate()` **before** Obsidian opens it — its startup scan indexes
 everything in one pass (no `app:reload`, no per-file `adapter.write`). The plugin
 consumes it via `scripts/vitest-global-setup-performance.ts`
 (`createSetup({ populate })`) + `scripts/helpers/generate-performance-vault.ts` +

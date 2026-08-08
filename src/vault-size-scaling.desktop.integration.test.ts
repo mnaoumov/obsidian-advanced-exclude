@@ -1,7 +1,7 @@
 import type { DataAdapterEx } from '@obsidian-typings/obsidian-public-latest';
 
 import { evalInObsidian } from 'obsidian-integration-testing';
-import { getTempVault } from 'obsidian-integration-testing/vitest-global-setup-plugin';
+import { getTemporaryVault } from 'obsidian-integration-testing/vitest-global-setup-plugin';
 import {
   afterEach,
   describe,
@@ -100,14 +100,7 @@ afterEach(async () => {
   const topFolders = [...FLAT_SIZES.map((size) => `bulk-${String(size)}`), NESTED_ROOT, MANY_PARENT];
   const controlFiles = [...FLAT_SIZES.map((size) => `control-${String(size)}.md`), 'control-nested.md', 'control-many.md'];
   await evalInObsidian({
-    // eslint-disable-next-line unicorn/name-replacements -- `args` is an `obsidian-integration-testing` parameter name.
-    args: {
-      controlFiles,
-      OBSIDIAN_IGNORE_FILE,
-      topFolders
-    },
-    // eslint-disable-next-line unicorn/name-replacements -- `fn` is an `obsidian-integration-testing` parameter name.
-    async fn({ app, controlFiles: controls, OBSIDIAN_IGNORE_FILE: ignoreFile, topFolders: folders }) {
+    async callback({ app, controlFiles: controls, OBSIDIAN_IGNORE_FILE: ignoreFile, topFolders: folders }) {
       try {
         await app.vault.adapter.remove(ignoreFile);
       } catch {
@@ -128,7 +121,12 @@ afterEach(async () => {
         }
       }
     },
-    vaultPath: getTempVault().path
+    input: {
+      controlFiles,
+      OBSIDIAN_IGNORE_FILE,
+      topFolders
+    },
+    vaultPath: getTemporaryVault().path
   });
 });
 
@@ -235,7 +233,7 @@ function nestedTreeSpec(): ScenarioSpec {
 }
 
 async function runIgnoreScenario(spec: ScenarioSpec): Promise<VaultSizeScenarioResult> {
-  const vaultPath = getTempVault().path;
+  const vaultPath = getTemporaryVault().path;
   // Split the scenario across separate CDP calls so no single `evalInObsidian` exceeds the 30s
   // Command timeout: one prepare call (plugin off, clean baseline), one call per file chunk, one
   // Exercise call (enable, hide, re-show). All hit the same Obsidian, so vault state persists.
@@ -245,15 +243,7 @@ async function runIgnoreScenario(spec: ScenarioSpec): Promise<VaultSizeScenarioR
 
   async function prepareBaseline(): Promise<void> {
     await evalInObsidian({
-      // eslint-disable-next-line unicorn/name-replacements -- `args` is an `obsidian-integration-testing` parameter name.
-      args: {
-        controlPath: spec.controlPath,
-        folders: spec.folders,
-        OBSIDIAN_IGNORE_FILE,
-        PLUGIN_ID
-      },
-      // eslint-disable-next-line unicorn/name-replacements -- `fn` is an `obsidian-integration-testing` parameter name.
-      async fn({ app, controlPath, folders, OBSIDIAN_IGNORE_FILE: ignoreFile, PLUGIN_ID: pluginId }) {
+      async callback({ app, controlPath, folders, OBSIDIAN_IGNORE_FILE: ignoreFile, PLUGIN_ID: pluginId }) {
         const topFolders = folders.filter((folder) => !folder.includes('/'));
 
         /*
@@ -290,6 +280,12 @@ async function runIgnoreScenario(spec: ScenarioSpec): Promise<VaultSizeScenarioR
           }
         }
       },
+      input: {
+        controlPath: spec.controlPath,
+        folders: spec.folders,
+        OBSIDIAN_IGNORE_FILE,
+        PLUGIN_ID
+      },
       vaultPath
     });
   }
@@ -299,17 +295,15 @@ async function runIgnoreScenario(spec: ScenarioSpec): Promise<VaultSizeScenarioR
     for (let start = 0; start < spec.files.length; start += FILES_PER_CALL) {
       const chunk = spec.files.slice(start, start + FILES_PER_CALL);
       await evalInObsidian({
-        // eslint-disable-next-line unicorn/name-replacements -- `args` is an `obsidian-integration-testing` parameter name.
-        args: {
-          chunk,
-          CREATE_BATCH_SIZE
-        },
-        // eslint-disable-next-line unicorn/name-replacements -- `fn` is an `obsidian-integration-testing` parameter name.
-        async fn({ app, chunk: chunkFiles, CREATE_BATCH_SIZE: batchSize }) {
+        async callback({ app, chunk: chunkFiles, CREATE_BATCH_SIZE: batchSize }) {
           for (let batchStart = 0; batchStart < chunkFiles.length; batchStart += batchSize) {
             const batch = chunkFiles.slice(batchStart, batchStart + batchSize).map((path) => app.vault.create(path, ''));
             await Promise.all(batch);
           }
+        },
+        input: {
+          chunk,
+          CREATE_BATCH_SIZE
         },
         vaultPath
       });
@@ -318,17 +312,7 @@ async function runIgnoreScenario(spec: ScenarioSpec): Promise<VaultSizeScenarioR
 
   function exerciseHideAndShow(): Promise<VaultSizeScenarioResult> {
     return evalInObsidian({
-      // eslint-disable-next-line unicorn/name-replacements -- `args` is an `obsidian-integration-testing` parameter name.
-      args: {
-        controlPath: spec.controlPath,
-        fileCount: spec.fileCount,
-        pattern: spec.pattern,
-        PLUGIN_ID,
-        scopePrefix: spec.scopePrefix,
-        SETTLE_DELAY_IN_MS
-      },
-      // eslint-disable-next-line unicorn/name-replacements -- `fn` is an `obsidian-integration-testing` parameter name.
-      async fn({
+      async callback({
         app,
         controlPath,
         fileCount,
@@ -448,6 +432,14 @@ async function runIgnoreScenario(spec: ScenarioSpec): Promise<VaultSizeScenarioR
           }
           return undefined;
         }
+      },
+      input: {
+        controlPath: spec.controlPath,
+        fileCount: spec.fileCount,
+        pattern: spec.pattern,
+        PLUGIN_ID,
+        scopePrefix: spec.scopePrefix,
+        SETTLE_DELAY_IN_MS
       },
       vaultPath
     });
