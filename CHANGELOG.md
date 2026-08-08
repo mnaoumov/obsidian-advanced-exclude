@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## 3.4.2
+
+- chore: update libs and adopt obsidian-integration-testing 10
+
 ## 3.4.1
 
 - fix: await the settings and ignore-pattern loads before the components that read them
