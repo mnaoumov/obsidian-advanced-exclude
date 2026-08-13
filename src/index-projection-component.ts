@@ -508,6 +508,14 @@ export class IndexProjectionComponent extends ComponentEx {
     // Reset, whose recompute is intentionally cold.
     await this.ignorePatternsComponent.ensureVerdictsLoaded();
     const byPath = new Map<string, VaultModelEntry>();
+    // The model's own hidden paths come first, because neither source below can supply them: in
+    // `Full` mode a hidden path never enters Obsidian's index, and the store only holds what an
+    // Earlier projection persisted. A path recorded since then (`recordCreate`) would otherwise be
+    // Dropped from the rebuilt universe — and a folder whose only child is dropped reads as
+    // GENUINELY empty, so `shouldHideEmptyFolders` would keep the emptied chain visible.
+    for (const entry of this.vaultModel.getPathsByVisibility(false)) {
+      byPath.set(entry.path, entry);
+    }
     const stored = await this.vaultPathStore.load();
     for (const entry of stored.entries) {
       byPath.set(entry.path, entry);
