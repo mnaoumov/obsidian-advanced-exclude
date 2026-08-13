@@ -1,5 +1,3 @@
-[Docs](https://github.com/mnaoumov/obsidian-advanced-exclude/)
-
 # Whitelist with negation
 
 Because Advanced Exclude uses real [`gitignore`](https://git-scm.com/docs/gitignore)
@@ -47,5 +45,5 @@ The same pattern works for whole folders - keep only `Shared/`:
 ```
 
 When you are done experimenting, clear the **Ignore patterns** to bring every file back.
-See [[03 Exclude mode and sources]] for how these patterns combine with `.gitignore`
+See [03 Exclude mode and sources](<./03 Exclude mode and sources.md>) for how these patterns combine with `.gitignore`
 files and Obsidian's own excluded-files list.
