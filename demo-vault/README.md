@@ -1,3 +1,5 @@
+# Advanced Exclude demo vault
+
 This is an [Obsidian](https://obsidian.md/) vault demonstrating features of the [Advanced Exclude](https://github.com/mnaoumov/obsidian-advanced-exclude) plugin.
 
 ## Opening this vault

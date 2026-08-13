@@ -1,5 +1,3 @@
-[Docs](https://github.com/mnaoumov/obsidian-advanced-exclude/)
-
 # Settings
 
 Open **Settings -> Community plugins -> Advanced Exclude** to configure the plugin.
@@ -9,7 +7,7 @@ Each option below lists the setting key stored in the plugin's `data.json`.
 
 - `obsidianIgnoreContent` - the list of [`gitignore`](https://git-scm.com/docs/gitignore)
   patterns that decide which files and folders are ignored, one per line. This is the text
-  area used in [[01 Exclude a folder]] and [[02 Whitelist with negation]]. The same content
+  area used in [01 Exclude a folder](<./01 Exclude a folder.md>) and [02 Whitelist with negation](<./02 Whitelist with negation.md>). The same content
   is mirrored in an `.obsidianignore` file at the vault root, which you can edit by hand.
 
 ## Sources
@@ -23,7 +21,7 @@ Each option below lists the setting key stored in the plugin's `data.json`.
 
 - `excludeMode` - how far the exclusion reaches: `Full` hides ignored files from the whole
   app (Files pane, Backlinks, Graph, search, ...), while `FilesPane` hides them from the
-  Files pane only. See [[03 Exclude mode and sources]].
+  Files pane only. See [03 Exclude mode and sources](<./03 Exclude mode and sources.md>).
 - `shouldHideEmptyFolders` - when on, also hide folders left empty because every file inside
   them is excluded. This cascades to parent folders: when a folder and all of its subfolders
   become empty, the whole chain is hidden. Genuinely empty folders (with no files at all) stay

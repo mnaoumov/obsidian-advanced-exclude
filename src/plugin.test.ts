@@ -1,6 +1,7 @@
 import type { PluginManifest } from 'obsidian';
 
 import { Component } from 'obsidian';
+import { castTo } from 'obsidian-dev-utils/object-utils';
 import { ComponentEx } from 'obsidian-dev-utils/obsidian/components/component-ex';
 import { App } from 'obsidian-test-mocks/obsidian';
 import {
@@ -15,7 +16,16 @@ import type { IgnorePatternsComponent } from './ignore-patterns-component.ts';
 
 import { Plugin } from './plugin.ts';
 
+// The subset of `App` the dev-utils Notebook Navigator bridge reads on layout-ready.
+interface AppWithPlugins {
+  plugins: PluginRegistryLike;
+}
+
 type IgnorePatternsComponentConstructorParams = ConstructorParameters<typeof IgnorePatternsComponent>[0];
+
+interface PluginRegistryLike {
+  getPlugin(this: void, id: string): unknown;
+}
 
 /*
  * The real `PluginBase` (from `obsidian-dev-utils`) drives the lifecycle here —
@@ -26,9 +36,9 @@ type IgnorePatternsComponentConstructorParams = ConstructorParameters<typeof Ign
  * returns a real `Component` (carrying only the methods `plugin.ts` calls on it).
  */
 
-vi.mock('obsidian-dev-utils/obsidian/data-handler', () => ({
-  PluginDataHandler: vi.fn()
-}));
+// `PluginDataHandler` is NOT stubbed: since obsidian-dev-utils 93.2 the base builds its own settings
+// Component out of one during `onload` and really calls `dataHandler.loadData()`, which a bare `vi.fn()`
+// Double does not answer (G49).
 
 vi.mock('obsidian-dev-utils/obsidian/components/plugin-settings-tab-component', () => ({
   // eslint-disable-next-line prefer-arrow-callback, func-names -- mock must be constructable with `new` and return a real loadable Component.
@@ -133,6 +143,9 @@ describe('Plugin', () => {
 
   beforeEach(() => {
     app = App.createConfigured__();
+    // Since obsidian-dev-utils 89.0.0 the base bridges its command handlers into Notebook Navigator's
+    // Menus, which looks the plugin up on layout-ready -- so `plugins` has to answer on the strict mock.
+    castTo<AppWithPlugins>(app).plugins = { getPlugin: vi.fn().mockReturnValue(null) };
     const appOriginal = app.asOriginalType__();
     appOriginal.appId = 'test-app-id';
 
@@ -163,13 +176,14 @@ describe('Plugin', () => {
 
   it('should call addChild the expected number of times', async () => {
     /*
-     * The real `PluginBase` registers 9 universal child components before
+     * The real `PluginBase` registers 10 universal child components before
      * `onloadImpl` (including its own `commandHandlerComponent`, the
-     * `MenuEventRegistrarComponent` it wires into it, and — since
-     * `obsidian-dev-utils` 89.0.0 — the Notebook Navigator menu-event registrar),
-     * then the plugin's `onloadImpl` adds its own 11 children.
+     * `MenuEventRegistrarComponent` it wires into it, since
+     * `obsidian-dev-utils` 89.0.0 the Notebook Navigator menu-event registrar,
+     * and since 93.2.0 a settings component of its own — which this plugin then
+     * replaces), then the plugin's `onloadImpl` adds its own 11 children.
      */
-    const EXPECTED_BASE_ADD_CHILD_CALLS = 9;
+    const EXPECTED_BASE_ADD_CHILD_CALLS = 10;
     const EXPECTED_PLUGIN_ADD_CHILD_CALLS = 11;
     const EXPECTED_ADD_CHILD_CALLS = EXPECTED_BASE_ADD_CHILD_CALLS + EXPECTED_PLUGIN_ADD_CHILD_CALLS;
     const appOriginal = app.asOriginalType__();

@@ -80,6 +80,7 @@ interface SetupParams {
   isIgnored(normalizedPath: string): boolean;
   readonly persistedEntries?: readonly MockEntry[];
   readonly persistedUniverseSignature?: null | string;
+  readonly shouldHideEmptyFolders?: boolean;
   readonly wasVaultLoadCalled?: boolean;
 }
 
@@ -117,6 +118,7 @@ function setup(params: SetupParams): SetupResult {
     isIgnored,
     persistedEntries = [],
     persistedUniverseSignature = null,
+    shouldHideEmptyFolders = false,
     wasVaultLoadCalled = false
   } = params;
 
@@ -170,7 +172,7 @@ function setup(params: SetupParams): SetupResult {
   });
 
   const pluginSettingsComponent = strictProxy<PluginSettingsComponent>({
-    settings: { excludeMode, shouldHideEmptyFolders: false }
+    settings: { excludeMode, shouldHideEmptyFolders }
   });
 
   const vaultLoadPatch = strictProxy<VaultLoadPatchComponent>({ wasVaultLoadCalled });
@@ -551,6 +553,38 @@ describe('IndexProjectionComponent', () => {
 
       expect(hiddenPaths(manualIndexHider)).toEqual(['drop.md']);
       expect(deleteFromFilesPane).toHaveBeenCalledExactlyOnceWith('drop.md');
+    });
+
+    it('keeps a path recorded since the last projection, so its folder is not read as genuinely empty', async () => {
+      // The regression: a file excluded in `Full` mode never enters Obsidian's index, and the store
+      // Only holds what an earlier projection persisted — so a file created AFTER enable lives only
+      // In the model. A rebuild that reads just those two sources dropped it, `charlie` then looked
+      // Like a folder with no children on disk, and `shouldHideEmptyFolders` left the emptied
+      // `alpha/bravo/charlie` chain visible in the File Explorer.
+      const { component, deleteFromFilesPane } = setup({
+        entries: [
+          { isFolderFlag: true, path: 'alpha' },
+          { isFolderFlag: true, path: 'alpha/bravo' },
+          { isFolderFlag: true, path: 'alpha/bravo/charlie' },
+          { isFolderFlag: true, path: 'delta' }
+        ],
+        isIgnored: (path) => path === 'alpha/bravo/charlie/hidden.md',
+        shouldHideEmptyFolders: true
+      });
+
+      // Created on disk after enable: the adapter patch hides it live and records it here only.
+      component.recordCreate({ isFolderPath: false, normalizedPath: 'alpha/bravo/charlie/hidden.md' });
+      await component.update();
+
+      const model = castTo<TestableIndexProjectionComponent>(component).vaultModel;
+      expect(model.isVisible('alpha/bravo/charlie/hidden.md')).toBe(false);
+      // The whole emptied chain collapses...
+      expect(model.isVisible('alpha/bravo/charlie')).toBe(false);
+      expect(model.isVisible('alpha/bravo')).toBe(false);
+      expect(model.isVisible('alpha')).toBe(false);
+      // ...while a genuinely empty folder stays.
+      expect(model.isVisible('delta')).toBe(true);
+      expect(deleteFromFilesPane).toHaveBeenCalledWith('alpha');
     });
 
     it('aborts a previous in-flight update when called again', async () => {

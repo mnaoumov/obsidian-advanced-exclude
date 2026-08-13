@@ -1,19 +1,17 @@
-[Docs](https://github.com/mnaoumov/obsidian-advanced-exclude/)
-
 # Exclude mode and sources
 
-Beyond the ignore patterns from [[01 Exclude a folder]] and
-[[02 Whitelist with negation]], Advanced Exclude has three more settings that change
+Beyond the ignore patterns from [01 Exclude a folder](<./01 Exclude a folder.md>) and
+[02 Whitelist with negation](<./02 Whitelist with negation.md>), Advanced Exclude has three more settings that change
 *how far* the exclusion reaches and *which sources* feed the ignore list. All of them
 live in **Settings -> Community plugins -> Advanced Exclude**; each key is documented
-in [[04 Settings]].
+in [04 Settings](<./04 Settings.md>).
 
 ## Exclude mode
 
 The **Exclude mode** dropdown controls how aggressively ignored files are hidden:
 
 - **Full** (default) - excludes files from the entire Obsidian app: the Files pane,
-  Backlinks, Graph, search, quick switcher, everything. This is what [[01 Exclude a folder]]
+  Backlinks, Graph, search, quick switcher, everything. This is what [01 Exclude a folder](<./01 Exclude a folder.md>)
   demonstrates.
 - **Files pane** - excludes files from the **Files pane only**. They stay reachable
   from Backlinks, Graph, and search.
