@@ -13,8 +13,9 @@ The **Exclude mode** dropdown controls how aggressively ignored files are hidden
 - **Full** (default) - excludes files from the entire Obsidian app: the Files pane,
   Backlinks, Graph, search, quick switcher, everything. This is what [01 Exclude a folder](<./01 Exclude a folder.md>)
   demonstrates.
-- **Files pane** - excludes files from the **Files pane only**. They stay reachable
-  from Backlinks, Graph, and search.
+- **Files pane**
+  - excludes files from the **Files pane only**. They stay reachable
+    from Backlinks, Graph, and search.
 
 Try it: with `Archive/` still ignored, switch the mode to **Files pane**. The `Archive/`
 folder stays hidden in the Files pane, but a search for `Draft` finds the note again.

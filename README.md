@@ -5,17 +5,13 @@
 [![GitHub downloads](https://img.shields.io/github/downloads/mnaoumov/obsidian-advanced-exclude/total)](https://github.com/mnaoumov/obsidian-advanced-exclude/releases)
 [![Coverage: 100%](https://img.shields.io/badge/coverage-100%25-brightgreen)](https://github.com/mnaoumov/obsidian-advanced-exclude)
 
-This is a plugin for [Obsidian](https://obsidian.md/) that enhances the `Excluded files` setting bringing `gitignore` syntax.
+[Obsidian](https://obsidian.md/)'s `Files and links > Excluded files` setting does less than its name
+suggests: excluded files still sit in the Files pane, still turn up in Backlinks, still appear in
+search. They are de-emphasized, not excluded.
 
-Obsidian has `Files and links > Excluded files` setting, but it is not as useful, because the excluded files are still present in the `Files` pane, appear in `Backlinks` pane, etc.
-
-The plugin adds the following features:
-
-- Configure ignore patterns using [`gitignore`](https://git-scm.com/docs/gitignore) syntax.
-- `.obsidianignore` file for manual editing.
-- Support ignore patterns from `.gitignore` file.
-- Reuse existing `Files and links > Excluded files` setting in string/regexp format.
-- Optionally hide folders left empty by exclusion via the `Hide empty folders` setting. When every file inside a folder is excluded, the folder is hidden too, cascading up through parent folders whose whole subtree became empty. Genuinely empty folders (with no files at all) stay visible.
+This plugin makes them behave as though they are not there, and lets you say which ones with
+[`gitignore`](https://git-scm.com/docs/gitignore) syntax — the pattern language you already know —
+from a `.obsidianignore` file, your existing `.gitignore`, or Obsidian's own setting.
 
 > [!WARNING]
 >
@@ -25,66 +21,43 @@ The plugin adds the following features:
 
 ## Demo vault
 
-A demo vault with usage examples ships with every release. You can access it via any of the following:
+**The documentation is a demo vault.** Every feature has a note that explains what it does and why you
+would want it, with folders already in place to hide and un-hide.
+
+**[Start reading here](<./demo-vault/00 Start.md>)** — it is plain markdown, so it works on GitHub with
+nothing installed.
+
+A copy of the vault ships with every release. You can access it via any of the following:
 
 1. Running the **Advanced Exclude: Open demo vault** command.
 2. Downloading `advanced-exclude-demo-vault-<version>.zip` (`<version>` is the release version) from the [Releases](https://github.com/mnaoumov/obsidian-advanced-exclude/releases).
 3. Browsing its source in [`demo-vault/`](./demo-vault/README.md) in this repository.
 
-## Pattern examples
+## What it does
 
-Patterns use [`gitignore`](https://git-scm.com/docs/gitignore) syntax. A few common recipes:
-
-Ignore a folder and everything under it:
-
-```gitignore
-Archive/
-```
-
-Ignore all files with a given extension, anywhere in the vault:
-
-```gitignore
-*.png
-```
-
-Ignore **everything except** a few file types (a whitelist). This is the idiom most people get wrong: once `*` ignores everything, you must re-include directories with `!*/` **before** a negated file rule can match inside them — otherwise the files stay ignored because their parent folder is still excluded:
-
-```gitignore
-# Ignore everything...
-*
-# ...but keep folders traversable so the rules below can reach into them...
-!*/
-# ...and re-include these file types.
-!*.md
-!*.canvas
-!*.base
-```
-
-Whitelist specific folders instead of file types:
-
-```gitignore
-*
-!Journal/
-!Journal/**
-!Templates/
-!Templates/**
-```
-
-> [!NOTE]
->
-> The `!*/` (or `!Folder/`) line is required by `gitignore` itself: *"It is not possible to re-include a file if a parent directory of that file is excluded."* Re-including the directory is what lets the later `!...` file rules take effect.
-
-See the [official `gitignore` pattern format](https://git-scm.com/docs/gitignore#_pattern_format) for the full syntax.
+- **Exclude with `gitignore` syntax** — a folder, an extension, a path, from a `.obsidianignore` file
+  you can edit by hand.
+  [01 Exclude a folder](<./demo-vault/01 Exclude a folder.md>)
+- **Whitelist instead of blacklist**, including the negation trap that catches most people: once `*`
+  ignores everything, folders must be re-included with `!*/` before any `!file` rule can reach inside
+  them.
+  [02 Whitelist with negation](<./demo-vault/02 Whitelist with negation.md>)
+- **Choose where patterns come from and how hard they hide** — your `.gitignore`, Obsidian's own
+  `Excluded files` setting, and how completely an ignored file disappears.
+  [03 Exclude mode and sources](<./demo-vault/03 Exclude mode and sources.md>)
+- **Hide folders left empty by exclusion**, cascading up through parents whose whole subtree went
+  away. Genuinely empty folders stay visible.
+  [04 Settings](<./demo-vault/04 Settings.md>)
 
 ## Installation
 
-The plugin is available in [the official Community Plugins repository](https://community.obsidian.md/plugins/advanced-exclude).
+The plugin is available in [the official Community Plugins repository](https://obsidian.md/plugins?id=advanced-exclude).
 
 ### Beta versions
 
-To install the latest beta release of this plugin (regardless if it is available in [the official Community Plugins repository](https://community.obsidian.md) or not), follow these steps:
+To install the latest beta release of this plugin (regardless if it is available in [the official Community Plugins repository](https://obsidian.md/plugins) or not), follow these steps:
 
-1. Ensure you have the [BRAT plugin](https://community.obsidian.md/plugins/obsidian42-brat) installed and enabled.
+1. Ensure you have the [BRAT plugin](https://obsidian.md/plugins?id=obsidian42-brat) installed and enabled.
 2. Click [Install via BRAT](https://intradeus.github.io/http-protocol-redirector?r=obsidian://brat?plugin=https://github.com/mnaoumov/obsidian-advanced-exclude).
 3. An Obsidian pop-up window should appear. In the window, click the `Add plugin` button once and wait a few seconds for the plugin to install.
 
@@ -92,13 +65,21 @@ To install the latest beta release of this plugin (regardless if it is available
 
 By default, debug messages for this plugin are hidden.
 
-To show them, run the following command in the `DevTools Console`:
+To show them, run the following command:
 
 ```js
 window.DEBUG.enable('advanced-exclude');
 ```
 
 For more details, refer to the [documentation](https://mnaoumov.dev/obsidian-dev-utils/guides/debugging/).
+
+## Changelog
+
+All notable changes to this project will be documented in the [CHANGELOG](./CHANGELOG.md).
+
+## Contributing
+
+Contributions are welcome — see [CONTRIBUTING](./CONTRIBUTING.md) to get set up.
 
 ## Support
 
