@@ -27,6 +27,7 @@ export class Plugin extends PluginBase {
         pluginEventSource: new PluginEventSourceImpl(this)
       })
     );
+    this.pluginSettingsComponent = pluginSettingsComponent;
     const vaultLoadPatch = this.addChild(new VaultLoadPatchComponent(this.app));
 
     // Since obsidian-dev-utils 90 a child is loaded as it is added, so a component's async load tail runs
