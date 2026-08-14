@@ -48,7 +48,7 @@ Built on `obsidian-dev-utils`. Patches Obsidian's `FileSystemAdapter` / `Capacit
     - `file-system-adapter-patch-component.ts`, `capacitor-adapter-patch-component.ts` — patch `reconcileFile{Creation,Internal}`
     - `vault-load-patch-component.ts` — intercepts initial vault load
     - `file-explorer-view-on-create-patch-component.ts` — patches `FileExplorerView.onCreate`
-- **Test files** live next to the source: `foo.ts` → `foo.test.ts`. Integration tests use suffixes `.desktop.integration.test.ts` / `.android.integration.test.ts`.
+- **Test files** live next to the source: `alpha.ts` → `alpha.test.ts`. Integration tests use suffixes `.desktop.integration.test.ts` / `.android.integration.test.ts`.
 - **`main` field** points to `src/main.ts` (Obsidian plugin source entry — built artifact is `dist/build/main.js`, not published to npm).
 
 ## Conventions
@@ -93,7 +93,7 @@ consumes it via `scripts/vitest-global-setup-performance.ts`
 a new `integration-tests:desktop-performance` vitest project running
 `src/vault-real-scale.desktop-performance.integration.test.ts`.
 
-In-memory shadow-tree rewrite (plan: `docs/in-memory-tree-rewrite-plan.md`).
+In-memory shadow-tree rewrite (plan, with its measurements and reasoning: `~/.config/ai/tasks/closed/T481-P3.md`).
 Implemented on branch `feat/in-memory-tree`: `VaultModel` (shadow tree +
 bottom-up visibility) and `IndexProjectionComponent` replace the whole-vault
 reconcile walk — initial load snapshots Obsidian's loaded tree and removes only
