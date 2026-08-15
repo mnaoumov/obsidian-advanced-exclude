@@ -12,6 +12,15 @@ This vault ships an `Archive/` folder with two notes - [Archive/Old note](<./Arc
 
 ## Exclude it
 
+```code-button
+---
+caption: Ignore the Archive folder
+---
+await require('/demoSetup.ts').excludeArchiveFolder(app);
+```
+
+Manual equivalent:
+
 1. Open **Settings -> Community plugins -> Advanced Exclude**.
 2. In the **Ignore patterns** text area, add a line:
 
@@ -20,6 +29,17 @@ This vault ships an `Archive/` folder with two notes - [Archive/Old note](<./Arc
    ```
 
 3. Click **Apply** (or close Settings - patterns are applied on close too).
+
+To bring the folder back at any point:
+
+```code-button
+---
+caption: Clear every ignore pattern
+---
+await require('/demoSetup.ts').clearIgnorePatterns(app);
+```
+
+Manual equivalent: empty the **Ignore patterns** text area and apply.
 
 ## What you should see
 

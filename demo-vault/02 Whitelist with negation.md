@@ -13,6 +13,17 @@ file whose parent directory is excluded. You must first re-include the directori
 
 ## Try it
 
+This is the idiom most people get wrong, and the middle line is why - so the button applies all of it at once, exactly as written:
+
+```code-button
+---
+caption: Ignore everything except Markdown notes
+---
+await require('/demoSetup.ts').useMarkdownWhitelist(app);
+```
+
+Manual equivalent:
+
 1. Open **Settings -> Community plugins -> Advanced Exclude**.
 2. Replace the **Ignore patterns** with:
 
@@ -26,6 +37,15 @@ file whose parent directory is excluded. You must first re-include the directori
    ```
 
 3. Click **Apply**.
+
+Then drop the `!*/` line by hand and apply again - everything disappears, which is the trap described above. The button below puts the vault back:
+
+```code-button
+---
+caption: Clear every ignore pattern
+---
+await require('/demoSetup.ts').clearIgnorePatterns(app);
+```
 
 ## What you should see
 

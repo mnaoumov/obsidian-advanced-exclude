@@ -21,6 +21,29 @@ Try it: with `Archive/` still ignored, switch the mode to **Files pane**. The `A
 folder stays hidden in the Files pane, but a search for `Draft` finds the note again.
 Switch back to **Full** to hide it everywhere.
 
+```code-button
+---
+caption: Ignore the Archive folder (if you have not already)
+---
+await require('/demoSetup.ts').excludeArchiveFolder(app);
+```
+
+```code-button
+---
+caption: Exclude mode - Files pane only
+---
+await require('/demoSetup.ts').changeSettings(app, { excludeMode: 'FilesPane' });
+```
+
+```code-button
+---
+caption: Exclude mode - Full (the default)
+---
+await require('/demoSetup.ts').changeSettings(app, { excludeMode: 'Full' });
+```
+
+Manual equivalent: pick from the **Exclude mode** dropdown. Search for `Draft` after each one - it is found under **Files pane** and not under **Full**.
+
 ## Reuse Obsidian's excluded files
 
 **Ignore excluded files** (a toggle) pulls in whatever you have configured under
@@ -34,3 +57,19 @@ Advanced Exclude treatment.
 **Include `.gitignore` patterns** (a toggle, on by default) also honors any `.gitignore`
 file in your vault. If your vault is a git repository, the files git already ignores get
 hidden from Obsidian too - no need to restate them in the plugin.
+
+```code-button
+---
+caption: Turn both source toggles on
+---
+await require('/demoSetup.ts').changeSettings(app, { shouldIgnoreExcludedFiles: true, shouldIncludeGitIgnorePatterns: true });
+```
+
+```code-button
+---
+caption: Restore the defaults for both
+---
+await require('/demoSetup.ts').changeSettings(app, { shouldIgnoreExcludedFiles: false, shouldIncludeGitIgnorePatterns: true });
+```
+
+Manual equivalent: toggle **Ignore excluded files** and **Include `.gitignore` patterns** above.
