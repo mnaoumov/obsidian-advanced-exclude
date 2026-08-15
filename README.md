@@ -19,6 +19,21 @@ from a `.obsidianignore` file, your existing `.gitignore`, or Obsidian's own set
 >
 > Ensure you configured the plugin correctly to avoid data loss.
 
+<!-- markdownlint-disable MD033 -->
+
+<a href="images/screenshots/screenshot-desktop-1.png"><img src="images/screenshots/screenshot-desktop-1.png" alt="Excluded files still sit in your file explorer" width="600"></a>
+
+<details>
+<summary>More screenshots</summary>
+
+<a href="images/screenshots/screenshot-desktop-2.png"><img src="images/screenshots/screenshot-desktop-2.png" alt="One gitignore line later, they are not there at all" width="600"></a>
+<a href="images/screenshots/screenshot-mobile-1.png"><img src="images/screenshots/screenshot-mobile-1.png" alt="Excluded files still sit in your file explorer" width="270"></a>
+<a href="images/screenshots/screenshot-mobile-2.png"><img src="images/screenshots/screenshot-mobile-2.png" alt="One gitignore line later, they are not there at all" width="270"></a>
+
+</details>
+
+<!-- markdownlint-enable MD033 -->
+
 ## Demo vault
 
 **The documentation is a demo vault.** Every feature has a note that explains what it does and why you
