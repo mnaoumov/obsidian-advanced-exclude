@@ -26,6 +26,8 @@
     "subfolders",
     "tsbuildinfo",
     "unnumber",
+    "unvalidated",
+    "wdio",
     "yieldable"
   ],
   "ignoreWords": [],
