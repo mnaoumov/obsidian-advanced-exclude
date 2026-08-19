@@ -17,8 +17,8 @@ interface DemoSettingsPatch {
  * Replaces the ignore patterns with `content` and applies them.
  *
  * Multi-line gitignore text is the one thing a settings text area is worst at — it has to be typed
- * exactly, and a single missing `!*/` silently changes the result — so every pattern set this vault
- * teaches gets a button.
+ * exactly, and dropping the keep-folders-traversable line alone silently changes the result — so every
+ * pattern set this vault teaches gets a button.
  *
  * Manual equivalent: paste the same lines into **Ignore patterns** in **Settings -> Community plugins
  * -> Advanced Exclude** and click **Apply**. The same text also lives in `.obsidianignore` at the vault
@@ -42,8 +42,11 @@ export async function excludeArchiveFolder(app: App): Promise<void> {
  * The whitelist idiom from `02 Whitelist with negation.md`: ignore everything, keep folders
  * traversable, then re-include only markdown.
  *
- * The middle line is the one everybody forgets — without `!*/` the negation below it cannot reach
- * into any folder, because gitignore will not re-include a file whose parent is excluded.
+ * The middle line — the one re-including every directory — is the one everybody forgets. Without it
+ * the negation below cannot reach into any folder, because gitignore will not re-include a file whose
+ * parent is excluded. It is spelled out in the array below, where it is a string rather than prose:
+ * a literal comment-terminator sequence inside a block comment ENDS the comment, which is exactly how
+ * this whole module was left failing to load until the button suite ran it.
  *
  * Manual equivalent: paste those four lines into **Ignore patterns** and apply.
  */
