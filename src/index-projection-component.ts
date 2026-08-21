@@ -372,6 +372,13 @@ export class IndexProjectionComponent extends ComponentEx {
       await requestAnimationFrameAsync();
       if (!this.hasBuiltModel || this.needsFullProjection) {
         this.hasBuiltModel = true;
+        // Pessimistic for the same reason as the delta branch below, and for a sharper
+        // Failure: `applyFull` rebuilds the model BEFORE it touches the index, so an abort
+        // Between the two leaves the model already marking the new hidden set while the
+        // Index still holds it. Without this the superseding update would see a built model
+        // And no pending full, take the delta path, find nothing changed (the model is
+        // Already up to date) and leave the file visible forever.
+        this.needsFullProjection = true;
         await this.applyFull(abortSignal);
       } else {
         // Pessimistic: assume this delta will be superseded, so a concurrent/next

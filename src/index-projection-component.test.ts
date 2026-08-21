@@ -587,20 +587,21 @@ describe('IndexProjectionComponent', () => {
       expect(deleteFromFilesPane).toHaveBeenCalledWith('alpha');
     });
 
-    it('aborts a previous in-flight update when called again', async () => {
+    it('still projects when a superseding update aborts the first model-building one', async () => {
       const { component, manualIndexHider } = setup({
         entries: [{ isFolderFlag: false, path: 'drop.md' }],
         isIgnored: (path) => path === 'drop.md'
       });
 
-      // Both calls are the first (model-building) projection. The second aborts the
-      // First before its rebuild finishes, then takes the delta branch over the
-      // Still-empty model — so neither projection hides anything.
+      // Both calls are the first (model-building) projection, and the second aborts the
+      // First before it reaches the index. The first has already rebuilt the model, so a
+      // Delta over it would find nothing left to do — the superseding update must redo the
+      // Full projection instead, or the ignored file stays in the index forever.
       const firstUpdate = component.update();
       const secondUpdate = component.update();
       await Promise.all([firstUpdate, secondUpdate]);
 
-      expect(manualIndexHider.hide).not.toHaveBeenCalled();
+      expect(hiddenPaths(manualIndexHider)).toEqual(['drop.md']);
     });
 
     it('skips applying the delta when superseded mid-recompute', async () => {
