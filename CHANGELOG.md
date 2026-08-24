@@ -1,5 +1,19 @@
 # CHANGELOG
 
+## 4.0.0
+
+- feat!: default Include .gitignore patterns to false
+- chore: update obsidian-dev-utils to 94.6.1
+- chore: update obsidian-dev-utils to 94.6.0
+- fix: re-project fully when a superseding update aborts the first one
+- fix: override deepmerge-ts to clear GHSA-ggr8-5vv4-36mx
+- test: gate the demo vault by clicking every code button
+- chore: teach cspell the advisory wording
+- chore: update libs
+- docs(demo-vault): give the demo vault its code buttons
+- docs: capture the community-store screenshot set
+- docs: retire the finished rewrite plan and use NATO placeholders
+
 ## 3.4.3
 
 - docs: make the demo vault the documentation, in the standard layout
