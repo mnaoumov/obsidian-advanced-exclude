@@ -8,5 +8,5 @@ export class PluginSettings {
   public obsidianIgnoreContent = '';
   public shouldHideEmptyFolders = false;
   public shouldIgnoreExcludedFiles = false;
-  public shouldIncludeGitIgnorePatterns = true;
+  public shouldIncludeGitIgnorePatterns = false;
 }

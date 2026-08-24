@@ -54,9 +54,11 @@ Advanced Exclude treatment.
 
 ## Reuse `.gitignore`
 
-**Include `.gitignore` patterns** (a toggle, on by default) also honors any `.gitignore`
+**Include `.gitignore` patterns** (a toggle, off by default) also honors any `.gitignore`
 file in your vault. If your vault is a git repository, the files git already ignores get
-hidden from Obsidian too - no need to restate them in the plugin.
+hidden from Obsidian too - no need to restate them in the plugin. It starts off because a
+vault that happens to be a git repository should not change how it looks the moment the
+plugin is installed - turn it on when you want that.
 
 ```code-button
 ---
@@ -69,7 +71,7 @@ await require('/demoSetup.ts').changeSettings(app, { shouldIgnoreExcludedFiles: 
 ---
 caption: Restore the defaults for both
 ---
-await require('/demoSetup.ts').changeSettings(app, { shouldIgnoreExcludedFiles: false, shouldIncludeGitIgnorePatterns: true });
+await require('/demoSetup.ts').changeSettings(app, { shouldIgnoreExcludedFiles: false, shouldIncludeGitIgnorePatterns: false });
 ```
 
 Manual equivalent: toggle **Ignore excluded files** and **Include `.gitignore` patterns** above.

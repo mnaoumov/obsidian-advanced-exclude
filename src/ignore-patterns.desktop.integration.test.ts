@@ -9,6 +9,12 @@ import {
   it
 } from 'vitest';
 
+import type { PluginSettingsComponent } from './plugin-settings-component.ts';
+
+interface TraversableComponent {
+  readonly _children?: readonly unknown[];
+}
+
 const PLUGIN_ID = 'advanced-exclude';
 const SETTLE_DELAY_IN_MS = 5000;
 
@@ -21,6 +27,7 @@ const ALL_TEST_FILES = [
   'explorer-hidden.md',
   'explorer-visible.md',
   'gamma.md',
+  'gitignored-note.md',
   'keep-this.md',
   'normal-file.md',
   'secret-folder/nested.md',
@@ -128,7 +135,7 @@ describe('Ignore patterns — Full mode (vault-level exclusion)', () => {
     expect(result.allLoadedFiles).not.toContain('secret-folder/nested.md');
   });
 
-  it('should include .gitignore patterns when shouldIncludeGitIgnorePatterns is enabled', async () => {
+  it('should not include .gitignore patterns by default', async () => {
     const result = await evalInObsidian({
       async callback({ app, PLUGIN_ID: pluginId, SETTLE_DELAY_IN_MS: settleDelay }) {
         const plugin = app.plugins.getPlugin(pluginId);
@@ -136,14 +143,14 @@ describe('Ignore patterns — Full mode (vault-level exclusion)', () => {
           return { error: 'Plugin not loaded' };
         }
 
-        // Write .gitignore and ignored file to disk
-        await app.vault.adapter.write('.gitignore', '*.log\n');
-        await app.vault.adapter.write('build-output.log', 'I should be hidden by gitignore');
+        // Write .gitignore and the note it ignores to disk, leaving the setting at its default.
+        await app.vault.adapter.write('.gitignore', 'gitignored-note.md\n');
+        await app.vault.adapter.write('gitignored-note.md', 'I am ignored by git, not by Obsidian');
 
         // Create visible file via vault API
         await app.vault.create('normal-file.md', 'I am normal');
 
-        // Reload plugin to pick up .gitignore patterns
+        // Reload plugin so it would pick up .gitignore patterns if the setting allowed it
         await app.plugins.disablePluginAndSave(pluginId);
         await app.plugins.enablePluginAndSave(pluginId);
         await sleep(settleDelay);
@@ -163,6 +170,89 @@ describe('Ignore patterns — Full mode (vault-level exclusion)', () => {
     });
 
     expect(result.error).toBeNull();
+    // The vault's .gitignore is not the plugin's business until the user says so.
+    expect(result.allFiles).toContain('gitignored-note.md');
+    expect(result.allFiles).toContain('normal-file.md');
+  });
+
+  it('should include .gitignore patterns when shouldIncludeGitIgnorePatterns is enabled', async () => {
+    const result = await evalInObsidian({
+      async callback({ app, PLUGIN_ID: pluginId, SETTLE_DELAY_IN_MS: settleDelay }) {
+        const plugin = app.plugins.getPlugin(pluginId);
+        if (!plugin) {
+          return { error: 'Plugin not loaded' };
+        }
+
+        const pluginSettingsComponent = findComponent(plugin, 'PluginSettingsComponent') as PluginSettingsComponent | undefined;
+        if (!pluginSettingsComponent) {
+          return { error: 'Could not locate PluginSettingsComponent' };
+        }
+
+        // The setting is off by default, so this source has to be turned on explicitly.
+        await pluginSettingsComponent.editAndSave((settings) => {
+          settings.shouldIncludeGitIgnorePatterns = true;
+        });
+
+        // Write .gitignore and ignored files to disk
+        await app.vault.adapter.write('.gitignore', '*.log\ngitignored-note.md\n');
+        await app.vault.adapter.write('build-output.log', 'I should be hidden by gitignore');
+        await app.vault.adapter.write('gitignored-note.md', 'I should be hidden by gitignore');
+
+        // Create visible file via vault API
+        await app.vault.create('normal-file.md', 'I am normal');
+
+        // Reload plugin to pick up .gitignore patterns
+        await app.plugins.disablePluginAndSave(pluginId);
+        await app.plugins.enablePluginAndSave(pluginId);
+        await sleep(settleDelay);
+
+        const allFiles = app.vault.getFiles().map((f) => f.path).sort();
+
+        /*
+         * `editAndSave` persists to `data.json`, which outlives this test — reset the setting on the
+         * reloaded plugin so the rest of the suite still sees the shipped default.
+         */
+        const reloadedPlugin = app.plugins.getPlugin(pluginId);
+        const reloadedSettingsComponent = reloadedPlugin
+          ? findComponent(reloadedPlugin, 'PluginSettingsComponent') as PluginSettingsComponent | undefined
+          : undefined;
+        await reloadedSettingsComponent?.editAndSave((settings) => {
+          settings.shouldIncludeGitIgnorePatterns = false;
+        });
+
+        return {
+          allFiles,
+          error: null
+        };
+
+        function findComponent(root: object, className: string): unknown {
+          if (root.constructor.name === className) {
+            return root;
+          }
+
+          for (const child of ((root as TraversableComponent)._children ?? [])) {
+            if (typeof child !== 'object' || !child) {
+              continue;
+            }
+
+            const found = findComponent(child, className);
+            if (found) {
+              return found;
+            }
+          }
+
+          return undefined;
+        }
+      },
+      input: {
+        PLUGIN_ID,
+        SETTLE_DELAY_IN_MS
+      },
+      vaultPath: getTemporaryVault().path
+    });
+
+    expect(result.error).toBeNull();
+    expect(result.allFiles).not.toContain('gitignored-note.md');
     expect(result.allFiles).not.toContain('build-output.log');
     expect(result.allFiles).toContain('normal-file.md');
   });
