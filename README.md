@@ -58,7 +58,8 @@ A copy of the vault ships with every release. You can access it via any of the f
   them.
   [02 Whitelist with negation](<./demo-vault/02 Whitelist with negation.md>)
 - **Choose where patterns come from and how hard they hide** — your `.gitignore`, Obsidian's own
-  `Excluded files` setting, and how completely an ignored file disappears.
+  `Excluded files` setting, and how completely an ignored file disappears. Both extra sources are
+  off by default, so a fresh install changes nothing until you turn one on.
   [03 Exclude mode and sources](<./demo-vault/03 Exclude mode and sources.md>)
 - **Hide folders left empty by exclusion**, cascading up through parents whose whole subtree went
   away. Genuinely empty folders stay visible.

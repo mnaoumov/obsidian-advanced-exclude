@@ -14,8 +14,9 @@ Each option below lists the setting key stored in the plugin's `data.json`.
 ## Sources
 
 - `shouldIncludeGitIgnorePatterns`
-  - when on (the default), also honor patterns from a
-    `.gitignore` file in the vault.
+  - when on, also honor patterns from a
+    `.gitignore` file in the vault. Off by default, so a fresh install never applies your
+    vault's `.gitignore` until you ask it to.
 - `shouldIgnoreExcludedFiles`
   - when on, also ignore files matched by Obsidian's core
     **Files and links > Excluded files** setting.
