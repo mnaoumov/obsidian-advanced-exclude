@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## 4.1.1
+
+- docs(demo-vault): unwrap the notes so Obsidian stops rendering a break per line
+- docs(readme): render the same in Obsidian's plugin page as on GitHub
+- docs(agents): refresh the stale src/ map and the integration-test suffixes
+
 ## 4.1.0
 
 - fix: re #14
