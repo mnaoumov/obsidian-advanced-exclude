@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## 4.0.1
+
+- fix(versions): correct the stale 1.13.8 minAppVersion row for 4.0.0
+- chore: update libs
+
 ## 4.0.0
 
 - feat!: default Include .gitignore patterns to false
