@@ -8,10 +8,7 @@ Welcome to the [Advanced Exclude](https://github.com/mnaoumov/obsidian-advanced-
 
 **How to try it:** open [01 Exclude a folder](<./01 Exclude a folder.md>) and press its button - it adds `Archive/` to the plugin's ignore patterns, and that folder disappears from the Files pane, Backlinks, and search. The other feature notes build up to whitelists and the different exclude modes.
 
-Every pattern set these notes teach has a button, because multi-line `gitignore` text is the one thing
-a settings text area is worst at - and in the whitelist idiom a single missing line silently changes
-the result. Each button says what to type instead, and every note has one that clears the patterns
-again.
+Every pattern set these notes teach has a button, because multi-line `gitignore` text is the one thing a settings text area is worst at - and in the whitelist idiom a single missing line silently changes the result. Each button says what to type instead, and every note has one that clears the patterns again.
 
 ## Feature
 
