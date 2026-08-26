@@ -1,14 +1,11 @@
 # Exclude a folder
 
-The simplest use of Advanced Exclude: hide an entire folder and everything under it.
-This vault ships an `Archive/` folder with two notes - [Archive/Old note](<./Archive/Old note.md>) and
-[Archive/Draft](<./Archive/Draft.md>) - as the exclusion target.
+The simplest use of Advanced Exclude: hide an entire folder and everything under it. This vault ships an `Archive/` folder with two notes - [Archive/Old note](<./Archive/Old note.md>) and [Archive/Draft](<./Archive/Draft.md>) - as the exclusion target.
 
 ## Before you start
 
 1. In the Files pane, confirm you can see the `Archive/` folder with its two notes.
-2. Open [Shared/Topic](<./Shared/Topic.md>) and show its **Backlinks** pane (right-click the tab ->
-   **Backlinks for the current file**). Note the backlink from `Old note`.
+2. Open [Shared/Topic](<./Shared/Topic.md>) and show its **Backlinks** pane (right-click the tab -> **Backlinks for the current file**). Note the backlink from `Old note`.
 
 ## Exclude it
 
@@ -48,11 +45,8 @@ Manual equivalent: empty the **Ignore patterns** text area and apply.
 - A global **Search** for `Draft` no longer returns the archived note.
 - The excluded notes drop out of **Graph view**.
 
-The trailing slash in `Archive/` matters: it targets a folder. See [04 Settings](<./04 Settings.md>)
-for the setting key this text area writes to, and [02 Whitelist with negation](<./02 Whitelist with negation.md>)
-for the inverse - hiding everything *except* a few files.
+The trailing slash in `Archive/` matters: it targets a folder. See [04 Settings](<./04 Settings.md>) for the setting key this text area writes to, and [02 Whitelist with negation](<./02 Whitelist with negation.md>) for the inverse - hiding everything *except* a few files.
 
 > [!TIP]
 >
-> You can also edit the ignore list outside Settings: the same patterns live in an
-> `.obsidianignore` file at the vault root, which you can open and edit as plain text.
+> You can also edit the ignore list outside Settings: the same patterns live in an `.obsidianignore` file at the vault root, which you can open and edit as plain text.
