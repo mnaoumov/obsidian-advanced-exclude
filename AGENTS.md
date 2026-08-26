@@ -40,15 +40,26 @@ Built on `obsidian-dev-utils`. Patches Obsidian's `FileSystemAdapter` / `Capacit
   - `main.ts` — Obsidian entry point (default export of `Plugin`)
   - `plugin.ts` — `Plugin` class, wires up child components
   - `ignore-patterns-component.ts` — owns gitignore matching, IndexedDB cache, `.obsidianignore` / `.gitignore` reads
+  - `vault-model.ts` — `VaultModel`: the in-memory shadow tree and its bottom-up visibility (`recomputeAll`, `applyDelta`, `seedHidden`)
+  - `index-projection-component.ts` — `IndexProjectionComponent`: projects the model onto Obsidian's index in one event-free pass, drives the explorer, owns fast-enable and apply progress
+  - `manual-index-hider.ts` — `ManualIndexHider`: S6 direct index mutation — hides/re-inserts files with no events, keeps the in-memory snapshots a same-session un-ignore restores from
+  - `vault-path-store.ts` — IndexedDB persistence of the hidden set + universe signature (`IndexedDatabaseVaultPathStore`)
+  - `universe-signature.ts` — order-independent signature of the file universe; a mismatch vetoes fast-enable
   - `file-tree-component.ts` — drives Files pane add/delete based on ignore state
   - `data-adapter-safe.ts` — read/write/stat wrappers that survive missing files
+  - `indexed-database-utils.ts` — IndexedDB request → promise helper
+  - `constants.ts` — shared constants (`.gitignore` / `.obsidianignore` names, root path)
+  - `publish-compatibility-warning-component.ts` — warns when Obsidian Publish is on while `excludeMode === Full`
+  - `restore-notice-component.ts` — restores hidden files synchronously on unload (added last so it unloads first)
+  - `update-progress-notice-component.ts` — progress notice shown while a projection is applied
   - `plugin-settings*.ts` — settings model, component, settings tab
   - `patches/` — monkey-patches on Obsidian internals:
     - `adapter-patch-component.ts` — dispatches to file-system or capacitor variant
+    - `adapter-patch-base-component.ts` — shared `MonkeyAroundComponent` base for both adapter patches
     - `file-system-adapter-patch-component.ts`, `capacitor-adapter-patch-component.ts` — patch `reconcileFile{Creation,Internal}`
     - `vault-load-patch-component.ts` — intercepts initial vault load
     - `file-explorer-view-on-create-patch-component.ts` — patches `FileExplorerView.onCreate`
-- **Test files** live next to the source: `alpha.ts` → `alpha.test.ts`. Integration tests use suffixes `.desktop.integration.test.ts` / `.android.integration.test.ts`.
+- **Test files** live next to the source: `alpha.ts` → `alpha.test.ts`. Integration tests are named by the vitest project that runs them: `.desktop.` / `.android.` / `.cross-platform.` / `.no-app.` / `.desktop-performance.` / `.demo-vault.` / `.desktop-capture.` / `.android-capture.` + `.integration.test.ts`.
 - **`main` field** points to `src/main.ts` (Obsidian plugin source entry — built artifact is `dist/build/main.js`, not published to npm).
 
 ## Conventions
