@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## 4.1.0
+
+- fix: re #14
+
 ## 4.0.1
 
 - fix(versions): correct the stale 1.13.8 minAppVersion row for 4.0.0
