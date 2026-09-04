@@ -1,7 +1,6 @@
 import type { PluginManifest } from 'obsidian';
 
 import { Component } from 'obsidian';
-import { castTo } from 'obsidian-dev-utils/object-utils';
 import { ComponentEx } from 'obsidian-dev-utils/obsidian/components/component-ex';
 import { App } from 'obsidian-test-mocks/obsidian';
 import {
@@ -16,16 +15,7 @@ import type { IgnorePatternsComponent } from './ignore-patterns-component.ts';
 
 import { Plugin } from './plugin.ts';
 
-// The subset of `App` the dev-utils Notebook Navigator bridge reads on layout-ready.
-interface AppWithPlugins {
-  plugins: PluginRegistryLike;
-}
-
 type IgnorePatternsComponentConstructorParams = ConstructorParameters<typeof IgnorePatternsComponent>[0];
-
-interface PluginRegistryLike {
-  getPlugin(this: void, id: string): unknown;
-}
 
 /*
  * The real `PluginBase` (from `obsidian-dev-utils`) drives the lifecycle here —
@@ -143,9 +133,6 @@ describe('Plugin', () => {
 
   beforeEach(() => {
     app = App.createConfigured__();
-    // Since obsidian-dev-utils 89.0.0 the base bridges its command handlers into Notebook Navigator's
-    // Menus, which looks the plugin up on layout-ready -- so `plugins` has to answer on the strict mock.
-    castTo<AppWithPlugins>(app).plugins = { getPlugin: vi.fn().mockReturnValue(null) };
     const appOriginal = app.asOriginalType__();
     appOriginal.appId = 'test-app-id';
 
