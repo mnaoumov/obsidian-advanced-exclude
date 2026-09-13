@@ -90,7 +90,7 @@
 ## 3.1.3
 
 - docs: standardize demo-vault README
-- docs: drop per-plugin demo-vault setup notes (bootstrap covered by ODU harness)
+- docs: drop per-plugin demo-vault setup notes (bootstrap covered by the obsidian-dev-utils harness)
 - docs: unnumber demo-vault setup notes
 - docs(demo-vault): create the Advanced Exclude demo vault
 
