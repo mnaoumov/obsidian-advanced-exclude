@@ -185,7 +185,7 @@ here and, with the same shape, against CodeScript Toolkit (#59) and Embed HTML (
 in `obsidian-dev-utils`, not here: `PluginBase.onload` adds a placeholder `PluginSettingsComponentBase`
 typed on `Object` before `onloadImpl` installs the real one, and knowing no property names it could only
 serialize `{}` — which the normalizing save at the end of `loadFromFile` (there to persist migrations)
-then wrote over the real settings. ODU 94.6.0 skips that save for a component that knows no properties;
+then wrote over the real settings. `obsidian-dev-utils` 94.6.0 skips that save for a component that knows no properties;
 `advanced-exclude` picked it up in 4.0.0 (`obsidian-dev-utils ^94.6.1`, now `^96.0.1`). 3.4.3 — the
 version #14 was filed against — predates it. `src/settings-persistence.cross-platform.integration.test.ts`
 is the regression guard: it clears `data.json`, confirms an untouched plugin writes none, flips
@@ -194,4 +194,4 @@ reloads the plugin rather than the app (the harness has no app-reload primitive)
 is created on every plugin **enable**, not only at startup — which also explains the "startup resets,
 disable/enable does not" asymmetry #59 reported: after the first wipe the file is already `{}`, so the
 next pass has nothing left to erase. Verified both ways — green as shipped, and red (`expected '{}' not
-to be '{}'`) with the ODU guard neutered in the built bundle.
+to be '{}'`) with that `obsidian-dev-utils` guard neutered in the built bundle.
