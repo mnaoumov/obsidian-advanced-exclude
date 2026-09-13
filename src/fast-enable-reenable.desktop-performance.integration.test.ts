@@ -12,14 +12,14 @@ import type { PluginSettingsComponent } from './plugin-settings-component.ts';
 import { ExcludeMode } from './plugin-settings.ts';
 
 /*
- * Fast-enable (issue #10 enable half, T125) in real Obsidian on the ISOLATED synthetic
+ * Fast-enable (issue #10, the enable half) in real Obsidian on the ISOLATED synthetic
  * performance vault — ONLY this plugin, so behavior is attributed purely to us (no
  * other-plugin confound) and reproducibly, without touching any real vault.
  *
  * One contiguous eval, so enable/disable state and timing are uninterrupted:
  *   1. Full mode + ignore `big/dir-0/` → a full projection persists the hidden set + a
  *      universe signature; the folder leaves Obsidian's index.
- *   2. `disablePlugin` → the hidden set is restored from snapshots (T124).
+ *   2. `disablePlugin` → the hidden set is restored from snapshots.
  *   3. `enablePlugin` with the config AND file universe unchanged → the FAST path
  *      (`fastEnableApplied === true`) re-hides the persisted set directly, no whole-vault
  *      rebuild/recompute. Must be correct.
