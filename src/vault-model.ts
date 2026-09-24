@@ -34,14 +34,14 @@ export interface VaultModelRecomputeAllOptions {
    * Reports progress as `processed` of `total` node-visits (two visits per node:
    * one to evaluate its ignore verdict, one to compute its visibility).
    */
-  onProgress?(this: void, processed: number, total: number): void;
+  readonly onProgress?: (this: void, processed: number, total: number) => void;
 
   /**
    * Awaited every {@link RECOMPUTE_YIELD_CHUNK_SIZE} nodes to yield the main
    * thread. Omit for a straight-through synchronous-style run (used by tests and
    * benchmarks).
    */
-  yieldFunction?(this: void): Promise<void>;
+  readonly yieldFunction?: (this: void) => Promise<void>;
 }
 
 /**

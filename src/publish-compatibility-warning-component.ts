@@ -16,7 +16,7 @@ import { ExcludeMode } from './plugin-settings.ts';
 
 interface AddButtonParams {
   readonly containerEl: HTMLElement;
-  listener(this: void): void;
+  readonly listener: (this: void) => void;
   readonly text: string;
 }
 

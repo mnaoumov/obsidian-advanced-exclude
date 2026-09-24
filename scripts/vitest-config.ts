@@ -1,8 +1,5 @@
 import type { ObsidianPluginVitestConfigContext } from 'obsidian-dev-utils/script-utils/test-runners/vitest-config';
-import type {
-  TestProjectConfiguration,
-  ViteUserConfig
-} from 'vitest/config';
+import type { TestProjectConfiguration } from 'vitest/config';
 
 import { defineObsidianPluginVitestConfig } from 'obsidian-dev-utils/script-utils/test-runners/vitest-config';
 
@@ -69,25 +66,7 @@ const DEMO_VAULT_TEST_FILES = 'src/**/*.demo-vault.integration.test.ts';
  */
 const DEMO_VAULT_TIMEOUT_IN_MILLISECONDS = 600_000;
 
-/**
- * Drops the root-level `include` the shared factory still sets on this `obsidian-dev-utils` line.
- *
- * Under vitest 5 a project's own `include` no longer replaces the root one, and the root
- * `src/**\/*.test.ts` is a superset of every project glob, so EVERY project collected EVERY test
- * file: unit suites ran under the CDP transport, and the screenshot-capture suites ran from
- * `npm run test:integration` and rewrote the checked-in PNGs. `obsidian-dev-utils` 101.7.0 removed
- * the root `include` itself; this wrapper is dead once the dependency is floated past it.
- *
- * @param baseConfig - The configuration the shared factory built.
- * @returns The same configuration without the root `include`.
- */
-function withoutRootInclude(baseConfig: ViteUserConfig): ViteUserConfig {
-  const test = { ...baseConfig.test };
-  delete test.include;
-  return { ...baseConfig, test };
-}
-
-export const config = withoutRootInclude(defineObsidianPluginVitestConfig({
+export const config = defineObsidianPluginVitestConfig({
   customProjects(context: ObsidianPluginVitestConfigContext): TestProjectConfiguration[] {
     return [
       {
@@ -142,4 +121,4 @@ export const config = withoutRootInclude(defineObsidianPluginVitestConfig({
      */
     context.desktopPerformance.globalSetup = ['./scripts/vitest-global-setup-performance.ts'];
   }
-}));
+});

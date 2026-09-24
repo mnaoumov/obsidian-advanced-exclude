@@ -9,7 +9,7 @@ interface LinkViewRenderer {
   backlinkFile?: unknown;
   outgoingFile?: unknown;
   unlinkedFile?: unknown;
-  update?(this: void): void;
+  update?: (this: void) => void;
 }
 
 declare module 'obsidian' {
@@ -22,6 +22,7 @@ declare module 'obsidian' {
      * a bulk removal — the source of the O(N²) folder-hide cost this plugin
      * batches around. This overload adds the real array signature.
      */
+    // eslint-disable-next-line @typescript-eslint/method-signature-style -- An overload augmentation must stay a method: a property would conflict with the public declaration instead of adding a signature.
     updateRelatedLinks(names: string[]): void;
   }
 

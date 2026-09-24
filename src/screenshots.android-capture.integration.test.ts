@@ -39,7 +39,7 @@ import {
  * Setting baseFontSize alone changes nothing on screen.
  */
 interface FontSizeApp {
-  updateFontSize(this: void): void;
+  updateFontSize: (this: void) => void;
 }
 
 const WIDTH_IN_PIXELS = 900;

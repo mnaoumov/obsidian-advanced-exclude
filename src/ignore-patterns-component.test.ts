@@ -64,7 +64,7 @@ vi.mock('obsidian-dev-utils/object-utils', async (importOriginal) => ({
 
 interface CreateComponentOverrides {
   app?: AppOriginal;
-  onUpdateFileTree?(): Promise<void>;
+  onUpdateFileTree?: () => Promise<void>;
   pluginSettingsComponent?: PluginSettingsComponent;
   vaultLoadPatch?: VaultLoadPatchComponent;
 }
@@ -123,8 +123,8 @@ interface SetupIndexedDatabaseResult {
 }
 
 interface TestableIgnorePatternsComponent {
-  clearCachedExcludeRegExps(): void;
-  writeObsidianIgnore(obsidianIgnoreContent: string): Promise<void>;
+  clearCachedExcludeRegExps: () => void;
+  writeObsidianIgnore: (obsidianIgnoreContent: string) => Promise<void>;
 }
 
 interface UpgradeEvent {

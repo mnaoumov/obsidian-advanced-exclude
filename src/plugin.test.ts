@@ -163,16 +163,14 @@ describe('Plugin', () => {
 
   it('should call addChild the expected number of times', async () => {
     /*
-     * The real `PluginBase` registers 10 universal child components before
-     * `onloadImpl` (including its own `commandHandlerComponent`, the
-     * `MenuEventRegistrarComponent` it wires into it, since
-     * `obsidian-dev-utils` 89.0.0 the Notebook Navigator menu-event registrar,
-     * and since 93.2.0 a settings component of its own — which this plugin then
-     * replaces), then the plugin's `onloadImpl` adds its own 11 children.
+     * The real `PluginBase` adds its universal child components to an internal
+     * wrapper component, and that wrapper to itself through the base
+     * `Component.addChild`, so none of them reaches the `addChild` override
+     * spied on here. Every call it sees is one of the plugin's own 11
+     * `onloadImpl` children, which the override routes into the gated
+     * feature-surface tier.
      */
-    const EXPECTED_BASE_ADD_CHILD_CALLS = 10;
-    const EXPECTED_PLUGIN_ADD_CHILD_CALLS = 11;
-    const EXPECTED_ADD_CHILD_CALLS = EXPECTED_BASE_ADD_CHILD_CALLS + EXPECTED_PLUGIN_ADD_CHILD_CALLS;
+    const EXPECTED_ADD_CHILD_CALLS = 11;
     const appOriginal = app.asOriginalType__();
 
     // Spy on the real addChild (calls through) so the real children still load.

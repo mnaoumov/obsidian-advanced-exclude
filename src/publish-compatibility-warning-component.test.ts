@@ -48,13 +48,13 @@ interface Harness {
   component: PublishCompatibilityWarningComponent;
   disablePluginAndSave: ReturnType<typeof vi.fn>;
   effectiveSettings: PluginSettings;
-  fireInternalPluginsChange(): void;
-  fireSaveSettings(): void;
+  fireInternalPluginsChange: () => void;
+  fireSaveSettings: () => void;
   processConfigChanges: ReturnType<typeof vi.fn>;
   publishDisable: ReturnType<typeof vi.fn>;
   setProperty: ReturnType<typeof vi.fn>;
   state: HarnessState;
-  triggerLayoutReady(): Promise<void>;
+  triggerLayoutReady: () => Promise<void>;
 }
 
 interface HarnessState {
