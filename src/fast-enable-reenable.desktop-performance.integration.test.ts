@@ -209,10 +209,7 @@ describe('Fast enable — re-hides the persisted set directly on unchanged confi
           if ((metadataCache.resolvedLinks[source]?.[target] ?? 0) > 0) {
             return 'resolved';
           }
-          if ((metadataCache.unresolvedLinks[source]?.[target] ?? 0) > 0) {
-            return 'unresolved';
-          }
-          return 'none';
+          return (metadataCache.unresolvedLinks[source]?.[target] ?? 0) > 0 ? 'unresolved' : 'none';
         }
 
         function findComponent(root: object, className: string): unknown {

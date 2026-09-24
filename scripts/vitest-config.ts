@@ -120,5 +120,11 @@ export const config = defineObsidianPluginVitestConfig({
      * shared global setup knows nothing about. Every suite in this project asserts against it.
      */
     context.desktopPerformance.globalSetup = ['./scripts/vitest-global-setup-performance.ts'];
+
+    /*
+     * The Reload-button test fakes `location.reload` by redefining `window.location`, which the
+     * `vmThreads` pool makes non-configurable, so this file runs on the default pool instead.
+     */
+    context.globalStubTestFiles.push('src/restore-notice-component.test.ts');
   }
 });

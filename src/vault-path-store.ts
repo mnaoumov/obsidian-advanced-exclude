@@ -88,8 +88,5 @@ function normalizeStoredValue(value: PersistedValue | undefined): StoredVaultPat
   if (!value) {
     return { entries: [], universeSignature: null };
   }
-  if (Array.isArray(value)) {
-    return { entries: value, universeSignature: null };
-  }
-  return { entries: value.entries, universeSignature: value.universeSignature };
+  return Array.isArray(value) ? { entries: value, universeSignature: null } : { entries: value.entries, universeSignature: value.universeSignature };
 }

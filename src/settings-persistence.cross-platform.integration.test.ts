@@ -187,11 +187,7 @@ async function runStep(action: StepAction): Promise<null | string> {
 
       function getSettingsComponent(): PluginSettingsComponent | undefined {
         const plugin = app.plugins.getPlugin(pluginId);
-        if (!plugin) {
-          return undefined;
-        }
-
-        return findComponent(plugin, 'PluginSettingsComponent') as PluginSettingsComponent | undefined;
+        return plugin ? (findComponent(plugin, 'PluginSettingsComponent') as PluginSettingsComponent | undefined) : undefined;
       }
     },
     input: {

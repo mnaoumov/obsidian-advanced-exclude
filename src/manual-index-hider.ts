@@ -89,10 +89,7 @@ export class ManualIndexHider {
    */
   public getSnapshotStat(normalizedPath: string): null | SnapshotStat {
     const snapshot = this.snapshots.get(normalizedPath);
-    if (snapshot?.mtime === undefined || snapshot.size === undefined) {
-      return null;
-    }
-    return { mtime: snapshot.mtime, size: snapshot.size };
+    return snapshot?.mtime === undefined || snapshot.size === undefined ? null : { mtime: snapshot.mtime, size: snapshot.size };
   }
 
   /**

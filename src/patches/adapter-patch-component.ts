@@ -78,13 +78,9 @@ export class AdapterPatchComponent extends MonkeyAroundComponent {
 
   private async reconcileDeletion(fallback: () => Promise<void>, normalizedPath: string): Promise<void> {
     await fallback();
-    if (!this.app.workspace.layoutReady) {
-      return;
-    }
-
     // While a projection is applying, ignore reconcileDeletion: it is not a real on-disk
     // Deletion to record, and recording it would forget paths the projection is managing.
-    if (this.indexProjectionComponent.isApplyingProjection) {
+    if (!this.app.workspace.layoutReady || this.indexProjectionComponent.isApplyingProjection) {
       return;
     }
 

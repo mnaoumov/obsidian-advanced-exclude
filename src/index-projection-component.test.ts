@@ -507,10 +507,7 @@ describe('IndexProjectionComponent', () => {
         if (viewType === 'backlink') {
           return [linkLeaf(backlink, undefined)];
         }
-        if (viewType === 'outgoing-link') {
-          return [linkLeaf(undefined, outgoingLink)];
-        }
-        return [];
+        return viewType === 'outgoing-link' ? [linkLeaf(undefined, outgoingLink)] : [];
       });
 
       await component.update();

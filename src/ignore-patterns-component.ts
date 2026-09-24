@@ -142,12 +142,14 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
       shouldRefresh ||= await this.readGitIgnore();
     }
 
-    if (shouldRefresh) {
-      this.cachedIgnoreTester = null;
-      invokeAsyncSafelyAfterDelay({
-        asyncFunction: () => this.processConfigChanges()
-      });
+    if (!shouldRefresh) {
+      return;
     }
+
+    this.cachedIgnoreTester = null;
+    invokeAsyncSafelyAfterDelay({
+      asyncFunction: () => this.processConfigChanges()
+    });
   }
 
   /**
@@ -248,12 +250,14 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
 
   private clearCachedExcludeRegExps(): void {
     this.cachedExcludeRegExps = null;
-    if (this.pluginSettingsComponent.settings.shouldIgnoreExcludedFiles) {
-      this.fileIgnoreMap.clear();
-      invokeAsyncSafelyAfterDelay({
-        asyncFunction: () => this.processConfigChanges()
-      });
+    if (!this.pluginSettingsComponent.settings.shouldIgnoreExcludedFiles) {
+      return;
     }
+
+    this.fileIgnoreMap.clear();
+    invokeAsyncSafelyAfterDelay({
+      asyncFunction: () => this.processConfigChanges()
+    });
   }
 
   private async getCurrentMtimeEntry(): Promise<DatabaseMtimeEntry> {
@@ -310,11 +314,7 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
   }
 
   private getUserIgnoreFilters(): string[] {
-    if (!this.pluginSettingsComponent.settings.shouldIgnoreExcludedFiles) {
-      return [];
-    }
-
-    return (this.app.vault.getConfig('userIgnoreFilters') ?? []) as string[];
+    return this.pluginSettingsComponent.settings.shouldIgnoreExcludedFiles ? ((this.app.vault.getConfig('userIgnoreFilters') ?? []) as string[]) : [];
   }
 
   /**
