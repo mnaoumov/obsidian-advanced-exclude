@@ -21,11 +21,7 @@ export class FileTreeComponent extends ComponentEx {
 
   public addToFilesPane(normalizedPath: string): void {
     const fileExplorerView = this.getFileExplorerView();
-    if (!fileExplorerView) {
-      return;
-    }
-
-    if (Object.hasOwn(fileExplorerView.fileItems, normalizedPath)) {
+    if (!fileExplorerView || Object.hasOwn(fileExplorerView.fileItems, normalizedPath)) {
       return;
     }
 
@@ -39,11 +35,7 @@ export class FileTreeComponent extends ComponentEx {
 
   public deleteFromFilesPane(normalizedPath: string): void {
     const fileExplorerView = this.getFileExplorerView();
-    if (!fileExplorerView) {
-      return;
-    }
-
-    if (!Object.hasOwn(fileExplorerView.fileItems, normalizedPath)) {
+    if (!fileExplorerView || !Object.hasOwn(fileExplorerView.fileItems, normalizedPath)) {
       return;
     }
 

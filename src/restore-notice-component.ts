@@ -27,11 +27,7 @@ export class RestoreNoticeComponent extends ComponentEx {
     // Restore is driven from here — the projection is still loaded, so its in-memory
     // Snapshots are intact and the index can be restored synchronously. When the
     // Restore succeeds there is nothing to reload, so the notice is suppressed.
-    if (this.indexProjectionComponent.restoreHiddenFilesOnUnload()) {
-      return;
-    }
-
-    if (this.indexProjectionComponent.getHiddenCount() === 0) {
+    if (this.indexProjectionComponent.restoreHiddenFilesOnUnload() || (this.indexProjectionComponent.getHiddenCount() === 0)) {
       return;
     }
 

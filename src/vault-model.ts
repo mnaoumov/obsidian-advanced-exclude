@@ -187,10 +187,7 @@ export class VaultModel {
    */
   public isParentVisible(normalizedPath: string): boolean | undefined {
     const node = this.nodes.get(normalizedPath);
-    if (!node) {
-      return undefined;
-    }
-    return node.parent?.isVisible ?? true;
+    return node ? node.parent?.isVisible ?? true : undefined;
   }
 
   /**
@@ -240,11 +237,13 @@ export class VaultModel {
       // `await` is reached only on a chunk boundary (and only with a `yieldFunction`),
       // So a small model — or any caller without `yieldFunction` — runs straight through
       // Without suspending per node.
-      if (processed % RECOMPUTE_YIELD_CHUNK_SIZE === 0) {
-        options?.onProgress?.(processed, total);
-        if (options?.yieldFunction && await hasAbortedAfterYield(options)) {
-          return changes;
-        }
+      if (processed % RECOMPUTE_YIELD_CHUNK_SIZE !== 0) {
+        continue;
+      }
+
+      options?.onProgress?.(processed, total);
+      if (options?.yieldFunction && await hasAbortedAfterYield(options)) {
+        return changes;
       }
     }
 
@@ -255,11 +254,13 @@ export class VaultModel {
         changes.push({ isFolder: node.isFolder, isVisible: node.isVisible, path: node.path });
       }
       processed++;
-      if (processed % RECOMPUTE_YIELD_CHUNK_SIZE === 0) {
-        options?.onProgress?.(processed, total);
-        if (options?.yieldFunction && await hasAbortedAfterYield(options)) {
-          return changes;
-        }
+      if (processed % RECOMPUTE_YIELD_CHUNK_SIZE !== 0) {
+        continue;
+      }
+
+      options?.onProgress?.(processed, total);
+      if (options?.yieldFunction && await hasAbortedAfterYield(options)) {
+        return changes;
       }
     }
 
@@ -338,10 +339,7 @@ export class VaultModel {
     // A non-ignored folder emptied by exclusion (has children but none visible)
     // Collapses only when the setting is on; a genuinely empty folder (no
     // Children on disk) always stays visible.
-    if (this.shouldHideEmptyFolders() && children.size > 0) {
-      return this.hasVisibleChild(children);
-    }
-    return true;
+    return this.shouldHideEmptyFolders() && children.size > 0 ? this.hasVisibleChild(children) : true;
   }
 
   private ensureNode(params: VaultModelEnsureNodeParams): VaultModelNode {

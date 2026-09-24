@@ -322,13 +322,9 @@ export class IndexProjectionComponent extends ComponentEx {
 
     // On app shutdown the index and explorer are being destroyed — restoring is
     // Wasted work, and driving the tearing-down explorer could throw.
-    if (this.isQuitting) {
-      return true;
-    }
-
     // `FilesPane` mode never mutates the index (`hideFromIndex` is a no-op), so there
     // Is nothing to restore and no reload is ever needed.
-    if (this.excludeMode !== ExcludeMode.Full) {
+    if (this.isQuitting || this.excludeMode !== ExcludeMode.Full) {
       return true;
     }
 
@@ -618,13 +614,7 @@ export class IndexProjectionComponent extends ComponentEx {
 
     const stored = await this.vaultPathStore.load();
     // A disable during the `load()` above unloaded the component; do not mutate the index.
-    if (abortSignal.aborted) {
-      return false;
-    }
-    if (stored.universeSignature === null || stored.entries.length === 0) {
-      return false;
-    }
-    if (this.computeUniverseSignature(stored.entries) !== stored.universeSignature) {
+    if (abortSignal.aborted || stored.universeSignature === null || stored.entries.length === 0 || (this.computeUniverseSignature(stored.entries) !== stored.universeSignature)) {
       return false;
     }
 
