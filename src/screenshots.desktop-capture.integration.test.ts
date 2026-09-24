@@ -92,7 +92,7 @@ beforeAll(async () => {
       app.changeTheme('obsidian');
 
       // The file explorer IS the subject here, so it is the one thing that must
-      // Be open — the opposite of most of these suites, which collapse it.
+      // be open — the opposite of most of these suites, which collapse it.
       app.workspace.leftSplit.expand();
       const fileExplorerLeaf = app.workspace.getLeavesOfType('file-explorer')[0];
       if (fileExplorerLeaf) {
@@ -122,8 +122,8 @@ describe('desktop store screenshots', () => {
     }
 
     // A before-shot is only safe BECAUSE of the caption. A listing carousel
-    // Shows screenshots one at a time, so an unlabelled one reads as a picture
-    // Of what the plugin does, not of what it fixes.
+    // shows screenshots one at a time, so an unlabelled one reads as a picture
+    // of what the plugin does, not of what it fixes.
     expect(names).toContain(IGNORED_FOLDER);
     await shoot(1, 'Excluded files still sit in your file explorer');
   });

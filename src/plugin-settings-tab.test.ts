@@ -133,7 +133,7 @@ describe('PluginSettingsTab', () => {
   describe('Apply button', () => {
     it('should call ignorePatternsComponent.processConfigChanges when clicked', async () => {
       // The test-mock ButtonComponent stores its onClick handler instead of
-      // Wiring a real DOM listener, so capture the handlers by button text.
+      // wiring a real DOM listener, so capture the handlers by button text.
       const handlersByText = new Map<string, ($event: MouseEvent) => unknown>();
       const onClickSpy = vi.spyOn(ButtonComponent.prototype, 'onClick')
         .mockImplementation(function captureOnClick(this: ButtonComponent, callback): ButtonComponent {

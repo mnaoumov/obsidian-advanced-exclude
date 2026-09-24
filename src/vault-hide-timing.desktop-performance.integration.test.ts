@@ -59,9 +59,9 @@ describe('Full-mode hide-almost-everything scales with work, not vault size (iss
     const vaultPath = getTemporaryVault().path;
 
     // Settle across short eval calls until the loaded-file count is stable. Each poll sleeps
-    // In-page (harness `sleep`) then returns the count, so no single eval spans both the
-    // Wait and the hide (which would exceed the CDP command timeout) and no Node timer is
-    // Imported. A single eval that both waits and hides would exceed the CDP command timeout.
+    // in-page (harness `sleep`) then returns the count, so no single eval spans both the
+    // wait and the hide (which would exceed the CDP command timeout) and no Node timer is
+    // imported. A single eval that both waits and hides would exceed the CDP command timeout.
     let previous = -1;
     for (let poll = 0; poll < SETTLE_MAX_POLLS; poll++) {
       const count = await evalInObsidian({

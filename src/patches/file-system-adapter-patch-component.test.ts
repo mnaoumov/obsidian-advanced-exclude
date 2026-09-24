@@ -91,8 +91,8 @@ describe('FileSystemAdapterPatchComponent', () => {
     component.load();
 
     // The reconcileFileCreation patch should pass isFolder=false
-    // When ignored with Full mode, it should return early (not call next)
-    // We verify through isIgnored being called with isFolder=false
+    // when ignored with Full mode, it should return early (not call next)
+    // we verify through isIgnored being called with isFolder=false
     const fsAdapter = FileSystemAdapter.create__('/vault');
     const adapter = fsAdapter.asOriginalType__();
     Object.defineProperties(adapter, {

@@ -154,7 +154,7 @@ async function assertScenario(spec: ScenarioSpec): Promise<void> {
 
   expect(result.error).toBeNull();
   // S6 hides by mutating the index directly and firing no events, so a hide issues
-  // No `reconcileDeletion` at all — at any file count or hide-root count.
+  // no `reconcileDeletion` at all — at any file count or hide-root count.
   expect(result.reconcileDeletionCount).toBe(0);
   // Every file inside the ignored scope is gone from the vault.
   expect(result.inScopeVisibleAfterHide).toBe(0);
@@ -235,8 +235,8 @@ function nestedTreeSpec(): ScenarioSpec {
 async function runIgnoreScenario(spec: ScenarioSpec): Promise<VaultSizeScenarioResult> {
   const vaultPath = getTemporaryVault().path;
   // Split the scenario across separate CDP calls so no single `evalInObsidian` exceeds the 30s
-  // Command timeout: one prepare call (plugin off, clean baseline), one call per file chunk, one
-  // Exercise call (enable, hide, re-show). All hit the same Obsidian, so vault state persists.
+  // command timeout: one prepare call (plugin off, clean baseline), one call per file chunk, one
+  // exercise call (enable, hide, re-show). All hit the same Obsidian, so vault state persists.
   await prepareBaseline();
   await createFilesInChunks();
   return exerciseHideAndShow();

@@ -36,7 +36,7 @@ async function populate(): Promise<PopulateFilesParams> {
 }
 
 // Pre-populates the whole `demo-vault/` tree (plus the CodeScript Toolkit binary and its settings)
-// Before Obsidian opens, so the startup scan indexes every note in one pass. Used by
+// before Obsidian opens, so the startup scan indexes every note in one pass. Used by
 // `integration-tests:demo-vault`.
 const { setup, teardown } = createSetup({
   enableCommunityPlugins: [CODE_SCRIPT_TOOLKIT_PLUGIN_ID],

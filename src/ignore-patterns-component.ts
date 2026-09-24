@@ -30,9 +30,9 @@ import { getResult } from './indexed-database-utils.ts';
 
 const DB_VERSION = 1;
 // Bumped whenever the ignore-matching logic changes shape (e.g. the folder verdict
-// Now tests the trailing-slash form only). It rides in the mtime entry so an upgrade
-// Whose ignore-file modification times are unchanged still fails the `isDeepEqual` check in `loadDb`
-// And resets the persisted per-path verdicts instead of serving stale ones.
+// now tests the trailing-slash form only). It rides in the mtime entry so an upgrade
+// whose ignore-file modification times are unchanged still fails the `isDeepEqual` check in `loadDb`
+// and resets the persisted per-path verdicts instead of serving stale ones.
 const IGNORE_MATCHER_VERSION = 2;
 const MTIME_STORE_NAME = 'mtime';
 const FILES_STORE_NAME = 'files';
@@ -91,7 +91,7 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
   private readonly vaultLoadPatch: VaultLoadPatchComponent;
   // Whether the persisted per-path verdicts have been hydrated into `fileIgnoreMap`
   // (or there is nothing left to hydrate after a reset). Deferred off the enable
-  // Path; see `ensureVerdictsLoaded`.
+  // path; see `ensureVerdictsLoaded`.
   private verdictsLoaded = false;
 
   private get database(): IDBDatabase {
@@ -177,10 +177,10 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
     const excludeRegExps = this.getExcludeRegExps();
 
     // A folder is tested against the trailing-slash (directory) form only: that is the
-    // Form gitignore negation re-includes via `!*/`, so a whitelist idiom (`*` + `!*/` +
+    // form gitignore negation re-includes via `!*/`, so a whitelist idiom (`*` + `!*/` +
     // `!*.md`) leaves folders traversable instead of the slash-less `foo` being caught by
     // `*`. Dir-only (`build/`) and plain (`node_modules`) patterns still match the slash
-    // Form, so this is stricter only where negation intends it. The exclude regexps
+    // form, so this is stricter only where negation intends it. The exclude regexps
     // (Obsidian's `userIgnoreFilters`) keep testing both forms, unchanged.
     const gitignorePath = isFolder ? `${normalizedPath}/` : normalizedPath;
     const excludePaths = isFolder ? [normalizedPath, `${normalizedPath}/`] : [normalizedPath];
@@ -242,8 +242,8 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
 
   private addStoreAction(normalizedPath: string, storeAction: (store: IDBObjectStore) => void): void {
     // Keyed by path so repeated config changes overwrite rather than append: the
-    // Queue is bounded to the number of distinct paths instead of growing by the
-    // Whole vault on every `processConfigChanges`.
+    // queue is bounded to the number of distinct paths instead of growing by the
+    // whole vault on every `processConfigChanges`.
     this.pendingStoreActions.set(normalizedPath, storeAction);
     this.processStoreActionsDebounced();
   }
@@ -420,10 +420,10 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
     filesStore.clear();
     this.fileIgnoreMap.clear();
     // Drop any queued writes: they target the store we just cleared and would
-    // Otherwise repopulate it with stale entries.
+    // otherwise repopulate it with stale entries.
     this.pendingStoreActions.clear();
     // The store is now empty, so there is nothing left for `ensureVerdictsLoaded`
-    // To hydrate — `fileIgnoreMap` (empty) is authoritative and repopulates on miss.
+    // to hydrate — `fileIgnoreMap` (empty) is authoritative and repopulates on miss.
     this.verdictsLoaded = true;
     mtimeStore.put(currentMtimeEntry, 0);
   }

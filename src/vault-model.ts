@@ -235,8 +235,8 @@ export class VaultModel {
       this.evaluateIgnored(node);
       processed++;
       // `await` is reached only on a chunk boundary (and only with a `yieldFunction`),
-      // So a small model — or any caller without `yieldFunction` — runs straight through
-      // Without suspending per node.
+      // so a small model — or any caller without `yieldFunction` — runs straight through
+      // without suspending per node.
       if (processed % RECOMPUTE_YIELD_CHUNK_SIZE !== 0) {
         continue;
       }
@@ -337,8 +337,8 @@ export class VaultModel {
       return this.hasVisibleChild(children);
     }
     // A non-ignored folder emptied by exclusion (has children but none visible)
-    // Collapses only when the setting is on; a genuinely empty folder (no
-    // Children on disk) always stays visible.
+    // collapses only when the setting is on; a genuinely empty folder (no
+    // children on disk) always stays visible.
     return this.shouldHideEmptyFolders() && children.size > 0 ? this.hasVisibleChild(children) : true;
   }
 

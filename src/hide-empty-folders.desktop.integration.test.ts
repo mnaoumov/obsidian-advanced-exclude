@@ -29,7 +29,7 @@ afterEach(async () => {
   await evalInObsidian({
     async callback({ ALL_TEST_FILES: files, ALL_TEST_FOLDERS: folders, app, HIDE_EMPTY_FOLDERS_SETTING_NAME: settingName, PLUGIN_ID: pluginId, SETTLE_DELAY_IN_MS: settleDelay }) {
       // Toggle the setting back off so it does not leak into other suites sharing
-      // The temp vault, then remove the scratch files/folders.
+      // the temp vault, then remove the scratch files/folders.
       try {
         const settingTab = app.setting.pluginTabs.find((tab) => tab.id === pluginId) as PluginSettingsTab | undefined;
         if (settingTab) {
@@ -95,7 +95,7 @@ describe('Hide empty folders — Full mode', () => {
         }
 
         // Flip the "Hide empty folders" toggle through the real settings UI, then
-        // Close the tab so its `hideAsync` runs the projection over the live model.
+        // close the tab so its `hideAsync` runs the projection over the live model.
         async function setHideEmptyFolders(isEnabled: boolean): Promise<void> {
           const settingTab = app.setting.pluginTabs.find((tab) => tab.id === pluginId) as PluginSettingsTab | undefined;
           if (!settingTab) {
@@ -118,8 +118,8 @@ describe('Hide empty folders — Full mode', () => {
         }
 
         // Activate the ignore pattern first, then create the files so the live model
-        // Records the excluded `hidden.md` as a child of `charlie` (in Full mode it
-        // Never enters Obsidian's index, so the model is the only place that knows it).
+        // records the excluded `hidden.md` as a child of `charlie` (in Full mode it
+        // never enters Obsidian's index, so the model is the only place that knows it).
         await app.vault.adapter.write('.obsidianignore', 'alpha/bravo/charlie/hidden.md\n');
         await app.plugins.disablePluginAndSave(pluginId);
         await app.plugins.enablePluginAndSave(pluginId);

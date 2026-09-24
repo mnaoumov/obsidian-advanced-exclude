@@ -32,7 +32,7 @@ export function computeUniverseSignature(paths: Iterable<string>): string {
     }
     seen.add(path);
     // Order-independent: an unsigned 32-bit sum of per-path hashes. Paired with
-    // The distinct-path count so two different sets sharing a hash sum still differ.
+    // the distinct-path count so two different sets sharing a hash sum still differ.
     sum = (sum + fnv1a32(path)) >>> 0;
     count++;
   }
