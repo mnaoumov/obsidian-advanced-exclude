@@ -1,5 +1,8 @@
 import type { ObsidianPluginVitestConfigContext } from 'obsidian-dev-utils/script-utils/test-runners/vitest-config';
-import type { TestProjectConfiguration } from 'vitest/config';
+import type {
+  TestProjectConfiguration,
+  ViteUserConfig
+} from 'vitest/config';
 
 import { defineObsidianPluginVitestConfig } from 'obsidian-dev-utils/script-utils/test-runners/vitest-config';
 
@@ -66,7 +69,25 @@ const DEMO_VAULT_TEST_FILES = 'src/**/*.demo-vault.integration.test.ts';
  */
 const DEMO_VAULT_TIMEOUT_IN_MILLISECONDS = 600_000;
 
-export const config = defineObsidianPluginVitestConfig({
+/**
+ * Drops the root-level `include` the shared factory still sets on this `obsidian-dev-utils` line.
+ *
+ * Under vitest 5 a project's own `include` no longer replaces the root one, and the root
+ * `src/**\/*.test.ts` is a superset of every project glob, so EVERY project collected EVERY test
+ * file: unit suites ran under the CDP transport, and the screenshot-capture suites ran from
+ * `npm run test:integration` and rewrote the checked-in PNGs. `obsidian-dev-utils` 101.7.0 removed
+ * the root `include` itself; this wrapper is dead once the dependency is floated past it.
+ *
+ * @param baseConfig - The configuration the shared factory built.
+ * @returns The same configuration without the root `include`.
+ */
+function withoutRootInclude(baseConfig: ViteUserConfig): ViteUserConfig {
+  const test = { ...baseConfig.test };
+  delete test.include;
+  return { ...baseConfig, test };
+}
+
+export const config = withoutRootInclude(defineObsidianPluginVitestConfig({
   customProjects(context: ObsidianPluginVitestConfigContext): TestProjectConfiguration[] {
     return [
       {
@@ -101,5 +122,24 @@ export const config = defineObsidianPluginVitestConfig({
         }
       }
     ];
+  },
+  editContext(context: ObsidianPluginVitestConfigContext): void {
+    context.desktopPerformance.environmentOptions = {
+      /*
+       * The real-scale suites wait for Obsidian's startup scan of the ~90k-note vault inside a
+       * single `Runtime.evaluate`, which far exceeds the transport's default 30s per-command
+       * timeout, so raise it to the performance test budget.
+       */
+      obsidianTransport: {
+        commandTimeoutInMilliseconds: context.performanceTimeoutInMilliseconds,
+        type: 'obsidian-cdp'
+      }
+    };
+
+    /*
+     * The performance vault is pre-populated with a large note tree before open, which the
+     * shared global setup knows nothing about. Every suite in this project asserts against it.
+     */
+    context.desktopPerformance.globalSetup = ['./scripts/vitest-global-setup-performance.ts'];
   }
-});
+}));

@@ -1,6 +1,7 @@
 import { evalInObsidian } from 'obsidian-integration-testing';
 import { getTemporaryVault } from 'obsidian-integration-testing/vitest-global-setup-plugin';
 import {
+  afterEach,
   describe,
   expect,
   it
@@ -9,6 +10,7 @@ import {
 import type { IgnorePatternsComponent } from './ignore-patterns-component.ts';
 import type { PluginSettingsComponent } from './plugin-settings-component.ts';
 
+import { restorePerformanceVaultExclusions } from '../scripts/helpers/restore-performance-vault-exclusions.ts';
 import { ExcludeMode } from './plugin-settings.ts';
 
 /*
@@ -48,6 +50,9 @@ const SETTLE_MAX_POLLS = 60;
 // Before the time-based yield fix the cost was ~0.9 ms/path; after, ~0.01 ms/path.
 // A 0.2 ms/path ceiling sits well above the fixed cost yet far below the regression.
 const MAX_MS_PER_PATH = 0.2;
+
+// Every suite in this project shares one vault; leave it fully visible for the next.
+afterEach(restorePerformanceVaultExclusions);
 
 describe('Full-mode hide-almost-everything scales with work, not vault size (issue #8)', () => {
   it('hides the whole vault in bounded per-path time via the `*` whitelist idiom', async () => {
