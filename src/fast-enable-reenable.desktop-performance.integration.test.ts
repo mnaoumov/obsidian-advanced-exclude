@@ -41,8 +41,8 @@ const VAULT_CONTROL = 'keep-real.md';
 const HIDDEN_DIR = 'big/dir-0';
 const INTRUDER_PATH = 'big/dir-0/intruder-while-disabled.md';
 // A visible note (outside the hidden folder) whose inbound link points INTO it — the
-// Populate spec makes `big/dir-N/file-0.md` link to `big/dir-0/file-0`. Hiding the folder
-// Must demote this link to unresolved; restoring it must promote it back.
+// populate spec makes `big/dir-N/file-0.md` link to `big/dir-0/file-0`. Hiding the folder
+// must demote this link to unresolved; restoring it must promote it back.
 const LINK_SOURCE = 'big/dir-1/file-0.md';
 const LINK_TARGET = 'big/dir-0/file-0.md';
 
@@ -84,7 +84,7 @@ describe('Fast enable — re-hides the persisted set directly on unchanged confi
     const vaultPath = getTemporaryVault().path;
 
     // Wait out Obsidian's startup scan (across short eval calls so no single call spans
-    // The whole wait) until the loaded-file count is stable.
+    // the whole wait) until the loaded-file count is stable.
     let previous = -1;
     for (let poll = 0; poll < SETTLE_MAX_POLLS; poll++) {
       const count = await evalInObsidian({
@@ -195,7 +195,7 @@ describe('Fast enable — re-hides the persisted set directly on unchanged confi
         }
 
         // Re-enable and wait until the folder's files are hidden again (enablePlugin may
-        // Resolve before the async projection finishes).
+        // resolve before the async projection finishes).
         async function reEnableUntilHidden(): Promise<void> {
           const t0 = performance.now();
           await app.plugins.enablePlugin(pluginId);
@@ -255,8 +255,8 @@ describe('Fast enable — re-hides the persisted set directly on unchanged confi
     expect(result.hiddenAfterFastReEnable).toBe(0);
     expect(result.controlVisibleAfterFast).toBe(true);
     // Inbound links into the folder were promoted back on disable, then demoted again by
-    // The fast re-hide — the `demoteInboundLinks`/`promoteInboundLinks` path a link-free
-    // Vault never exercised.
+    // the fast re-hide — the `demoteInboundLinks`/`promoteInboundLinks` path a link-free
+    // vault never exercised.
     expect(result.linkStateWhenRestored).toBe('resolved');
     expect(result.linkStateAfterFastReEnable).toBe('unresolved');
     // 4. After a change while disabled the universe signature no longer matches, so the

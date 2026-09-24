@@ -47,7 +47,7 @@ const mockGetDataAdapterEx = vi.mocked(getDataAdapterEx);
 const mockIsFolder = vi.mocked(isFolder);
 
 // The disk stat a fresh (non-stale) snapshot matches: getSnapshotStat and adapter.stat
-// Both return this by default, so the staleness check finds the snapshot up to date.
+// both return this by default, so the staleness check finds the snapshot up to date.
 const FRESH_STAT = { mtime: 1000, size: 50 };
 
 interface IsIgnoredParams {
@@ -123,7 +123,7 @@ function setup(params: SetupParams): SetupResult {
   } = params;
 
   // Mirror the real adapter: its internal stat record lists every path on disk —
-  // The loaded entries plus any persisted (prior-session-hidden, still-on-disk) paths.
+  // the loaded entries plus any persisted (prior-session-hidden, still-on-disk) paths.
   const files: DataAdapterEx['files'] = {};
   for (const entry of [...entries, ...persistedEntries]) {
     files[entry.path] = strictProxy<DataAdapterEx['files'][string]>({});
@@ -188,9 +188,9 @@ function setup(params: SetupParams): SetupResult {
   const deleteFromFilesPane = vi.fn<(normalizedPath: string) => void>();
 
   // Snapshot-backed restore is the default (show finds a snapshot, returns no
-  // Re-parse paths); tests that exercise the re-parse fallback override `show`.
+  // re-parse paths); tests that exercise the re-parse fallback override `show`.
   // The default snapshot is fresh: getSnapshotStat matches the adapter's disk stat,
-  // So the staleness check leaves the snapshot in place.
+  // so the staleness check leaves the snapshot in place.
   const manualIndexHider: MockManualIndexHider = {
     dropStaleSnapshot: vi.fn<(normalizedPath: string) => void>(),
     getSnapshotStat: vi.fn<(normalizedPath: string) => null | SnapshotStat>().mockReturnValue(FRESH_STAT),
@@ -385,7 +385,7 @@ describe('IndexProjectionComponent', () => {
         isIgnored: () => false
       });
       // Simulate an unfocused/hidden window: requestAnimationFrame never fires its
-      // Callback, so the projection must fall back to the timeout to keep going.
+      // callback, so the projection must fall back to the timeout to keep going.
       const requestAnimationFrameSpy = vi.spyOn(window, 'requestAnimationFrame').mockReturnValue(0);
 
       try {
@@ -554,9 +554,9 @@ describe('IndexProjectionComponent', () => {
 
     it('keeps a path recorded since the last projection, so its folder is not read as genuinely empty', async () => {
       // The regression: a file excluded in `Full` mode never enters Obsidian's index, and the store
-      // Only holds what an earlier projection persisted — so a file created AFTER enable lives only
-      // In the model. A rebuild that reads just those two sources dropped it, `charlie` then looked
-      // Like a folder with no children on disk, and `shouldHideEmptyFolders` left the emptied
+      // only holds what an earlier projection persisted — so a file created AFTER enable lives only
+      // in the model. A rebuild that reads just those two sources dropped it, `charlie` then looked
+      // like a folder with no children on disk, and `shouldHideEmptyFolders` left the emptied
       // `alpha/bravo/charlie` chain visible in the File Explorer.
       const { component, deleteFromFilesPane } = setup({
         entries: [
@@ -591,9 +591,9 @@ describe('IndexProjectionComponent', () => {
       });
 
       // Both calls are the first (model-building) projection, and the second aborts the
-      // First before it reaches the index. The first has already rebuilt the model, so a
-      // Delta over it would find nothing left to do — the superseding update must redo the
-      // Full projection instead, or the ignored file stays in the index forever.
+      // first before it reaches the index. The first has already rebuilt the model, so a
+      // delta over it would find nothing left to do — the superseding update must redo the
+      // full projection instead, or the ignored file stays in the index forever.
       const firstUpdate = component.update();
       const secondUpdate = component.update();
       await Promise.all([firstUpdate, secondUpdate]);
@@ -617,7 +617,7 @@ describe('IndexProjectionComponent', () => {
 
       ignored.add('a');
       // Two deltas in flight: the second aborts the first after its recompute, so the
-      // First returns without applying — only the second hides the subtree.
+      // first returns without applying — only the second hides the subtree.
       const firstUpdate = component.update();
       const secondUpdate = component.update();
       await Promise.all([firstUpdate, secondUpdate]);
@@ -787,7 +787,7 @@ describe('IndexProjectionComponent', () => {
       });
 
       // The apply phase yields a (faked) macrotask between chunks, so advance timers
-      // To let the load-time projection finish.
+      // to let the load-time projection finish.
       const loadPromise = component.loadWithPromises();
       await vi.runAllTimersAsync();
       await loadPromise;
@@ -804,16 +804,16 @@ describe('IndexProjectionComponent', () => {
       });
 
       // Loading runs the onloadAsync projection (nothing ignored yet, so no hide) and
-      // Registers the real layout-ready child; clear so the assertion only sees the
-      // Layout-ready projection. The projection yields a (faked) paint frame, so advance
-      // Timers to let load finish.
+      // registers the real layout-ready child; clear so the assertion only sees the
+      // layout-ready projection. The projection yields a (faked) paint frame, so advance
+      // timers to let load finish.
       const loadPromise = component.loadWithPromises();
       await vi.runAllTimersAsync();
       await loadPromise;
       manualIndexHider.hide.mockClear();
 
       // Flip the file hidden, then fire layout ready: since the vault load was not
-      // Intercepted, onLayoutReady runs a second projection that hides it.
+      // intercepted, onLayoutReady runs a second projection that hides it.
       ignored.add('drop.md');
       fireWorkspaceLayoutReady();
       await vi.runAllTimersAsync();
@@ -836,7 +836,7 @@ describe('IndexProjectionComponent', () => {
       manualIndexHider.hide.mockClear();
 
       // Flip the file hidden, but since the vault load was intercepted, onLayoutReady
-      // Skips its projection entirely — no hide happens despite the flip.
+      // skips its projection entirely — no hide happens despite the flip.
       ignored.add('drop.md');
       fireWorkspaceLayoutReady();
       await vi.runAllTimersAsync();
@@ -878,7 +878,7 @@ describe('IndexProjectionComponent', () => {
       });
 
       // The load-time projection is in flight (parked on the initial paint yield / async
-      // Model rebuild); unload aborts it before it hides.
+      // model rebuild); unload aborts it before it hides.
       const loadPromise = component.loadWithPromises();
       component.unload();
       await vi.runAllTimersAsync();
@@ -991,7 +991,7 @@ describe('IndexProjectionComponent', () => {
       });
 
       // Unloading before the store's promise settles aborts the signal the fast path checks
-      // Right after the `await`, so it must bail out instead of mutating the index.
+      // right after the `await`, so it must bail out instead of mutating the index.
       const loadPromise = component.loadWithPromises();
       component.unload();
       await vi.runAllTimersAsync();
@@ -1162,7 +1162,7 @@ describe('IndexProjectionComponent', () => {
       await component.applyFull();
       addToFilesPane.mockClear();
       // A path with no snapshot (e.g. a prior-session hide never loaded) cannot be
-      // Restored synchronously, so the tree is not fully back and the notice must show.
+      // restored synchronously, so the tree is not fully back and the notice must show.
       manualIndexHider.show.mockReturnValue(['a/x.md']);
 
       const isRestored = component.restoreHiddenFilesOnUnload();
@@ -1219,7 +1219,7 @@ describe('IndexProjectionComponent', () => {
         });
 
         // Load so onloadAsync registers the `'quit'` handler; advance the (faked) paint
-        // Frame so the load-time projection finishes and hides the file.
+        // frame so the load-time projection finishes and hides the file.
         const loadPromise = component.loadWithPromises();
         await vi.runAllTimersAsync();
         await loadPromise;

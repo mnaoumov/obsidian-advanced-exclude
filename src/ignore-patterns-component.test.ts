@@ -370,7 +370,7 @@ describe('IgnorePatternsComponent', () => {
       component.isIgnored({ isFolder: false, normalizedPath: 'secret/file.md' });
       component.isIgnored({ isFolder: false, normalizedPath: 'secret/other.md' });
 
-      // GetConfig should be called for the first isIgnored, but the second should use cached regexps.
+      // getConfig should be called for the first isIgnored, but the second should use cached regexps.
       // We can verify by checking that both return true (i.e., the pattern was applied)
       expect(component.isIgnored({ isFolder: false, normalizedPath: 'secret/file.md' })).toBe(true);
       expect(component.isIgnored({ isFolder: false, normalizedPath: 'secret/other.md' })).toBe(true);
@@ -531,7 +531,7 @@ describe('IgnorePatternsComponent', () => {
       await component.loadWithPromises();
 
       vi.mocked(invokeAsyncSafelyAfterDelay).mockClear();
-      // ReadSafe returns '' which matches the initial cached content
+      // readSafe returns '' which matches the initial cached content
       vi.mocked(readSafe).mockResolvedValueOnce('');
       await component.handleDeletedOrDotFile('.obsidianignore');
 
@@ -577,7 +577,7 @@ describe('IgnorePatternsComponent', () => {
       await component.loadWithPromises();
 
       // We need to simulate the saveSettings event. Since registerAsyncEvent is mocked,
-      // We access the on() calls on pluginSettingsComponent
+      // we access the on() calls on pluginSettingsComponent
       const onCalls = vi.mocked(pluginSettingsComponent.on).mock.calls as MockCallEntry[];
       const saveSettingsCall = onCalls.find(([name]) => name === 'saveSettings');
 
@@ -734,7 +734,7 @@ describe('IgnorePatternsComponent', () => {
       const component = createComponent({ pluginSettingsComponent });
       await component.loadWithPromises();
 
-      // RegisterAsyncEvent is called for loadSettings and saveSettings from this component;
+      // registerAsyncEvent is called for loadSettings and saveSettings from this component;
       // But it may also be called by other components in the chain. Just check it was called.
       expect(registerAsyncEvent).toHaveBeenCalled();
       expect(pluginSettingsComponent.on).toHaveBeenCalledWith('loadSettings', expect.any(Function));
@@ -786,8 +786,8 @@ describe('IgnorePatternsComponent', () => {
         const callback = saveSettingsCall[1] as (newState: SaveSettingsState) => Promise<void>;
         await callback({ effectiveValues: { obsidianIgnoreContent: 'new-pattern' } });
 
-        // HadConfigChanges should be set to true, verifiable by processConfigChanges doing work
-        // We cannot easily re-inject onUpdateFileTree, so just verify no error
+        // hadConfigChanges should be set to true, verifiable by processConfigChanges doing work
+        // we cannot easily re-inject onUpdateFileTree, so just verify no error
         expect(writeSafe).toHaveBeenCalled();
       } else {
         expect.fail('saveSettings event was not registered');
@@ -889,7 +889,7 @@ describe('IgnorePatternsComponent', () => {
       vi.mocked(readSafe).mockClear();
       await component.loadWithPromises();
 
-      // ReadSafe should only be called for obsidian ignore, not git ignore
+      // readSafe should only be called for obsidian ignore, not git ignore
       const readSafeCalls = vi.mocked(readSafe).mock.calls;
       const gitIgnoreReads = readSafeCalls.filter(([, path]) => path === '.gitignore');
       expect(gitIgnoreReads).toHaveLength(0);
@@ -1003,7 +1003,7 @@ describe('IgnorePatternsComponent', () => {
       }
 
       // After reload with changed patterns, cached entry should be cleared
-      // And re-evaluated with new patterns
+      // and re-evaluated with new patterns
       expect(component.isIgnored({ isFolder: false, normalizedPath: 'test-file.md' })).toBe(true);
     });
   });
@@ -1046,9 +1046,9 @@ describe('IgnorePatternsComponent', () => {
       await component.loadWithPromises();
 
       // Queue a put for the path, then a delete for the same path before the
-      // Debounced flush: the delete must overwrite the put (last-write-wins)
-      // Rather than both accumulating, so repeated config changes cannot grow
-      // The queue beyond the number of distinct paths.
+      // debounced flush: the delete must overwrite the put (last-write-wins)
+      // rather than both accumulating, so repeated config changes cannot grow
+      // the queue beyond the number of distinct paths.
       component.isIgnored({ isFolder: false, normalizedPath: 'file1.md' });
       await component.handleDeletedOrDotFile('file1.md');
 
@@ -1224,12 +1224,12 @@ describe('IgnorePatternsComponent', () => {
     it('should throw when database is not set', () => {
       const component = createComponent();
       // Accessing isIgnored before onload means db is not initialized,
-      // But isIgnored only touches db via addStoreAction which is debounced.
-      // ProcessConfigChanges accesses db through resetDb.
+      // but isIgnored only touches db via addStoreAction which is debounced.
+      // processConfigChanges accesses db through resetDb.
       // We test via processStoreActions path.
       expect(() => {
         // Force processStoreActions by calling isIgnored (adds store action)
-        // Then immediately running the debounce
+        // then immediately running the debounce
         component.isIgnored({ isFolder: false, normalizedPath: 'test.md' });
         // Manually trigger the debounce
         vi.runAllTimers();

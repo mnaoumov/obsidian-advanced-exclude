@@ -27,8 +27,8 @@ type IgnorePatternsComponentConstructorParams = ConstructorParameters<typeof Ign
  */
 
 // `PluginDataHandler` is NOT stubbed: since obsidian-dev-utils 93.2 the base builds its own settings
-// Component out of one during `onload` and really calls `dataHandler.loadData()`, which a bare `vi.fn()`
-// Double does not answer.
+// component out of one during `onload` and really calls `dataHandler.loadData()`, which a bare `vi.fn()`
+// double does not answer.
 
 vi.mock('obsidian-dev-utils/obsidian/components/plugin-settings-tab-component', () => ({
   // eslint-disable-next-line prefer-arrow-callback, func-names -- mock must be constructable with `new` and return a real loadable Component.

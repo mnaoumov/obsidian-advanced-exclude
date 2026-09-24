@@ -12,7 +12,7 @@ import { test } from 'obsidian-dev-utils/script-utils/test-runners/vitest';
 const IGNORE_RULES_STATES = ['none', 'rules'];
 
 // Desktop first, then Android — the two share one machine, and the Android leg
-// Boots an emulator, so running them concurrently would collide on the device.
+// boots an emulator, so running them concurrently would collide on the device.
 await wrapCliTask(async () => {
   for (const projectName of ['capture-screenshots:desktop', 'capture-screenshots:android']) {
     for (const state of IGNORE_RULES_STATES) {

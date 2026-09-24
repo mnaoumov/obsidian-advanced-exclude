@@ -67,7 +67,7 @@ describe('Settings persistence', () => {
 
     // Trigger: move one setting away from its default. 4.0.0 flipped the default of
     // `shouldIncludeGitIgnorePatterns` to `false`, so enabling it is now what the original report
-    // Achieved by disabling it.
+    // achieved by disabling it.
     const afterToggleRaw = await runStep('enable-setting');
 
     const afterReloadRaws: (null | string)[] = [];
@@ -78,7 +78,7 @@ describe('Settings persistence', () => {
       }
     } finally {
       // `editAndSave` persists to a `data.json` that outlives this test — put the shipped default
-      // Back for the rest of the suite.
+      // back for the rest of the suite.
       await runStep('restore-setting');
     }
 

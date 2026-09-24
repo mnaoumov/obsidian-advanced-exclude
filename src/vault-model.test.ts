@@ -104,7 +104,7 @@ describe('VaultModel', () => {
 
     it('leaves an emptied-by-exclusion folder chain visible when the setting is off', () => {
       // Default constructor => shouldHideEmptyFolders() returns false, so the
-      // Non-ignored folder chain stays visible even though its only file is hidden.
+      // non-ignored folder chain stays visible even though its only file is hidden.
       const model = build(ENTRIES, matcher(['alpha/bravo/charlie/hidden.md']));
 
       expect(model.isVisible('alpha/bravo/charlie/hidden.md')).toBe(false);
@@ -421,7 +421,7 @@ describe('VaultModel', () => {
       const persistedHidden = recomputed.getPathsByVisibility(false);
 
       // A fresh model whose `isIgnored` always returns false (never consulted) is
-      // Seeded purely from the persisted set and must reproduce it exactly.
+      // seeded purely from the persisted set and must reproduce it exactly.
       const seeded = new VaultModel(() => false);
       seeded.seedHidden(persistedHidden);
 
@@ -487,7 +487,7 @@ describe('VaultModel', () => {
       });
 
       // Aborted on the first chunk boundary (the ignore-evaluation pass, before any
-      // Visibility flip is collected), so it returns no changes.
+      // visibility flip is collected), so it returns no changes.
       expect(changes).toEqual([]);
     });
 
@@ -549,7 +549,7 @@ describe('VaultModel', () => {
 function build(entries: readonly VaultModelEntry[], isIgnored: IsIgnoredFunction): VaultModel {
   const model = new VaultModel(isIgnored);
   // Without a `yieldFunction` the async recompute never suspends, so the model is fully
-  // Built synchronously by the time `rebuild` returns its (already resolved) promise.
+  // built synchronously by the time `rebuild` returns its (already resolved) promise.
   // eslint-disable-next-line @typescript-eslint/no-floating-promises -- settles synchronously without a yieldFunction.
   model.rebuild(entries);
   return model;

@@ -21,8 +21,8 @@ import { RestoreNoticeComponent } from './restore-notice-component.ts';
 const showNoticeMock = vi.fn((message: DocumentFragment | string, _options?: PluginNoticeComponentShowNoticeOptions): Notice => new Notice(message, 0));
 
 // The restore normally runs (and succeeds) first, suppressing the notice; the notice
-// Path is only reached when it reports the index NOT fully restored, so these notice
-// Tests default `wasRestored` to false. A dedicated test covers the restore-succeeds path.
+// path is only reached when it reports the index NOT fully restored, so these notice
+// tests default `wasRestored` to false. A dedicated test covers the restore-succeeds path.
 function createComponent(hiddenCount: number, wasRestored = false): RestoreNoticeComponent {
   const indexProjectionComponent = strictProxy<IndexProjectionComponent>({
     getHiddenCount: vi.fn().mockReturnValue(hiddenCount),
@@ -68,7 +68,7 @@ describe('RestoreNoticeComponent', () => {
 
   it('should suppress the notice on unload when the restore fully succeeds', () => {
     // Even though the model still reports hidden paths, a successful in-place restore
-    // Means no reload is needed, so the notice must not appear.
+    // means no reload is needed, so the notice must not appear.
     const component = createComponent(5, true);
     component.load();
     component.unload();

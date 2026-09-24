@@ -83,7 +83,7 @@ beforeAll(async () => {
   await evalInObsidian({
     async callback({ app, fontSizeInPixels, lib: { waitUntil } }) {
       // A closure runs inside ONE Appium execute/sync call, which WebDriver caps
-      // Around 30s, so every wait in here stays comfortably under it.
+      // around 30s, so every wait in here stays comfortably under it.
       const SETTLE_TIMEOUT_IN_MILLISECONDS = 15_000;
       const SETTLE_DELAY_IN_MILLISECONDS = 1000;
 
@@ -94,7 +94,7 @@ beforeAll(async () => {
       (fontApp as FontSizeApp).updateFontSize();
 
       // The file explorer IS the subject here, so it is the one thing that must
-      // Be open — the opposite of most of these suites, which collapse it.
+      // be open — the opposite of most of these suites, which collapse it.
       app.workspace.leftSplit.expand();
       const fileExplorerLeaf = app.workspace.getLeavesOfType('file-explorer')[0];
       if (fileExplorerLeaf) {
@@ -125,8 +125,8 @@ describe('mobile store screenshots', () => {
     }
 
     // A before-shot is only safe BECAUSE of the caption. A listing carousel
-    // Shows screenshots one at a time, so an unlabelled one reads as a picture
-    // Of what the plugin does, not of what it fixes.
+    // shows screenshots one at a time, so an unlabelled one reads as a picture
+    // of what the plugin does, not of what it fixes.
     expect(names).toContain(IGNORED_FOLDER);
     await shoot(1, 'Excluded files still sit in your file explorer');
   });
@@ -186,8 +186,8 @@ async function shoot(index: number, caption: string): Promise<void> {
   const captured = await captureObsidianScreenshot({ vaultPath: vaultPath() });
 
   // The AVD is 900x1600, so the device frame IS the store size. Asserting it
-  // Here is what keeps that true: run this against any other AVD and it fails
-  // Loudly instead of quietly shipping an off-spec image.
+  // here is what keeps that true: run this against any other AVD and it fails
+  // loudly instead of quietly shipping an off-spec image.
   expect(readPngDimensions(captured)).toStrictEqual({
     heightInPixels: HEIGHT_IN_PIXELS,
     widthInPixels: WIDTH_IN_PIXELS

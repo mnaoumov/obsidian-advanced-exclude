@@ -102,8 +102,8 @@ export class IndexProjectionComponent extends ComponentEx {
   private applyingProjectionDepth = 0;
   private readonly deleteFromFilesPane: (normalizedPath: string) => void;
   // Set once the fast-enable path applied the persisted hide directly (no full model
-  // Build). Suppresses the `onLayoutReady` re-`update()` that would otherwise trigger a
-  // Whole-vault `applyFull` and undo the win; cleared when a full build supersedes it.
+  // build). Suppresses the `onLayoutReady` re-`update()` that would otherwise trigger a
+  // whole-vault `applyFull` and undo the win; cleared when a full build supersedes it.
   private fastEnableApplied = false;
   private hasBuiltModel = false;
   // Guards `restoreHiddenFilesOnUnload` so the on-disable restore runs at most once
@@ -112,16 +112,16 @@ export class IndexProjectionComponent extends ComponentEx {
   private hasRestoredOnUnload = false;
   private readonly ignorePatternsComponent: IgnorePatternsComponent;
   // Set once Obsidian starts quitting: an unload during app shutdown must not spend
-  // Time restoring the index/explorer (both are being torn down). See the `'quit'`
-  // Registration in `onloadAsync` and the guard in `restoreHiddenFilesOnUnload`.
+  // time restoring the index/explorer (both are being torn down). See the `'quit'`
+  // registration in `onloadAsync` and the guard in `restoreHiddenFilesOnUnload`.
   private isQuitting = false;
   // Timestamp of the last cooperative yield during an apply phase; drives the
-  // Time-based yield cadence in `reportApplyProgress` (see APPLY_YIELD_INTERVAL_IN_MILLISECONDS).
+  // time-based yield cadence in `reportApplyProgress` (see APPLY_YIELD_INTERVAL_IN_MILLISECONDS).
   private lastApplyYieldInMilliseconds = 0;
   private readonly manualIndexHider: ManualIndexHider;
   // Set while a delta is mid-flight: a superseded/aborted delta leaves the model's
-  // Visibility ahead of Obsidian (the recompute mutated the model but the apply was
-  // Skipped), so the next update must do a full reconcile instead of a stale delta.
+  // visibility ahead of Obsidian (the recompute mutated the model but the apply was
+  // skipped), so the next update must do a full reconcile instead of a stale delta.
   private needsFullProjection = false;
   private readonly pluginSettingsComponent: PluginSettingsComponent;
   private updateAbortController: AbortController | null = null;
@@ -195,7 +195,7 @@ export class IndexProjectionComponent extends ComponentEx {
    */
   public async applyFull(abortSignal?: AbortSignal): Promise<void> {
     // A full build replaces any fast-enable seed, so the `onLayoutReady` guard no
-    // Longer applies.
+    // longer applies.
     this.fastEnableApplied = false;
     await this.rebuildModel(abortSignal);
     this.lastApplyYieldInMilliseconds = performance.now();
@@ -235,7 +235,7 @@ export class IndexProjectionComponent extends ComponentEx {
 
   public async onLayoutReady(): Promise<void> {
     // The fast-enable path already applied the persisted hide; a full `update()` here
-    // Would trigger a whole-vault `applyFull` and undo the win.
+    // would trigger a whole-vault `applyFull` and undo the win.
     if (this.fastEnableApplied) {
       return;
     }
@@ -247,19 +247,19 @@ export class IndexProjectionComponent extends ComponentEx {
   public override async onloadAsync(): Promise<void> {
     // A disable during app shutdown must skip the restore (see `restoreHiddenFilesOnUnload`):
     // The index and file explorer are being torn down, so re-inserting the hidden set is
-    // Wasted work. `'quit'` fires before the teardown, so the flag is set in time.
+    // wasted work. `'quit'` fires before the teardown, so the flag is set in time.
     this.registerEvent(this.app.workspace.on('quit', () => {
       this.isQuitting = true;
     }));
     // Own an abort controller for the whole enable up front so an `onunload` during the
-    // Fast-enable check (its `await` on the persisted store) still aborts the enable —
-    // Otherwise `update()` would set the controller too late and hide into a torn-down
-    // Component. `update()` replaces it with its own on the fall-back path.
+    // fast-enable check (its `await` on the persisted store) still aborts the enable —
+    // otherwise `update()` would set the controller too late and hide into a torn-down
+    // component. `update()` replaces it with its own on the fall-back path.
     const abortController = new AbortController();
     this.updateAbortController = abortController;
     // Fast path: on a warm re-enable with an unchanged config and file universe,
-    // Re-hide the persisted set directly and defer the whole-vault build. Falls back
-    // To the proven full `update()` when not eligible.
+    // re-hide the persisted set directly and defer the whole-vault build. Falls back
+    // to the proven full `update()` when not eligible.
     const didFastEnable = await this.tryFastEnable(abortController.signal);
     if (abortController.signal.aborted) {
       return;
@@ -273,8 +273,8 @@ export class IndexProjectionComponent extends ComponentEx {
   public override onunload(): void {
     this.updateAbortController?.abort();
     // Defensive fallback: `RestoreNoticeComponent.onunload` (which unloads first, being added
-    // Later) normally drives the restore before this runs, so this is a no-op then. It stays
-    // Here so the index is still restored if the child add-order ever changes.
+    // later) normally drives the restore before this runs, so this is a no-op then. It stays
+    // here so the index is still restored if the child add-order ever changes.
     this.restoreHiddenFilesOnUnload();
     super.onunload();
   }
@@ -321,9 +321,9 @@ export class IndexProjectionComponent extends ComponentEx {
     this.hasRestoredOnUnload = true;
 
     // On app shutdown the index and explorer are being destroyed — restoring is
-    // Wasted work, and driving the tearing-down explorer could throw.
+    // wasted work, and driving the tearing-down explorer could throw.
     // `FilesPane` mode never mutates the index (`hideFromIndex` is a no-op), so there
-    // Is nothing to restore and no reload is ever needed.
+    // is nothing to restore and no reload is ever needed.
     if (this.isQuitting || this.excludeMode !== ExcludeMode.Full) {
       return true;
     }
@@ -331,7 +331,7 @@ export class IndexProjectionComponent extends ComponentEx {
     const hidden = this.vaultModel.getPathsByVisibility(false);
     const withoutSnapshot = new Set(this.manualIndexHider.show(hidden.map((entry) => entry.path)));
     // Show shallowest-first so a folder is re-inserted into the explorer before any
-    // File it must contain.
+    // file it must contain.
     const restored = hidden
       .filter((entry) => !withoutSnapshot.has(entry.path))
       .sort((a, b) => pathDepth(a.path) - pathDepth(b.path));
@@ -359,26 +359,26 @@ export class IndexProjectionComponent extends ComponentEx {
     this.updateProgressNotice.start(UPDATE_PROGRESS_MESSAGE);
     try {
       // Let the notice (and its indeterminate bar) paint before the first synchronous
-      // Slice of recompute/apply work. `start()` only inserts the DOM; without this yield
-      // The browser would not paint it until the first internal yield (after a recompute
-      // Chunk or `rebuildModel`'s node-build), so on a large vault the bar would appear
-      // Late — the very "looks frozen / nothing happening" perception this guards against.
+      // slice of recompute/apply work. `start()` only inserts the DOM; without this yield
+      // the browser would not paint it until the first internal yield (after a recompute
+      // chunk or `rebuildModel`'s node-build), so on a large vault the bar would appear
+      // late — the very "looks frozen / nothing happening" perception this guards against.
       // An abort during this yield needs no check here: `recomputeAll`/`applyFull` short-
-      // Circuit on the signal, and the post-phase `aborted` checks below still bail.
+      // circuit on the signal, and the post-phase `aborted` checks below still bail.
       await requestAnimationFrameAsync();
       if (!this.hasBuiltModel || this.needsFullProjection) {
         this.hasBuiltModel = true;
         // Pessimistic for the same reason as the delta branch below, and for a sharper
-        // Failure: `applyFull` rebuilds the model BEFORE it touches the index, so an abort
-        // Between the two leaves the model already marking the new hidden set while the
-        // Index still holds it. Without this the superseding update would see a built model
-        // And no pending full, take the delta path, find nothing changed (the model is
-        // Already up to date) and leave the file visible forever.
+        // failure: `applyFull` rebuilds the model BEFORE it touches the index, so an abort
+        // between the two leaves the model already marking the new hidden set while the
+        // index still holds it. Without this the superseding update would see a built model
+        // and no pending full, take the delta path, find nothing changed (the model is
+        // already up to date) and leave the file visible forever.
         this.needsFullProjection = true;
         await this.applyFull(abortSignal);
       } else {
         // Pessimistic: assume this delta will be superseded, so a concurrent/next
-        // Update reconciles fully (a superseded delta leaves the model ahead of
+        // update reconciles fully (a superseded delta leaves the model ahead of
         // Obsidian). Cleared below only once we finish without an abort.
         this.needsFullProjection = true;
         const changes = await this.vaultModel.recomputeAll(this.createRecomputeOptions(abortSignal));
@@ -400,7 +400,7 @@ export class IndexProjectionComponent extends ComponentEx {
     } finally {
       this.endProjection();
       // Only the current update owns the notice/controller: a superseding update
-      // Already replaced them, so a superseded run must not hide the new notice.
+      // already replaced them, so a superseded run must not hide the new notice.
       if (this.updateAbortController === abortController) {
         this.updateProgressNotice.finish();
         this.updateAbortController = null;
@@ -438,8 +438,8 @@ export class IndexProjectionComponent extends ComponentEx {
         this.updateProgressNotice.report({ processed, total });
       },
       // Yield aligned to a paint frame so the progress bar actually repaints
-      // Between chunks. `requestAnimationFrameAsync` falls back to a timeout so
-      // An unfocused/hidden window (where rAF is paused) keeps progressing.
+      // between chunks. `requestAnimationFrameAsync` falls back to a timeout so
+      // an unfocused/hidden window (where rAF is paused) keeps progressing.
       yieldFunction: requestAnimationFrameAsync
     };
     return abortSignal ? { ...options, abortSignal } : options;
@@ -507,14 +507,14 @@ export class IndexProjectionComponent extends ComponentEx {
 
   private async rebuildModel(abortSignal?: AbortSignal): Promise<void> {
     // A full recompute evaluates every node's ignore verdict, so warm the persisted
-    // Verdict cache first (deferred off the fast-enable path). A no-op after a config
-    // Reset, whose recompute is intentionally cold.
+    // verdict cache first (deferred off the fast-enable path). A no-op after a config
+    // reset, whose recompute is intentionally cold.
     await this.ignorePatternsComponent.ensureVerdictsLoaded();
     const byPath = new Map<string, VaultModelEntry>();
     // The model's own hidden paths come first, because neither source below can supply them: in
     // `Full` mode a hidden path never enters Obsidian's index, and the store only holds what an
-    // Earlier projection persisted. A path recorded since then (`recordCreate`) would otherwise be
-    // Dropped from the rebuilt universe — and a folder whose only child is dropped reads as
+    // earlier projection persisted. A path recorded since then (`recordCreate`) would otherwise be
+    // dropped from the rebuilt universe — and a folder whose only child is dropped reads as
     // GENUINELY empty, so `shouldHideEmptyFolders` would keep the emptied chain visible.
     for (const entry of this.vaultModel.getPathsByVisibility(false)) {
       byPath.set(entry.path, entry);
@@ -551,9 +551,9 @@ export class IndexProjectionComponent extends ComponentEx {
   private async reportApplyProgress(params: IndexProjectionComponentReportApplyProgressParams): Promise<void> {
     const { processed, total } = params;
     // Time-based cadence: yield only once APPLY_YIELD_INTERVAL_IN_MILLISECONDS have
-    // Elapsed since the last yield (always at completion). A per-item-count cadence
-    // Made the loop's wall-clock scale with the item count — each yield is ~one frame,
-    // So ~90k items / 20 ≈ 4,500 frames ≈ 72 s of pure yielding for <1 s of real work.
+    // elapsed since the last yield (always at completion). A per-item-count cadence
+    // made the loop's wall-clock scale with the item count — each yield is ~one frame,
+    // so ~90k items / 20 ≈ 4,500 frames ≈ 72 s of pure yielding for <1 s of real work.
     const now = performance.now();
     if (processed !== total && now - this.lastApplyYieldInMilliseconds < APPLY_YIELD_INTERVAL_IN_MILLISECONDS) {
       return;
@@ -561,7 +561,7 @@ export class IndexProjectionComponent extends ComponentEx {
     this.lastApplyYieldInMilliseconds = now;
     this.updateProgressNotice.report({ processed, total });
     // Yield to a paint frame so the apply loop returns to the event loop and the
-    // Progress bar repaints — otherwise the UI freezes for the whole apply.
+    // progress bar repaints — otherwise the UI freezes for the whole apply.
     await requestAnimationFrameAsync();
   }
 
@@ -581,9 +581,9 @@ export class IndexProjectionComponent extends ComponentEx {
     const withoutSnapshot = this.manualIndexHider.show([entry.path]);
     if (withoutSnapshot.length > 0) {
       // The prior session's hide removed the path from `vault.fileMap`/`metadataCache`
-      // But left the adapter's own stat record intact, so `reconcileFile` would compare
-      // Disk against that stale record, see no change, and re-add nothing. Drop the
-      // Record first so `reconcileFile` treats the still-on-disk file as new.
+      // but left the adapter's own stat record intact, so `reconcileFile` would compare
+      // disk against that stale record, see no change, and re-add nothing. Drop the
+      // record first so `reconcileFile` treats the still-on-disk file as new.
       // eslint-disable-next-line @typescript-eslint/no-dynamic-delete -- invalidate the adapter's stale stat record so the re-parse re-adds the file.
       delete adapter.files[entry.path];
       await adapter.reconcileFile(entry.path, entry.path);
