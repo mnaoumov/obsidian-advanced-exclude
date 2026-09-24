@@ -3,6 +3,7 @@ import type { FileExplorerView } from '@obsidian-typings/obsidian-public-latest'
 import { evalInObsidian } from 'obsidian-integration-testing';
 import { getTemporaryVault } from 'obsidian-integration-testing/vitest-global-setup-plugin';
 import {
+  afterEach,
   describe,
   expect,
   it
@@ -11,6 +12,7 @@ import {
 import type { IgnorePatternsComponent } from './ignore-patterns-component.ts';
 import type { PluginSettingsComponent } from './plugin-settings-component.ts';
 
+import { restorePerformanceVaultExclusions } from '../scripts/helpers/restore-performance-vault-exclusions.ts';
 import { ExcludeMode } from './plugin-settings.ts';
 
 /*
@@ -39,6 +41,9 @@ const INDEX_WAIT_IN_MS = 300_000;
 // A real vault, not a fluke: the populate spec writes tens of thousands of notes.
 const MIN_EXPECTED_FILES = 1000;
 const SCENARIO_TIMEOUT_IN_MS = 480_000;
+
+// Every suite in this project shares one vault; leave it fully visible for the next.
+afterEach(restorePerformanceVaultExclusions);
 
 describe('Real-scale vault — FilesPane mode', () => {
   it('hides the whole pre-populated vault folder from the explorer', async () => {

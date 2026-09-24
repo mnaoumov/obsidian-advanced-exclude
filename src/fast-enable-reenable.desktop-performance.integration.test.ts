@@ -1,6 +1,7 @@
 import { evalInObsidian } from 'obsidian-integration-testing';
 import { getTemporaryVault } from 'obsidian-integration-testing/vitest-global-setup-plugin';
 import {
+  afterEach,
   describe,
   expect,
   it
@@ -9,6 +10,7 @@ import {
 import type { IgnorePatternsComponent } from './ignore-patterns-component.ts';
 import type { PluginSettingsComponent } from './plugin-settings-component.ts';
 
+import { restorePerformanceVaultExclusions } from '../scripts/helpers/restore-performance-vault-exclusions.ts';
 import { ExcludeMode } from './plugin-settings.ts';
 
 /*
@@ -73,6 +75,9 @@ interface ReEnableResult {
 interface TraversableComponent {
   readonly _children?: readonly unknown[];
 }
+
+// Every suite in this project shares one vault; leave it fully visible for the next.
+afterEach(restorePerformanceVaultExclusions);
 
 describe('Fast enable — re-hides the persisted set directly on unchanged config (issue #10)', () => {
   it('takes the fast path on an unchanged re-enable and falls back to full when the vault changed while disabled', async () => {

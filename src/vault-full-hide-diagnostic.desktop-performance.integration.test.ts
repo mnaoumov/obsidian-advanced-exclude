@@ -1,6 +1,7 @@
 import { evalInObsidian } from 'obsidian-integration-testing';
 import { getTemporaryVault } from 'obsidian-integration-testing/vitest-global-setup-plugin';
 import {
+  afterEach,
   describe,
   expect,
   it
@@ -9,6 +10,7 @@ import {
 import type { IgnorePatternsComponent } from './ignore-patterns-component.ts';
 import type { PluginSettingsComponent } from './plugin-settings-component.ts';
 
+import { restorePerformanceVaultExclusions } from '../scripts/helpers/restore-performance-vault-exclusions.ts';
 import { ExcludeMode } from './plugin-settings.ts';
 
 /*
@@ -33,6 +35,9 @@ const SETTLE_DELAY_IN_MS = 5000;
 const INDEX_POLL_IN_MS = 5000;
 const INDEX_WAIT_IN_MS = 300_000;
 const SCENARIO_TIMEOUT_IN_MS = 595_000;
+
+// Every suite in this project shares one vault; leave it fully visible for the next.
+afterEach(restorePerformanceVaultExclusions);
 
 describe('Full-mode hide fires no updateRelatedLinks cascade', () => {
   it('issues zero real updateRelatedLinks calls for a whole-folder hide', async () => {
