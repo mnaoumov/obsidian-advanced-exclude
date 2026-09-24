@@ -71,127 +71,26 @@ Built on `obsidian-dev-utils`. Patches Obsidian's `FileSystemAdapter` / `Capacit
 
 ## Design & History (S6, publish-compatibility, in-memory tree rewrite)
 
-**Publish-compatibility warning shipped.** `src/publish-compatibility-warning-component.ts`
-(a `LayoutReadyComponent`, wired in `plugin.ts`) warns when Obsidian Publish is enabled
-while `excludeMode === Full` (the only unsafe combo; `Files Pane` mode is Publish-safe). The
-warning notice offers four actions: disable Advanced Exclude, switch to Files Pane mode,
-disable the Publish core plugin, or cancel (acknowledge the risk). It revalidates on plugin
-load (`onLayoutReady`), on `app.internalPlugins` `'change'` (Publish enable/disable), and on
-settings `saveSettings` (exclude-mode change). The Publish plugin instance implements only
-`onEnable`/`onDisable` (not `onUserEnable`/`onUserDisable`), so the live hook is the
-`internalPlugins` `'change'` event, not a `registerMethodPatch` on `onUserEnable` (that
-would wrap `undefined` and crash). See `docs/sync-and-publish.md` (Publish section).
+**Publish-compatibility warning shipped.** `src/publish-compatibility-warning-component.ts` (a `LayoutReadyComponent`, wired in `plugin.ts`) warns when Obsidian Publish is enabled while `excludeMode === Full` (the only unsafe combo; `Files Pane` mode is Publish-safe). The warning notice offers four actions: disable Advanced Exclude, switch to Files Pane mode, disable the Publish core plugin, or cancel (acknowledge the risk). It revalidates on plugin load (`onLayoutReady`), on `app.internalPlugins` `'change'` (Publish enable/disable), and on settings `saveSettings` (exclude-mode change). The Publish plugin instance implements only `onEnable`/`onDisable` (not `onUserEnable`/`onUserDisable`), so the live hook is the `internalPlugins` `'change'` event, not a `registerMethodPatch` on `onUserEnable` (that would wrap `undefined` and crash). See `docs/sync-and-publish.md` (Publish section).
 
-**S6 (direct index mutation) shipped.** `Full`-mode hide/show no longer calls
-`reconcileDeletion`/`reconcileFile`. `ManualIndexHider` (`src/manual-index-hider.ts`)
-removes files from the index directly and fires no events; `IndexProjectionComponent`
-batches the whole hidden set into one event-free pass and drives the file explorer
-explicitly. This removes the multi-minute bulk-hide freeze, the synthetic-deletion hazard,
-and the Obsidian Sync data-loss path. Validated end to end in real Obsidian
-(`ignore-patterns` + `vault-size-scaling` desktop integration); full unit suite + 100%
-coverage. See `docs/working-with-other-plugins.md` (S6) and the Known Issues. The show-path
-`mtime`/`size` staleness check is now implemented (`invalidateStaleSnapshot` +
-`ManualIndexHider.dropStaleSnapshot`); the one remaining deferred follow-up is a coalesced
-graph/backlinks refresh. The historical context below predates S6 — read it with that in mind.
+**S6 (direct index mutation) shipped.** `Full`-mode hide/show no longer calls `reconcileDeletion`/`reconcileFile`. `ManualIndexHider` (`src/manual-index-hider.ts`) removes files from the index directly and fires no events; `IndexProjectionComponent` batches the whole hidden set into one event-free pass and drives the file explorer explicitly. This removes the multi-minute bulk-hide freeze, the synthetic-deletion hazard, and the Obsidian Sync data-loss path. Validated end to end in real Obsidian (`ignore-patterns` + `vault-size-scaling` desktop integration); full unit suite + 100% coverage. See `docs/working-with-other-plugins.md` (S6) and the Known Issues. The show-path `mtime`/`size` staleness check is now implemented (`invalidateStaleSnapshot` + `ManualIndexHider.dropStaleSnapshot`); the one remaining deferred follow-up is a coalesced graph/backlinks refresh. The historical context below predates S6 — read it with that in mind.
 
-Real-vault-scale (~90k) end-to-end testing, via populate-before-open. The harness
-feature has shipped: `obsidian-integration-testing` (now `^4.3.0`) gained
-`coreSetup({ populate })` + `createSetup({ populate })` so a vault is written with
-`TemporaryVault.populate()` **before** Obsidian opens it — its startup scan indexes
-everything in one pass (no `app:reload`, no per-file `adapter.write`). The plugin
-consumes it via `scripts/vitest-global-setup-performance.ts`
-(`createSetup({ populate })`) + `scripts/helpers/generate-performance-vault.ts` +
-a new `integration-tests:desktop-performance` vitest project running
-`src/vault-real-scale.desktop-performance.integration.test.ts`.
+Real-vault-scale (~90k) end-to-end testing, via populate-before-open. The harness feature has shipped: `obsidian-integration-testing` (now `^4.3.0`) gained `coreSetup({ populate })` + `createSetup({ populate })` so a vault is written with `TemporaryVault.populate()` **before** Obsidian opens it — its startup scan indexes everything in one pass (no `app:reload`, no per-file `adapter.write`). The plugin consumes it via `scripts/vitest-global-setup-performance.ts` (`createSetup({ populate })`) + `scripts/helpers/generate-performance-vault.ts` + a new `integration-tests:desktop-performance` vitest project running `src/vault-real-scale.desktop-performance.integration.test.ts`.
 
-In-memory shadow-tree rewrite.
-Implemented on branch `feat/in-memory-tree`: `VaultModel` (shadow tree +
-bottom-up visibility) and `IndexProjectionComponent` replace the whole-vault
-reconcile walk — initial load snapshots Obsidian's loaded tree and removes only
-the ignored hide-roots; config changes apply a persistent-model delta; live
-adapter events sync the model; unload shows a reload notice when paths are
-hidden. The full known-path set is persisted in IndexedDB (`VaultPathStore`) so
-a mid-session disable/enable can re-show files whose pattern changed (Obsidian
-does not re-scan disk then). 200 unit tests, 100% coverage; desktop integration
-9/9. Verified live: clean enable ~12 s vs ~80–160 s, zero reconcile walk
-(persist load ~1 ms, missing-scan ~16 ms — negligible; persists only the hidden
-set, not all 90k paths).
+In-memory shadow-tree rewrite. Implemented on branch `feat/in-memory-tree`: `VaultModel` (shadow tree + bottom-up visibility) and `IndexProjectionComponent` replace the whole-vault reconcile walk — initial load snapshots Obsidian's loaded tree and removes only the ignored hide-roots; config changes apply a persistent-model delta; live adapter events sync the model; unload shows a reload notice when paths are hidden. The full known-path set is persisted in IndexedDB (`VaultPathStore`) so a mid-session disable/enable can re-show files whose pattern changed (Obsidian does not re-scan disk then). 200 unit tests, 100% coverage; desktop integration 9/9. Verified live: clean enable ~12 s vs ~80–160 s, zero reconcile walk (persist load ~1 ms, missing-scan ~16 ms — negligible; persists only the hidden set, not all 90k paths).
 
-`IndexProjectionComponent` exposes `isApplyingProjection` (set for the duration of
-`update()`); the adapter patch's `reconcileDeletion` skips `recordDelete` while it is set
-(under S6 this is dormant — the projection no longer issues `reconcileDeletion`, so it only
-guards against a concurrent *real* delete during a projection). `update()` persists the
-hidden set after each `applyDelta`, so a later reload reconstructs it. Under S6 the same
-hidden set is also snapshotted in memory by `ManualIndexHider`, so a same-session un-ignore
-re-shows hidden files instantly from the snapshot (no reload, no re-parse); a path with no
-snapshot (hidden by a prior session) falls back to `reconcileFile`. That fallback must first
-`delete adapter.files[path]`: `ManualIndexHider.hide` leaves the adapter's own stat record
-intact, so without dropping it `reconcileFile` compares disk against the stale record, sees
-no change, and re-adds nothing (the file would stay hidden forever).
+`IndexProjectionComponent` exposes `isApplyingProjection` (set for the duration of `update()`); the adapter patch's `reconcileDeletion` skips `recordDelete` while it is set (under S6 this is dormant — the projection no longer issues `reconcileDeletion`, so it only guards against a concurrent *real* delete during a projection). `update()` persists the hidden set after each `applyDelta`, so a later reload reconstructs it. Under S6 the same hidden set is also snapshotted in memory by `ManualIndexHider`, so a same-session un-ignore re-shows hidden files instantly from the snapshot (no reload, no re-parse); a path with no snapshot (hidden by a prior session) falls back to `reconcileFile`. That fallback must first `delete adapter.files[path]`: `ManualIndexHider.hide` leaves the adapter's own stat record intact, so without dropping it `reconcileFile` compares disk against the stale record, sees no change, and re-adds nothing (the file would stay hidden forever).
 
-Disable and enable are both fast (issue #10). On disable, `restoreHiddenFilesOnUnload`
-re-inserts the hidden set from the in-memory `ManualIndexHider` snapshots synchronously in
-`onunload` (driven by `RestoreNoticeComponent`, added last so it unloads first) — ~9 ms at
-90k, no reload notice. On a **warm re-enable** whose ignore config **and** file
-universe are unchanged, `IndexProjectionComponent.tryFastEnable` seeds the model from the
-persisted hidden set (`VaultModel.seedHidden`, O(hidden set)) and re-hides it directly —
-skipping the ~1.4 s 90k cached-verdict `getAll` (now split out of `loadDb` into
-`IgnorePatternsComponent.loadFingerprint` + a lazy `ensureVerdictsLoaded`) and the
-whole-vault `rebuild` + `recomputeAll`; the full model build is deferred to the next config
-change. A change to the vault **while disabled** — which the ignore-file mtime fingerprint
-cannot see — is caught by an order-independent universe signature (`universe-signature.ts`)
-persisted alongside the hidden set in `VaultPathStore`: a mismatch (or a changed config, or
-`FilesPane` mode) falls back to the proven full `applyFull`. Covered live by
-`src/fast-enable-reenable.desktop-performance.integration.test.ts` on a linked synthetic vault.
+Disable and enable are both fast (issue #10). On disable, `restoreHiddenFilesOnUnload` re-inserts the hidden set from the in-memory `ManualIndexHider` snapshots synchronously in `onunload` (driven by `RestoreNoticeComponent`, added last so it unloads first) — ~9 ms at 90k, no reload notice. On a **warm re-enable** whose ignore config **and** file universe are unchanged, `IndexProjectionComponent.tryFastEnable` seeds the model from the persisted hidden set (`VaultModel.seedHidden`, O(hidden set)) and re-hides it directly — skipping the ~1.4 s 90k cached-verdict `getAll` (now split out of `loadDb` into `IgnorePatternsComponent.loadFingerprint` + a lazy `ensureVerdictsLoaded`) and the whole-vault `rebuild` + `recomputeAll`; the full model build is deferred to the next config change. A change to the vault **while disabled** — which the ignore-file mtime fingerprint cannot see — is caught by an order-independent universe signature (`universe-signature.ts`) persisted alongside the hidden set in `VaultPathStore`: a mismatch (or a changed config, or `FilesPane` mode) falls back to the proven full `applyFull`. Covered live by `src/fast-enable-reenable.desktop-performance.integration.test.ts` on a linked synthetic vault.
 
 Scaling is covered at three levels.
 
-`src/vault-size-scaling.desktop.integration.test.ts` (real Obsidian, `Full` mode,
-end to end): a generic driver that builds a vault, drives the live "edit settings
-to change ignores" flow (`editAndSave` → `processConfigChanges`), and asserts the
-event-free hide (zero in-scope `reconcileDeletion`) plus full hide/re-show. Shapes: flat
-1000/5000-file folders, a deep+wide nested tree (breadth 4 × depth 4 ≈ 341 folders
-→ one hide-root), and 200 independently-ignored sibling folders (one hide-root
-each, cost is O(hide-roots) not O(files)). Timeouts are sized from the file count
-(`60 s + 20 ms × files`).
+`src/vault-size-scaling.desktop.integration.test.ts` (real Obsidian, `Full` mode, end to end): a generic driver that builds a vault, drives the live "edit settings to change ignores" flow (`editAndSave` → `processConfigChanges`), and asserts the event-free hide (zero in-scope `reconcileDeletion`) plus full hide/re-show. Shapes: flat 1000/5000-file folders, a deep+wide nested tree (breadth 4 × depth 4 ≈ 341 folders → one hide-root), and 200 independently-ignored sibling folders (one hide-root each, cost is O(hide-roots) not O(files)). Timeouts are sized from the file count (`60 s + 20 ms × files`).
 
-`src/vault-model-scaling.no-app.integration.test.ts` (no Obsidian, no disk):
-exercises `VaultModel` directly at 90,000 and 1,000,000 files (single ignored
-folder → one hide-root) and 10,000 / 100,000 independently-ignored folders. Bench:
-`recomputeAll` ~40 ms at 100k, ~420 ms at 1M, ~4.5 s at 10M; ~390 MB/million nodes.
-This proves the **plugin's** hide work is O(N log N) and ~milliseconds at the
-maintainer's full vault size.
+`src/vault-model-scaling.no-app.integration.test.ts` (no Obsidian, no disk): exercises `VaultModel` directly at 90,000 and 1,000,000 files (single ignored folder → one hide-root) and 10,000 / 100,000 independently-ignored folders. Bench: `recomputeAll` ~40 ms at 100k, ~420 ms at 1M, ~4.5 s at 10M; ~390 MB/million nodes. This proves the **plugin's** hide work is O(N log N) and ~milliseconds at the maintainer's full vault size.
 
-`src/vault-real-scale.desktop-performance.integration.test.ts` (real Obsidian, the
-`integration-tests:desktop-performance` project, ~90k populated before open): hides
-the whole vault folder in **`FilesPane` mode** and asserts the explorer is cleared
-(~0.8 s at 90k). `FilesPane` is used here because it is the fastest mode (pure DOM); since
-S6, `Full` mode also hides without the freeze, but `FilesPane` remains the cheapest at 90k.
+`src/vault-real-scale.desktop-performance.integration.test.ts` (real Obsidian, the `integration-tests:desktop-performance` project, ~90k populated before open): hides the whole vault folder in **`FilesPane` mode** and asserts the explorer is cleared (~0.8 s at 90k). `FilesPane` is used here because it is the fastest mode (pure DOM); since S6, `Full` mode also hides without the freeze, but `FilesPane` remains the cheapest at 90k.
 
-`IndexProjectionComponent.reportApplyProgress` yields on a **time-based** cadence
-(`APPLY_YIELD_INTERVAL_IN_MILLISECONDS`, reset per `applyDelta`/`applyFull`), not per-N-items.
-The old per-20-items cadence made the apply loop's wall-clock scale as `itemCount / 20` paint
-frames — a "hide almost everything" delta (`*` + a few `!whitelist` lines) at 90k spent ~4,500
-frames ≈ 72 s **yielding** while the real index work (`recomputeAll` ~70 ms, `ManualIndexHider.hide`
-~14 ms) was under 100 ms. This was the true cause of issue #8's "negation is broken" report
-(the whitelisted content did reappear — it just took ~72 s). Regression guard:
-`src/vault-hide-timing.desktop-performance.integration.test.ts` asserts the whole op stays under
-0.2 ms/path. Note the O(N log N)/~ms scaling claim above is about `VaultModel.recomputeAll`, not
-the apply loop.
+`IndexProjectionComponent.reportApplyProgress` yields on a **time-based** cadence (`APPLY_YIELD_INTERVAL_IN_MILLISECONDS`, reset per `applyDelta`/`applyFull`), not per-N-items. The old per-20-items cadence made the apply loop's wall-clock scale as `itemCount / 20` paint frames — a "hide almost everything" delta (`*` + a few `!whitelist` lines) at 90k spent ~4,500 frames ≈ 72 s **yielding** while the real index work (`recomputeAll` ~70 ms, `ManualIndexHider.hide` ~14 ms) was under 100 ms. This was the true cause of issue #8's "negation is broken" report (the whitelisted content did reappear — it just took ~72 s). Regression guard: `src/vault-hide-timing.desktop-performance.integration.test.ts` asserts the whole op stays under 0.2 ms/path. Note the O(N log N)/~ms scaling claim above is about `VaultModel.recomputeAll`, not the apply loop.
 
-**Settings persistence is guarded by an integration test (issue #14).** `data.json` was emptied and
-then re-filled with defaults on every reload once a user changed a setting — silent data loss, reported
-here and, with the same shape, against CodeScript Toolkit (#59) and Embed HTML (#15). The cause was
-in `obsidian-dev-utils`, not here: `PluginBase.onload` adds a placeholder `PluginSettingsComponentBase`
-typed on `Object` before `onloadImpl` installs the real one, and knowing no property names it could only
-serialize `{}` — which the normalizing save at the end of `loadFromFile` (there to persist migrations)
-then wrote over the real settings. `obsidian-dev-utils` 94.6.0 skips that save for a component that knows no properties;
-`advanced-exclude` picked it up in 4.0.0 (`obsidian-dev-utils ^94.6.1`, now `^96.0.1`). 3.4.3 — the
-version #14 was filed against — predates it. `src/settings-persistence.cross-platform.integration.test.ts`
-is the regression guard: it clears `data.json`, confirms an untouched plugin writes none, flips
-`shouldIncludeGitIgnorePatterns`, and re-reads the raw file after each of three plugin reloads. It
-reloads the plugin rather than the app (the harness has no app-reload primitive) because the placeholder
-is created on every plugin **enable**, not only at startup — which also explains the "startup resets,
-disable/enable does not" asymmetry #59 reported: after the first wipe the file is already `{}`, so the
-next pass has nothing left to erase. Verified both ways — green as shipped, and red (`expected '{}' not
-to be '{}'`) with that `obsidian-dev-utils` guard neutered in the built bundle.
+**Settings persistence is guarded by an integration test (issue #14).** `data.json` was emptied and then re-filled with defaults on every reload once a user changed a setting — silent data loss, reported here and, with the same shape, against CodeScript Toolkit (#59) and Embed HTML (#15). The cause was in `obsidian-dev-utils`, not here: `PluginBase.onload` adds a placeholder `PluginSettingsComponentBase` typed on `Object` before `onloadImpl` installs the real one, and knowing no property names it could only serialize `{}` — which the normalizing save at the end of `loadFromFile` (there to persist migrations) then wrote over the real settings. `obsidian-dev-utils` 94.6.0 skips that save for a component that knows no properties; `advanced-exclude` picked it up in 4.0.0 (`obsidian-dev-utils ^94.6.1`, now `^96.0.1`). 3.4.3 — the version #14 was filed against — predates it. `src/settings-persistence.cross-platform.integration.test.ts` is the regression guard: it clears `data.json`, confirms an untouched plugin writes none, flips `shouldIncludeGitIgnorePatterns`, and re-reads the raw file after each of three plugin reloads. It reloads the plugin rather than the app (the harness has no app-reload primitive) because the placeholder is created on every plugin **enable**, not only at startup — which also explains the "startup resets, disable/enable does not" asymmetry #59 reported: after the first wipe the file is already `{}`, so the next pass has nothing left to erase. Verified both ways — green as shipped, and red (`expected '{}' not to be '{}'`) with that `obsidian-dev-utils` guard neutered in the built bundle.

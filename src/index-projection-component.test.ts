@@ -77,7 +77,7 @@ interface SetupParams {
   readonly configUnchanged?: boolean;
   readonly entries: readonly MockEntry[];
   readonly excludeMode?: ExcludeMode;
-  isIgnored(normalizedPath: string): boolean;
+  readonly isIgnored: (normalizedPath: string) => boolean;
   readonly persistedEntries?: readonly MockEntry[];
   readonly persistedUniverseSignature?: null | string;
   readonly shouldHideEmptyFolders?: boolean;
@@ -89,8 +89,8 @@ interface SetupResult {
   readonly app: App;
   readonly component: IndexProjectionComponent;
   readonly deleteFromFilesPane: Mock<(normalizedPath: string) => void>;
-  fireQuit(): void;
-  fireWorkspaceLayoutReady(): void;
+  readonly fireQuit: () => void;
+  readonly fireWorkspaceLayoutReady: () => void;
   readonly manualIndexHider: MockManualIndexHider;
   readonly mockAdapter: MockAdapter;
   readonly save: ReturnType<typeof vi.fn>;

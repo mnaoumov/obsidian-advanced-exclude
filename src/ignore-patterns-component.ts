@@ -59,7 +59,7 @@ const DEFAULT_MTIME_ENTRY: DatabaseMtimeEntry = {
 
 interface IgnorePatternsComponentConstructorParams {
   readonly app: App;
-  onUpdateFileTree(this: void): Promise<void>;
+  readonly onUpdateFileTree: (this: void) => Promise<void>;
   readonly pluginSettingsComponent: PluginSettingsComponent;
   readonly vaultLoadPatch: VaultLoadPatchComponent;
 }

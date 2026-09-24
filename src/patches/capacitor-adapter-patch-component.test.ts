@@ -25,7 +25,7 @@ import {
 import { CapacitorAdapterPatchComponent } from './capacitor-adapter-patch-component.ts';
 
 interface OnloadAccessor {
-  onload(): void;
+  onload: () => void;
 }
 
 describe('CapacitorAdapterPatchComponent', () => {

@@ -9,7 +9,7 @@ import {
 import { VaultLoadPatchComponent } from './vault-load-patch-component.ts';
 
 interface OnloadAccessor {
-  onload(): void;
+  onload: () => void;
 }
 
 describe('VaultLoadPatchComponent', () => {

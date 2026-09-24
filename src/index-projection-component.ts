@@ -56,9 +56,9 @@ const APPLY_YIELD_INTERVAL_IN_MILLISECONDS = 50;
 const LINK_VIEW_TYPES = ['backlink', 'outgoing-link'];
 
 interface IndexProjectionComponentConstructorParams {
-  addToFilesPane(this: void, normalizedPath: string): void;
+  readonly addToFilesPane: (this: void, normalizedPath: string) => void;
   readonly app: App;
-  deleteFromFilesPane(this: void, normalizedPath: string): void;
+  readonly deleteFromFilesPane: (this: void, normalizedPath: string) => void;
   readonly ignorePatternsComponent: IgnorePatternsComponent;
   readonly manualIndexHider: ManualIndexHider;
   readonly pluginSettingsComponent: PluginSettingsComponent;
