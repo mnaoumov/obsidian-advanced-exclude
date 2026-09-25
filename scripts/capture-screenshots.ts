@@ -5,9 +5,9 @@ import { test } from 'obsidian-dev-utils/script-utils/test-runners/vitest';
 /**
  * Each project runs TWICE, once per ignore-rules state.
  *
- * The plugin reads its rules when the vault loads, so the before-state cannot be
- * recovered inside a run that already applied them — see the suite header. Two
- * runs give two vaults and therefore two honest frames.
+ * Two runs give two fresh vaults, so each frame shows one staged state and
+ * neither depends on another state having been undone first — see the suite
+ * header.
  */
 const IGNORE_RULES_STATES = ['none', 'rules'];
 

@@ -147,6 +147,10 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
     }
 
     this.cachedIgnoreTester = null;
+    // `readObsidianIgnore` / `readGitIgnore` only `setProperty`, which fires no `saveSettings`, so nothing else
+    // raises the flag: without it `processConfigChanges` returns at once, and an ignore file edited while the
+    // plugin runs is not applied until the next restart.
+    this.hadConfigChanges = true;
     invokeAsyncSafelyAfterDelay({
       asyncFunction: () => this.processConfigChanges()
     });
