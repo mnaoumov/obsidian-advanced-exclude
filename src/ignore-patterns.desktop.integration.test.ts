@@ -1,5 +1,7 @@
 import type { FileExplorerView } from '@obsidian-typings/obsidian-public-latest';
 
+import { writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { evalInObsidian } from 'obsidian-integration-testing';
 import { getTemporaryVault } from 'obsidian-integration-testing/vitest-global-setup-plugin';
 import {
@@ -367,5 +369,44 @@ describe('Ignore patterns — Settings round-trip', () => {
     expect(result.filesAfterChange).toContain('alpha.md');
     expect(result.filesAfterChange).toContain('beta.md');
     expect(result.filesAfterChange).not.toContain('gamma.md');
+  });
+});
+
+describe('Ignore patterns — Live ignore-file edit', () => {
+  it('should apply a .obsidianignore written from outside Obsidian while the plugin runs, without a reload', async () => {
+    const vaultPath = getTemporaryVault().path;
+
+    const filesBefore = await evalInObsidian({
+      async callback({ app, SETTLE_DELAY_IN_MS: settleDelay }) {
+        await app.vault.create('visible-note.md', 'I should stay visible');
+        await app.vault.create('secret-note.md', 'I should be hidden once the rule lands');
+        await sleep(settleDelay);
+        return app.vault.getFiles().map((f) => f.path).sort();
+      },
+      input: { SETTLE_DELAY_IN_MS },
+      vaultPath
+    });
+
+    expect(filesBefore).toContain('secret-note.md');
+
+    // Written by the test process, as an external editor would: Obsidian learns of it only from its
+    // file watcher, and the plugin only through that live dot-file change — no plugin reload follows.
+    writeFileSync(join(vaultPath, '.obsidianignore'), 'secret-*\n');
+
+    const filesAfter = await evalInObsidian({
+      async callback({ app, lib: { waitUntil }, SETTLE_DELAY_IN_MS: settleDelay }) {
+        await waitUntil({
+          message: 'secret-note.md to leave the vault',
+          predicate: () => !app.vault.getAbstractFileByPath('secret-note.md'),
+          timeoutInMilliseconds: settleDelay * 3
+        });
+        return app.vault.getFiles().map((f) => f.path).sort();
+      },
+      input: { SETTLE_DELAY_IN_MS },
+      vaultPath
+    });
+
+    expect(filesAfter).not.toContain('secret-note.md');
+    expect(filesAfter).toContain('visible-note.md');
   });
 });

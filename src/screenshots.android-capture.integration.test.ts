@@ -6,8 +6,8 @@
  * emulator and writing images/screenshots/screenshot-mobile-N.png.
  *
  * The mobile counterpart of the desktop capture suite, and it inherits the same
- * two-run structure: the plugin reads its rules when the vault loads, so the
- * pair needs two vaults. See the desktop suite for the full reasoning.
+ * two-run structure: one fresh vault per frame. See the desktop suite for the
+ * full reasoning.
  *
  * There is no mobile equivalent of the desktop viewport override, so the AVD is
  * built at exactly 900x1600. Its one-time provisioning is described beside
@@ -57,8 +57,9 @@ const MOBILE_FONT_SIZE_IN_PIXELS = 13;
 const IGNORED_FOLDER = 'archive';
 
 /**
- * Which of the two frames this run takes. `rules` stages the ignore file before
- * the vault opens, which is when the plugin reads it.
+ * Which of the two frames this run takes. `rules` stages the ignore file with
+ * the notes; the plugin is already running by then and applies it as a live
+ * ignore-file change.
  */
 const SHOULD_IGNORE = process.env['SCREENSHOT_IGNORE_RULES'] === 'rules';
 

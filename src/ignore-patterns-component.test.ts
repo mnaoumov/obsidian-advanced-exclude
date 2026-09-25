@@ -524,6 +524,20 @@ describe('IgnorePatternsComponent', () => {
       expect(invokeAsyncSafelyAfterDelay).toHaveBeenCalled();
     });
 
+    it('should update the file tree once the scheduled processConfigChanges runs after an ignore file changes', async () => {
+      setupIndexedDatabase();
+      vi.mocked(readSafe).mockResolvedValue('');
+      const onUpdateFileTree = vi.fn().mockResolvedValue(undefined);
+      const component = createComponent({ onUpdateFileTree });
+      await component.loadWithPromises();
+
+      vi.mocked(readSafe).mockResolvedValueOnce('archive/\n');
+      await component.handleDeletedOrDotFile('.obsidianignore');
+      await vi.runAllTimersAsync();
+
+      expect(onUpdateFileTree).toHaveBeenCalledTimes(1);
+    });
+
     it('should not trigger processConfigChanges when ignore file content is unchanged', async () => {
       setupIndexedDatabase();
       vi.mocked(readSafe).mockResolvedValue('');

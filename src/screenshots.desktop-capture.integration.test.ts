@@ -10,13 +10,10 @@
  *
  * **This suite takes ONE of the two shots per run**, chosen by
  * `SCREENSHOT_IGNORE_RULES`, and `npm run capture:screenshots` runs it twice.
- * That is not a preference — it is the only honest way to get the pair. The
- * plugin reads its rules when the vault loads, so within a single run the
- * before-state cannot be recovered: disabling the plugin does not put the files
- * back (it drops them from the index at load and nothing re-adds them), and
- * neither writing `.obsidianignore` nor setting `obsidianIgnoreContent` and
- * reloading the plugin moved them either way. Two runs, two vaults, two honest
- * frames.
+ * Two runs give two fresh vaults, so each frame shows exactly one staged state
+ * and neither depends on the other having been undone first. The harness enables
+ * the plugin before the suite stages its notes, so the `rules` frame also shows
+ * a `.obsidianignore` written while the plugin runs taking effect live.
  *
  * Each shot asserts what it claims — the archived notes present, then absent —
  * so a run that staged the wrong rules fails instead of shipping a frame that
@@ -55,8 +52,9 @@ const HEIGHT_IN_PIXELS = 800;
 const IGNORED_FOLDER = 'archive';
 
 /**
- * Which of the two frames this run takes. `rules` stages the ignore file before
- * the vault opens, which is when the plugin reads it.
+ * Which of the two frames this run takes. `rules` stages the ignore file with
+ * the notes; the plugin is already running by then and applies it as a live
+ * ignore-file change.
  */
 const SHOULD_IGNORE = process.env['SCREENSHOT_IGNORE_RULES'] === 'rules';
 
