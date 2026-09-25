@@ -339,7 +339,7 @@ export class VaultModel {
     // A non-ignored folder emptied by exclusion (has children but none visible)
     // collapses only when the setting is on; a genuinely empty folder (no
     // children on disk) always stays visible.
-    return this.shouldHideEmptyFolders() && children.size > 0 ? this.hasVisibleChild(children) : true;
+    return !this.shouldHideEmptyFolders() || children.size === 0 || this.hasVisibleChild(children);
   }
 
   private ensureNode(params: VaultModelEnsureNodeParams): VaultModelNode {
@@ -366,7 +366,7 @@ export class VaultModel {
   }
 
   private evaluateIgnored(node: VaultModelNode): void {
-    node.isIgnoredSelf = node === this.root ? false : this.isIgnored(node.path, node.isFolder);
+    node.isIgnoredSelf = node !== this.root && this.isIgnored(node.path, node.isFolder);
   }
 
   private hasVisibleChild(children: Map<string, VaultModelNode>): boolean {

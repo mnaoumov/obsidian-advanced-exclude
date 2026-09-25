@@ -62,7 +62,8 @@ describe('Settings persistence', () => {
     await runStep('reset');
     await reloadAndSettle();
 
-    // Control: an untouched plugin writes no `data.json` at all.
+    // Control: an untouched plugin writes its full default record once. Before `obsidian-dev-utils`
+    // 107.0.0 it wrote no `data.json` at all.
     const controlRaw = await runStep('read');
 
     // Trigger: move one setting away from its default. 4.0.0 flipped the default of
@@ -82,8 +83,10 @@ describe('Settings persistence', () => {
       await runStep('restore-setting');
     }
 
-    // A plugin whose settings were never changed writes nothing.
-    expect(controlRaw).toBeNull();
+    // A plugin whose settings were never changed writes the defaults, never an empty record.
+    expect(controlRaw).not.toBeNull();
+    expect(controlRaw?.trim()).not.toBe('{}');
+    expect(JSON.parse(controlRaw ?? '{}')).toMatchObject({ shouldIncludeGitIgnorePatterns: false });
 
     // The change itself reaches disk.
     expect(afterToggleRaw).not.toBeNull();
