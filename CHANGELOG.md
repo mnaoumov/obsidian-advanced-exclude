@@ -1,5 +1,35 @@
 # CHANGELOG
 
+## 4.1.3
+
+- test(screenshots): merge setting the desktop capture theme with applyObsidianTheme
+- fix(ignore-patterns): merge applying an ignore file edited while the plugin runs
+- chore(deps): merge the obsidian-integration-testing 17 float
+- chore(deps): merge the obsidian-test-mocks 7 float
+- chore(deps): merge the devalue 5.9.4 float
+- style(comments): stop capitalizing the middle of a wrapped comment
+- chore: merge the npm run gate branch gate
+- chore(deps): merge the restored lockfile resolved and integrity fields
+- docs(contributing): merge the PR base branch correction
+- fix(test): merge the headless demo-vault toolkit install
+- chore: merge the vmThreads pool move for the restore-notice suite
+- chore: merge the obsidian-dev-utils 105 bump and the markdown unwrap
+- test(settings): merge the per-step settings-persistence evaluations
+- test(perf): merge the performance vault wiring restore
+- chore(deps): drop the two dead dedupe overrides
+- chore(deps): drop the dead markdown-it override
+- chore(deps): drop the dead js-yaml override
+- fix(deps): override smol-toml to clear a denial-of-service advisory
+- docs: replace the private rule-id citations with what they assert
+- docs: name the library and the sibling plugins so a reader can resolve them
+- docs: replace the private tracker references with what they pointed at
+- docs: say where the debug command is run
+- test: bring the in-closure wait ceiling under the transport's per-eval cap
+- docs: name the unversioned demo-vault asset and the folder it unzips into
+- chore: make the LICENSE copyright line checkable by the linter and guard it against the year roll-over
+- test(test-mocks): drop the hand-rolled app.plugins stub, and sweep the dependencies
+- fix(build): wire build:compile to buildCompile and drop the duplicate leaf script
+
 ## 4.1.2
 
 - chore(deps): sweep caret-ranged dependencies to latest
