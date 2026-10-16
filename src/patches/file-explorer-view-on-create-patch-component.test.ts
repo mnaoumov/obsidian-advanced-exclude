@@ -29,6 +29,8 @@ import {
 import { FileExplorerViewOnCreatePatchComponent } from './file-explorer-view-on-create-patch-component.ts';
 
 class MockFileExplorerView extends View {
+  public fileItems = {};
+
   public override getDisplayText(): string {
     return 'MockFileExplorerView';
   }
@@ -116,6 +118,17 @@ describe('FileExplorerViewOnCreatePatchComponent', () => {
 
   describe('onLayoutReady', () => {
     it('should not register patch when no file explorer view exists', () => {
+      const component = createComponent();
+      const registerMethodPatchSpy = vi.spyOn(component, 'registerMethodPatch');
+
+      loadAndFireLayoutReady(component);
+
+      expect(registerMethodPatchSpy).not.toHaveBeenCalled();
+    });
+
+    it('should not register patch while the file explorer view is still deferred', () => {
+      useFileExplorerView(strictProxy<View>({}));
+
       const component = createComponent();
       const registerMethodPatchSpy = vi.spyOn(component, 'registerMethodPatch');
 

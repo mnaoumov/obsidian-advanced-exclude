@@ -1,6 +1,7 @@
 import type { FileExplorerView } from '@obsidian-typings/obsidian-public-latest';
 import type { App } from 'obsidian';
 
+import { ViewType } from '@obsidian-typings/obsidian-public-latest/implementations';
 import { ComponentEx } from 'obsidian-dev-utils/obsidian/components/component-ex';
 
 interface FileTreeComponentConstructorParams {
@@ -48,6 +49,7 @@ export class FileTreeComponent extends ComponentEx {
   }
 
   private getFileExplorerView(): FileExplorerView | undefined {
-    return this.app.workspace.getLeavesOfType('file-explorer')[0]?.view as FileExplorerView | undefined;
+    const view = this.app.workspace.getLeavesOfType(ViewType.FileExplorer)[0]?.view;
+    return view && 'fileItems' in view ? view : undefined;
   }
 }
