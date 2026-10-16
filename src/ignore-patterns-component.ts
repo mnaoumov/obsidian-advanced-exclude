@@ -1,16 +1,16 @@
-import type { ReadonlyPluginSettingsState } from 'obsidian-dev-utils/obsidian/components/plugin-settings-component';
+import type { ReadonlyPluginSettingsState } from '@mnaoumov/obsidian-lib/components/plugin-settings-component';
 
+import { registerAsyncEvent } from '@mnaoumov/obsidian-lib/components/async-events-component';
+import { LayoutReadyComponent } from '@mnaoumov/obsidian-lib/components/layout-ready-component';
+import { ensureMetadataCacheReady } from '@mnaoumov/obsidian-lib/metadata-cache';
+import { invokeAsyncSafelyAfterDelay } from '@mnaoumov/typescript-lib/async';
+import { isDeepEqual } from '@mnaoumov/typescript-lib/object-utils';
+import { escapeRegExp } from '@mnaoumov/typescript-lib/reg-exp';
 import ignore from 'ignore';
 import {
   App,
   debounce
 } from 'obsidian';
-import { invokeAsyncSafelyAfterDelay } from 'obsidian-dev-utils/async';
-import { isDeepEqual } from 'obsidian-dev-utils/object-utils';
-import { registerAsyncEvent } from 'obsidian-dev-utils/obsidian/components/async-events-component';
-import { LayoutReadyComponent } from 'obsidian-dev-utils/obsidian/components/layout-ready-component';
-import { ensureMetadataCacheReady } from 'obsidian-dev-utils/obsidian/metadata-cache';
-import { escapeRegExp } from 'obsidian-dev-utils/reg-exp';
 
 import type { VaultLoadPatchComponent } from './patches/vault-load-patch-component.ts';
 import type { PluginSettingsComponent } from './plugin-settings-component.ts';

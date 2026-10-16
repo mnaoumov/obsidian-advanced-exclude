@@ -1,18 +1,18 @@
 import type {
-  AsyncEventRef,
-  GenericAsyncEventSource
-} from 'obsidian-dev-utils/async-events';
-import type {
   PluginNoticeComponent,
   PluginNoticeComponentShowNoticeOptions
-} from 'obsidian-dev-utils/obsidian/components/plugin-notice-component';
+} from '@mnaoumov/obsidian-lib/components/plugin-notice-component';
+import type {
+  AsyncEventRef,
+  GenericAsyncEventSource
+} from '@mnaoumov/typescript-lib/async-events';
 
+import { waitForAllAsyncOperations } from '@mnaoumov/typescript-test-toolkit/async-operation-tracking';
+import { strictProxy } from '@mnaoumov/typescript-test-toolkit/strict-proxy';
 import {
   Events,
   Notice
 } from 'obsidian';
-import { waitForAllAsyncOperations } from 'obsidian-dev-utils/async';
-import { strictProxy } from 'obsidian-dev-utils/strict-proxy';
 import { App } from 'obsidian-test-mocks/obsidian';
 import {
   afterEach,

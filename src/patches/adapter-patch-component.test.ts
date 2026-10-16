@@ -4,8 +4,8 @@ import type {
   DataAdapter
 } from 'obsidian';
 
+import { strictProxy } from '@mnaoumov/typescript-test-toolkit/strict-proxy';
 import { getDataAdapterEx } from '@obsidian-typings/obsidian-public-latest/implementations';
-import { strictProxy } from 'obsidian-dev-utils/strict-proxy';
 import {
   App,
   CapacitorAdapter,

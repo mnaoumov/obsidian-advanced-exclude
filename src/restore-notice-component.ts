@@ -1,6 +1,6 @@
-import type { PluginNoticeComponent } from 'obsidian-dev-utils/obsidian/components/plugin-notice-component';
+import type { PluginNoticeComponent } from '@mnaoumov/obsidian-lib/components/plugin-notice-component';
 
-import { ComponentEx } from 'obsidian-dev-utils/obsidian/components/component-ex';
+import { ComponentEx } from '@mnaoumov/obsidian-lib/components/component-ex';
 
 import type { IndexProjectionComponent } from './index-projection-component.ts';
 

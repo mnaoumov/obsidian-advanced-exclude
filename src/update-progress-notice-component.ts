@@ -1,7 +1,7 @@
-import type { PluginNoticeComponent } from 'obsidian-dev-utils/obsidian/components/plugin-notice-component';
+import type { PluginNoticeComponent } from '@mnaoumov/obsidian-lib/components/plugin-notice-component';
 
+import { ComponentEx } from '@mnaoumov/obsidian-lib/components/component-ex';
 import { Notice } from 'obsidian';
-import { ComponentEx } from 'obsidian-dev-utils/obsidian/components/component-ex';
 
 interface UpdateProgressNoticeComponentReportParams {
   readonly processed: number;

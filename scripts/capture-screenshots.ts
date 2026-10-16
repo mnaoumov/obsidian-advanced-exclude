@@ -1,6 +1,6 @@
+import { wrapCliTask } from '@mnaoumov/typescript-dev-toolkit/cli-utils';
+import { test } from '@mnaoumov/typescript-dev-toolkit/test-runners/vitest';
 import process from 'node:process';
-import { wrapCliTask } from 'obsidian-dev-utils/script-utils/cli-utils';
-import { test } from 'obsidian-dev-utils/script-utils/test-runners/vitest';
 
 /**
  * Each project runs TWICE, once per ignore-rules state.

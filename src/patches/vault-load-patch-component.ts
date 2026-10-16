@@ -1,5 +1,5 @@
+import { MonkeyAroundComponent } from '@mnaoumov/obsidian-lib/components/monkey-around-component';
 import { App } from 'obsidian';
-import { MonkeyAroundComponent } from 'obsidian-dev-utils/obsidian/components/monkey-around-component';
 
 export class VaultLoadPatchComponent extends MonkeyAroundComponent {
   public get wasVaultLoadCalled(): boolean {

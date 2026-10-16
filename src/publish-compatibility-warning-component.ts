@@ -1,14 +1,14 @@
+import type { PluginNoticeComponent } from '@mnaoumov/obsidian-lib/components/plugin-notice-component';
 import type {
   App,
   Notice
 } from 'obsidian';
-import type { PluginNoticeComponent } from 'obsidian-dev-utils/obsidian/components/plugin-notice-component';
 
+import { registerAsyncEvent } from '@mnaoumov/obsidian-lib/components/async-events-component';
+import { LayoutReadyComponent } from '@mnaoumov/obsidian-lib/components/layout-ready-component';
+import { appendCodeBlock } from '@mnaoumov/obsidian-lib/html-element';
+import { convertAsyncToSync } from '@mnaoumov/typescript-lib/async';
 import { InternalPluginName } from '@obsidian-typings/obsidian-public-latest/implementations';
-import { convertAsyncToSync } from 'obsidian-dev-utils/async';
-import { registerAsyncEvent } from 'obsidian-dev-utils/obsidian/components/async-events-component';
-import { LayoutReadyComponent } from 'obsidian-dev-utils/obsidian/components/layout-ready-component';
-import { appendCodeBlock } from 'obsidian-dev-utils/obsidian/html-element';
 
 import type { IgnorePatternsComponent } from './ignore-patterns-component.ts';
 import type { PluginSettingsComponent } from './plugin-settings-component.ts';

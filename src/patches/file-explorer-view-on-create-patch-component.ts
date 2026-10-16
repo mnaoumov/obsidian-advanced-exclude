@@ -1,14 +1,14 @@
 import type { FileExplorerView } from '@obsidian-typings/obsidian-public-latest';
 
+import { CallbackLayoutReadyComponent } from '@mnaoumov/obsidian-lib/components/layout-ready-component';
+import { MonkeyAroundComponent } from '@mnaoumov/obsidian-lib/components/monkey-around-component';
+import { isFolder as isFolderFunction } from '@mnaoumov/obsidian-lib/file-system';
+import { getPrototypeOf } from '@mnaoumov/typescript-lib/object-utils';
 import { ViewType } from '@obsidian-typings/obsidian-public-latest/implementations';
 import {
   App,
   TAbstractFile
 } from 'obsidian';
-import { getPrototypeOf } from 'obsidian-dev-utils/object-utils';
-import { CallbackLayoutReadyComponent } from 'obsidian-dev-utils/obsidian/components/layout-ready-component';
-import { MonkeyAroundComponent } from 'obsidian-dev-utils/obsidian/components/monkey-around-component';
-import { isFolder as isFolderFunction } from 'obsidian-dev-utils/obsidian/file-system';
 
 import type { IgnorePatternsComponent } from '../ignore-patterns-component.ts';
 import type { PluginSettingsComponent } from '../plugin-settings-component.ts';
