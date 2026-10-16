@@ -292,6 +292,17 @@ describe('IgnorePatternsComponent', () => {
       expect(component.isIgnored({ isFolder: false, normalizedPath: 'readme.md' })).toBe(false);
     });
 
+    it('should treat a line starting with # as a comment, and a backslash-escaped # as a literal #', async () => {
+      setupIndexedDatabase();
+      vi.mocked(readSafe).mockResolvedValueOnce('# notes/\n#drafts\n\\#tag.md');
+      const component = createComponent();
+      await component.loadWithPromises();
+
+      expect(component.isIgnored({ isFolder: true, normalizedPath: 'notes' })).toBe(false);
+      expect(component.isIgnored({ isFolder: false, normalizedPath: '#drafts' })).toBe(false);
+      expect(component.isIgnored({ isFolder: false, normalizedPath: '#tag.md' })).toBe(true);
+    });
+
     it('should test both path and path/ for folders', async () => {
       setupIndexedDatabase();
       vi.mocked(readSafe).mockResolvedValueOnce('build/');

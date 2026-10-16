@@ -43,7 +43,7 @@ A copy of the vault ships with every release. You can access it via any of the f
 
 ## What it does
 
-- **Exclude with `gitignore` syntax** — a folder, an extension, a path, from a `.obsidianignore` file you can edit by hand. [01 Exclude a folder](<./demo-vault/01 Exclude a folder.md>)
+- **Exclude with `gitignore` syntax** — a folder, an extension, a path, from a `.obsidianignore` file you can edit by hand. A line starting with `#` is a comment, as in `.gitignore`; write `\#` for a pattern that really starts with `#`. [01 Exclude a folder](<./demo-vault/01 Exclude a folder.md>)
 - **Whitelist instead of blacklist**, including the negation trap that catches most people: once `*` ignores everything, folders must be re-included with `!*/` before any `!file` rule can reach inside them. [02 Whitelist with negation](<./demo-vault/02 Whitelist with negation.md>)
 - **Choose where patterns come from and how hard they hide** — your `.gitignore`, Obsidian's own `Excluded files` setting, and how completely an ignored file disappears. Both extra sources are off by default, so a fresh install changes nothing until you turn one on. [03 Exclude mode and sources](<./demo-vault/03 Exclude mode and sources.md>)
 - **Hide folders left empty by exclusion**, cascading up through parents whose whole subtree went away. Genuinely empty folders stay visible. [04 Settings](<./demo-vault/04 Settings.md>)
