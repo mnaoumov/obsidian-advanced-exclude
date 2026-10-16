@@ -34,14 +34,6 @@ import {
   it
 } from 'vitest';
 
-/**
- * App, reduced to the font-size applier that obsidian-typings does not declare.
- * Setting baseFontSize alone changes nothing on screen.
- */
-interface FontSizeApp {
-  updateFontSize: (this: void) => void;
-}
-
 const WIDTH_IN_PIXELS = 900;
 const HEIGHT_IN_PIXELS = 1600;
 
@@ -91,8 +83,7 @@ beforeAll(async () => {
       app.changeTheme('obsidian');
 
       app.vault.setConfig('baseFontSize', fontSizeInPixels);
-      const fontApp: unknown = app;
-      (fontApp as FontSizeApp).updateFontSize();
+      app.updateFontSize();
 
       // The file explorer IS the subject here, so it is the one thing that must
       // be open — the opposite of most of these suites, which collapse it.
