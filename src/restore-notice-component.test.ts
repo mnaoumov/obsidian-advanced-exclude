@@ -1,10 +1,10 @@
 import type {
   PluginNoticeComponent,
   PluginNoticeComponentShowNoticeOptions
-} from 'obsidian-dev-utils/obsidian/components/plugin-notice-component';
+} from '@mnaoumov/obsidian-lib/components/plugin-notice-component';
 
+import { strictProxy } from '@mnaoumov/typescript-test-toolkit/strict-proxy';
 import { Notice } from 'obsidian';
-import { strictProxy } from 'obsidian-dev-utils/strict-proxy';
 import {
   beforeEach,
   describe,

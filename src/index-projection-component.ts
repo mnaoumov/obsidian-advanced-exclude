@@ -1,14 +1,14 @@
 import type { DataAdapterEx } from '@obsidian-typings/obsidian-public-latest';
 import type { App } from 'obsidian';
 
+import { ComponentEx } from '@mnaoumov/obsidian-lib/components/component-ex';
+import { CallbackLayoutReadyComponent } from '@mnaoumov/obsidian-lib/components/layout-ready-component';
+import { isFolder } from '@mnaoumov/obsidian-lib/file-system';
+import { requestAnimationFrameAsync } from '@mnaoumov/typescript-lib/async';
 import {
   getDataAdapterEx,
   ViewType
 } from '@obsidian-typings/obsidian-public-latest/implementations';
-import { requestAnimationFrameAsync } from 'obsidian-dev-utils/async';
-import { ComponentEx } from 'obsidian-dev-utils/obsidian/components/component-ex';
-import { CallbackLayoutReadyComponent } from 'obsidian-dev-utils/obsidian/components/layout-ready-component';
-import { isFolder } from 'obsidian-dev-utils/obsidian/file-system';
 
 import type { IgnorePatternsComponent } from './ignore-patterns-component.ts';
 import type { ManualIndexHider } from './manual-index-hider.ts';

@@ -1,6 +1,6 @@
 import type { App } from 'obsidian';
 
-import { MonkeyAroundComponent } from 'obsidian-dev-utils/obsidian/components/monkey-around-component';
+import { MonkeyAroundComponent } from '@mnaoumov/obsidian-lib/components/monkey-around-component';
 
 import type { FileTreeComponent } from '../file-tree-component.ts';
 import type { IgnorePatternsComponent } from '../ignore-patterns-component.ts';

@@ -1,7 +1,7 @@
 import type { PluginManifest } from 'obsidian';
 
+import { ComponentEx } from '@mnaoumov/obsidian-lib/components/component-ex';
 import { Component } from 'obsidian';
-import { ComponentEx } from 'obsidian-dev-utils/obsidian/components/component-ex';
 import { App } from 'obsidian-test-mocks/obsidian';
 import {
   beforeEach,
@@ -18,7 +18,7 @@ import { Plugin } from './plugin.ts';
 type IgnorePatternsComponentConstructorParams = ConstructorParameters<typeof IgnorePatternsComponent>[0];
 
 /*
- * The real `PluginBase` (from `obsidian-dev-utils`) drives the lifecycle here —
+ * The real `PluginBase` (from `@mnaoumov/obsidian-lib`) drives the lifecycle here —
  * it is NOT mocked. `await plugin.onload()` registers the base's universal
  * components, runs the plugin's `onloadImpl`, then loads every queued child via
  * the real children-first lifecycle. Each child the plugin adds must therefore
@@ -30,7 +30,7 @@ type IgnorePatternsComponentConstructorParams = ConstructorParameters<typeof Ign
 // component out of one during `onload` and really calls `dataHandler.loadData()`, which a bare `vi.fn()`
 // double does not answer.
 
-vi.mock('obsidian-dev-utils/obsidian/components/plugin-settings-tab-component', () => ({
+vi.mock('@mnaoumov/obsidian-lib/components/plugin-settings-tab-component', () => ({
   // eslint-disable-next-line prefer-arrow-callback, func-names -- mock must be constructable with `new` and return a real loadable Component.
   PluginSettingsTabComponent: vi.fn(function () {
     return new Component();

@@ -1,9 +1,9 @@
+import type { PluginSettingsTabBaseConstructorParams } from '@mnaoumov/obsidian-lib/plugin/plugin-settings-tab';
 import type { SettingDefinitionItem } from 'obsidian';
-import type { PluginSettingsTabBaseConstructorParams } from 'obsidian-dev-utils/obsidian/plugin/plugin-settings-tab';
 
-import { convertAsyncToSync } from 'obsidian-dev-utils/async';
-import { appendCodeBlock } from 'obsidian-dev-utils/obsidian/html-element';
-import { PluginSettingsTabBase } from 'obsidian-dev-utils/obsidian/plugin/plugin-settings-tab';
+import { appendCodeBlock } from '@mnaoumov/obsidian-lib/html-element';
+import { PluginSettingsTabBase } from '@mnaoumov/obsidian-lib/plugin/plugin-settings-tab';
+import { convertAsyncToSync } from '@mnaoumov/typescript-lib/async';
 
 import type { IgnorePatternsComponent } from './ignore-patterns-component.ts';
 

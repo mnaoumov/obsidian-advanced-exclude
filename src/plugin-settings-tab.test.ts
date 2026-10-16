@@ -1,14 +1,14 @@
+import type { PluginSettingsComponentBase } from '@mnaoumov/obsidian-lib/components/plugin-settings-component';
+import type { GenericVoidFunction } from '@mnaoumov/typescript-lib/function';
 import type {
   Plugin,
   SettingGroup
 } from 'obsidian';
-import type { GenericVoidFunction } from 'obsidian-dev-utils/function';
-import type { PluginSettingsComponentBase } from 'obsidian-dev-utils/obsidian/components/plugin-settings-component';
 
-import { noopAsync } from 'obsidian-dev-utils/function';
-import { castTo } from 'obsidian-dev-utils/object-utils';
-import { SettingEx } from 'obsidian-dev-utils/obsidian/setting-ex';
-import { strictProxy } from 'obsidian-dev-utils/strict-proxy';
+import { SettingEx } from '@mnaoumov/obsidian-lib/setting-ex';
+import { noopAsync } from '@mnaoumov/typescript-lib/function';
+import { castTo } from '@mnaoumov/typescript-lib/object-utils';
+import { strictProxy } from '@mnaoumov/typescript-test-toolkit/strict-proxy';
 import {
   App,
   ButtonComponent
@@ -34,7 +34,7 @@ import {
  * fragment that the test does not assert on; the real implementation is exercised
  * elsewhere.
  */
-vi.mock('obsidian-dev-utils/html-element', () => ({
+vi.mock('@mnaoumov/typescript-lib/html-element', () => ({
   appendCodeBlock: vi.fn()
 }));
 
@@ -51,7 +51,7 @@ vi.mock('obsidian-dev-utils/html-element', () => ({
  * that is covered by dev-utils' own tests; the lines under test here merely call
  * `this.bind(...)` and are exercised regardless.
  */
-vi.mock('obsidian-dev-utils/obsidian/setting-components/text-based-component', () => ({
+vi.mock('@mnaoumov/obsidian-lib/setting-components/text-based-component', () => ({
   getTextBasedComponentValue: vi.fn(() => null)
 }));
 

@@ -12,10 +12,10 @@ import type {
 } from 'obsidian';
 import type { Mock } from 'vitest';
 
+import { isFolder } from '@mnaoumov/obsidian-lib/file-system';
+import { castTo } from '@mnaoumov/typescript-lib/object-utils';
+import { strictProxy } from '@mnaoumov/typescript-test-toolkit/strict-proxy';
 import { getDataAdapterEx } from '@obsidian-typings/obsidian-public-latest/implementations';
-import { castTo } from 'obsidian-dev-utils/object-utils';
-import { isFolder } from 'obsidian-dev-utils/obsidian/file-system';
-import { strictProxy } from 'obsidian-dev-utils/strict-proxy';
 import {
   afterEach,
   beforeEach,
@@ -44,7 +44,7 @@ vi.mock('@obsidian-typings/obsidian-public-latest/implementations', async (impor
   getDataAdapterEx: vi.fn()
 }));
 
-vi.mock('obsidian-dev-utils/obsidian/file-system', () => ({
+vi.mock('@mnaoumov/obsidian-lib/file-system', () => ({
   isFolder: vi.fn()
 }));
 

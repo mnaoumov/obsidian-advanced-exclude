@@ -3,14 +3,14 @@ import type {
   EventRef
 } from 'obsidian';
 
-import { invokeAsyncSafelyAfterDelay } from 'obsidian-dev-utils/async';
+import { registerAsyncEvent } from '@mnaoumov/obsidian-lib/components/async-events-component';
+import { ensureMetadataCacheReady } from '@mnaoumov/obsidian-lib/metadata-cache';
+import { invokeAsyncSafelyAfterDelay } from '@mnaoumov/typescript-lib/async';
 import {
   castTo,
   isDeepEqual
-} from 'obsidian-dev-utils/object-utils';
-import { registerAsyncEvent } from 'obsidian-dev-utils/obsidian/components/async-events-component';
-import { ensureMetadataCacheReady } from 'obsidian-dev-utils/obsidian/metadata-cache';
-import { strictProxy } from 'obsidian-dev-utils/strict-proxy';
+} from '@mnaoumov/typescript-lib/object-utils';
+import { strictProxy } from '@mnaoumov/typescript-test-toolkit/strict-proxy';
 import { App } from 'obsidian-test-mocks/obsidian';
 import {
   afterEach,
@@ -38,27 +38,27 @@ vi.mock('./data-adapter-safe.ts', () => ({
   writeSafe: vi.fn().mockResolvedValue(undefined)
 }));
 
-vi.mock('obsidian-dev-utils/obsidian/metadata-cache', () => ({
+vi.mock('@mnaoumov/obsidian-lib/metadata-cache', () => ({
   ensureMetadataCacheReady: vi.fn().mockResolvedValue(undefined)
 }));
 
-vi.mock('obsidian-dev-utils/obsidian/components/async-events-component', () => ({
+vi.mock('@mnaoumov/obsidian-lib/components/async-events-component', () => ({
   registerAsyncEvent: vi.fn()
 }));
 
 // Keep the REAL invokeAsyncSafelyAfterDelay (so its genuine dev-utils scheduling/error-handling runs).
 // It is wrapped in a vi.fn pass-through purely so tests can assert it was invoked.
 // The real body is not re-created: vi.fn delegates every call to actual.invokeAsyncSafelyAfterDelay unchanged.
-vi.mock('obsidian-dev-utils/async', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('obsidian-dev-utils/async')>();
+vi.mock('@mnaoumov/typescript-lib/async', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@mnaoumov/typescript-lib/async')>();
   return {
     ...actual,
     invokeAsyncSafelyAfterDelay: vi.fn(actual.invokeAsyncSafelyAfterDelay)
   };
 });
 
-vi.mock('obsidian-dev-utils/object-utils', async (importOriginal) => ({
-  ...await importOriginal<typeof import('obsidian-dev-utils/object-utils')>(),
+vi.mock('@mnaoumov/typescript-lib/object-utils', async (importOriginal) => ({
+  ...await importOriginal<typeof import('@mnaoumov/typescript-lib/object-utils')>(),
   isDeepEqual: vi.fn().mockReturnValue(true)
 }));
 
@@ -245,7 +245,7 @@ describe('IgnorePatternsComponent', () => {
 
   afterEach(async () => {
     // Flush delayed async operations scheduled via the real invokeAsyncSafelyAfterDelay.
-    // This lets obsidian-dev-utils' async-operation tracking settle them.
+    // This lets typescript-test-toolkit's async-operation tracking settle them.
     // Otherwise its global afterEach waitForAllAsyncOperations hangs for the full hook timeout on a scheduled-but-never-run op.
     await vi.runAllTimersAsync();
     vi.useRealTimers();

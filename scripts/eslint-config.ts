@@ -1,7 +1,7 @@
 import type { Linter } from 'eslint';
 
+import { defineEslintConfigs } from '@mnaoumov/obsidian-dev-toolkit/linters/eslint-config';
 import { defineConfig } from 'eslint/config';
-import { defineEslintConfigs } from 'obsidian-dev-utils/script-utils/linters/eslint-config';
 
 /**
  * The per-command timeout `scripts/vitest-config.ts` gives the
@@ -34,7 +34,7 @@ export const configs: Linter.Config[] = defineEslintConfigs({
            * this project's real cap rather than the rule being turned off: a perf closure that one day
            * asks for more than 600 000 ms is still reported.
            */
-          'obsidian-dev-utils/no-over-cap-wait-in-eval-in-obsidian': [
+          'obsidian-dev-toolkit/no-over-cap-wait-in-eval-in-obsidian': [
             'error',
             {
               capInMilliseconds: DESKTOP_PERFORMANCE_CAP_IN_MILLISECONDS

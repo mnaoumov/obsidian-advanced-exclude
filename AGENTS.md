@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Obsidian plugin that enhances Obsidian's `Files and links > Excluded files` setting with full `gitignore` syntax. Ignored files become invisible to Obsidian (Files pane, Backlinks, etc.), not just dimmed.
 
-Built on `obsidian-dev-utils`. Patches Obsidian's `FileSystemAdapter` / `CapacitorAdapter` and `FileExplorerView` to filter ignored paths at the source.
+Built on `@mnaoumov/obsidian-lib` with tooling from `@mnaoumov/obsidian-dev-toolkit`, `@mnaoumov/typescript-dev-toolkit` and `@mnaoumov/typescript-test-toolkit`. Patches Obsidian's `FileSystemAdapter` / `CapacitorAdapter` and `FileExplorerView` to filter ignored paths at the source.
 
 ## Commands
 
@@ -65,7 +65,7 @@ Built on `obsidian-dev-utils`. Patches Obsidian's `FileSystemAdapter` / `Capacit
 
 ## Conventions
 
-- **Mocking**: prefer `strictProxy<T>({...})` / `StrictProxyPartial<T>` from `obsidian-dev-utils/strict-proxy` over `as unknown as T` and over `Record<string, unknown>` mock interfaces. Strict proxies throw on uninitialized property access, so mistakes surface in the failing test instead of silently passing.
+- **Mocking**: prefer `strictProxy<T>({...})` / `StrictProxyPartial<T>` from `@mnaoumov/typescript-test-toolkit/strict-proxy` over `as unknown as T` and over `Record<string, unknown>` mock interfaces. Strict proxies throw on uninitialized property access, so mistakes surface in the failing test instead of silently passing.
 - **Constructor params**: components take a single `{...}Params` object. When mocking a component constructor in tests, type the params with the real exported `...ConstructorParams` interface — export the interface from the source file if needed.
 - **v8 ignore**: only block form (`/* v8 ignore start -- reason. */` … `/* v8 ignore stop */`) is honored. Single-line `/* v8 ignore next */` does not work.
 - **Commit messages**: Conventional Commits. Use `npm run commit` (czg) for the interactive wizard.

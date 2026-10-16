@@ -1,5 +1,5 @@
+import { noopAsync } from '@mnaoumov/typescript-lib/function';
 import ignore from 'ignore';
-import { noopAsync } from 'obsidian-dev-utils/function';
 import {
   describe,
   expect,

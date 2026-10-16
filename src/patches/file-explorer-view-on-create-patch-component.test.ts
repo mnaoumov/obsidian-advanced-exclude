@@ -1,11 +1,11 @@
 import type { TAbstractFile } from 'obsidian';
 
+import { castTo } from '@mnaoumov/typescript-lib/object-utils';
+import { strictProxy } from '@mnaoumov/typescript-test-toolkit/strict-proxy';
 import {
   View,
   Workspace
 } from 'obsidian';
-import { castTo } from 'obsidian-dev-utils/object-utils';
-import { strictProxy } from 'obsidian-dev-utils/strict-proxy';
 import {
   App,
   WorkspaceLeaf
@@ -45,7 +45,7 @@ class MockFileExplorerView extends View {
 }
 
 // Return-value stub of a dev-utils utility — the test controls what counts as a folder.
-vi.mock('obsidian-dev-utils/obsidian/file-system', () => ({
+vi.mock('@mnaoumov/obsidian-lib/file-system', () => ({
   isFolder: vi.fn().mockReturnValue(false)
 }));
 

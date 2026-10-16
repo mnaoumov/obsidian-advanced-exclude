@@ -1,8 +1,8 @@
 import type { FileExplorerView } from '@obsidian-typings/obsidian-public-latest';
 import type { App } from 'obsidian';
 
+import { ComponentEx } from '@mnaoumov/obsidian-lib/components/component-ex';
 import { ViewType } from '@obsidian-typings/obsidian-public-latest/implementations';
-import { ComponentEx } from 'obsidian-dev-utils/obsidian/components/component-ex';
 
 interface FileTreeComponentConstructorParams {
   readonly app: App;

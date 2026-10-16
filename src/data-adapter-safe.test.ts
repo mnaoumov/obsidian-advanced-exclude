@@ -1,8 +1,8 @@
 import type { DataAdapterEx } from '@obsidian-typings/obsidian-public-latest';
 import type { App as AppOriginal } from 'obsidian';
 
+import { strictProxy } from '@mnaoumov/typescript-test-toolkit/strict-proxy';
 import { getDataAdapterEx } from '@obsidian-typings/obsidian-public-latest/implementations';
-import { strictProxy } from 'obsidian-dev-utils/strict-proxy';
 import {
   CapacitorAdapter,
   FileSystemAdapter
