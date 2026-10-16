@@ -1,6 +1,6 @@
 # Settings
 
-Open **Settings -> Community plugins -> Advanced Exclude** to configure the plugin. Each option below lists the setting key stored in the plugin's `data.json`.
+Open **Settings -> Community plugins -> `Advanced Exclude`** to configure the plugin. Each option below lists the setting key stored in the plugin's `data.json`.
 
 ## Ignore patterns
 

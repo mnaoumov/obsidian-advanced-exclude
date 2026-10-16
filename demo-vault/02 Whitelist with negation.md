@@ -1,6 +1,6 @@
 # Whitelist with negation
 
-Because Advanced Exclude uses real [`gitignore`](https://git-scm.com/docs/gitignore) syntax, you can invert the logic: ignore **everything** and then re-include only what you want. This is the idiom most people get wrong, so it is worth trying here.
+Because `Advanced Exclude` uses real [`gitignore`](https://git-scm.com/docs/gitignore) syntax, you can invert the logic: ignore **everything** and then re-include only what you want. This is the idiom most people get wrong, so it is worth trying here.
 
 ## The trap
 
@@ -19,7 +19,7 @@ await require('/demoSetup.ts').useMarkdownWhitelist(app);
 
 Manual equivalent:
 
-1. Open **Settings -> Community plugins -> Advanced Exclude**.
+1. Open **Settings -> Community plugins -> `Advanced Exclude`**.
 2. Replace the **Ignore patterns** with:
 
    ```gitignore

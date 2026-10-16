@@ -1,6 +1,6 @@
 # Exclude a folder
 
-The simplest use of Advanced Exclude: hide an entire folder and everything under it. This vault ships an `Archive/` folder with two notes - [Archive/Old note](<./Archive/Old note.md>) and [Archive/Draft](<./Archive/Draft.md>) - as the exclusion target.
+The simplest use of `Advanced Exclude`: hide an entire folder and everything under it. This vault ships an `Archive/` folder with two notes - [Archive/Old note](<./Archive/Old note.md>) and [Archive/Draft](<./Archive/Draft.md>) - as the exclusion target.
 
 ## Before you start
 
@@ -18,7 +18,7 @@ await require('/demoSetup.ts').excludeArchiveFolder(app);
 
 Manual equivalent:
 
-1. Open **Settings -> Community plugins -> Advanced Exclude**.
+1. Open **Settings -> Community plugins -> `Advanced Exclude`**.
 2. In the **Ignore patterns** text area, add a line:
 
    ```gitignore
