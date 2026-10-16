@@ -1,10 +1,10 @@
 import type { DataAdapterEx } from '@obsidian-typings/obsidian-public-latest';
-import type {
-  App,
-  View
-} from 'obsidian';
+import type { App } from 'obsidian';
 
-import { getDataAdapterEx } from '@obsidian-typings/obsidian-public-latest/implementations';
+import {
+  getDataAdapterEx,
+  ViewType
+} from '@obsidian-typings/obsidian-public-latest/implementations';
 import { requestAnimationFrameAsync } from 'obsidian-dev-utils/async';
 import { ComponentEx } from 'obsidian-dev-utils/obsidian/components/component-ex';
 import { CallbackLayoutReadyComponent } from 'obsidian-dev-utils/obsidian/components/layout-ready-component';
@@ -46,14 +46,6 @@ const UPDATE_PROGRESS_MESSAGE = 'Updating file tree…';
  * elapsed time, not vault size.
  */
 const APPLY_YIELD_INTERVAL_IN_MILLISECONDS = 50;
-
-/**
- * The link-dependent side-pane view types refreshed after a `Full`-mode projection. Their
- * renderers recompute only on an active-file change or a `metadataCache` event — neither of
- * which the event-free projection fires — so they would otherwise show stale links (a hidden
- * file lingering as a backlink) until the next interaction.
- */
-const LINK_VIEW_TYPES = ['backlink', 'outgoing-link'];
 
 interface IndexProjectionComponentConstructorParams {
   readonly addToFilesPane: (this: void, normalizedPath: string) => void;
@@ -537,14 +529,32 @@ export class IndexProjectionComponent extends ComponentEx {
    * Nudges the open link side-panes (Backlinks, Outgoing Links) to recompute after a
    * `Full`-mode projection. The projection mutates the link index without firing events, so
    * these views would otherwise render stale links (a hidden file lingering as a backlink)
-   * until the next interaction. Their renderers are undocumented internals, so the refresh
-   * is fully guarded — a no-op when a view exposes no matching renderer.
+   * until the next interaction: their components recompute only on an active-file change or
+   * a `metadataCache` event, neither of which the projection fires. Each component caches
+   * the file it last rendered in its `*File` fields and its `update()` short-circuits while
+   * they still match the active file, so clearing those trackers (but not `file`, the current
+   * target) makes `update()` recompute. A deferred leaf has no component yet, so it is skipped.
    */
   private refreshLinkViews(): void {
-    for (const viewType of LINK_VIEW_TYPES) {
-      for (const leaf of this.app.workspace.getLeavesOfType(viewType)) {
-        refreshLinkRenderer(leaf.view);
+    for (const leaf of this.app.workspace.getLeavesOfType(ViewType.Backlink)) {
+      if (!('backlink' in leaf.view)) {
+        continue;
       }
+
+      const { backlink } = leaf.view;
+      backlink.backlinkFile = null;
+      backlink.unlinkedFile = null;
+      backlink.update();
+    }
+    for (const leaf of this.app.workspace.getLeavesOfType(ViewType.OutgoingLink)) {
+      if (!('outgoingLink' in leaf.view)) {
+        continue;
+      }
+
+      const { outgoingLink } = leaf.view;
+      outgoingLink.outgoingFile = null;
+      outgoingLink.unlinkedFile = null;
+      outgoingLink.update();
     }
   }
 
@@ -646,23 +656,4 @@ function pathDepth(normalizedPath: string): number {
     }
   }
   return count;
-}
-
-/**
- * Forces a link side-pane renderer to recompute from the current link cache. The renderer
- * caches the file it last rendered in its `*File` fields and its `update()` short-circuits
- * while they still match the active file; clearing those trackers (but not `file`, the
- * current target) makes `update()` recompute. Guarded: a no-op when the view exposes no
- * such renderer.
- */
-function refreshLinkRenderer(view: View): void {
-  for (const renderer of [view.backlink, view.outgoingLink]) {
-    if (!renderer) {
-      continue;
-    }
-    renderer.backlinkFile = null;
-    renderer.outgoingFile = null;
-    renderer.unlinkedFile = null;
-    renderer.update?.();
-  }
 }

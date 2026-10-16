@@ -318,7 +318,7 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
   }
 
   private getUserIgnoreFilters(): string[] {
-    return this.pluginSettingsComponent.settings.shouldIgnoreExcludedFiles ? ((this.app.vault.getConfig('userIgnoreFilters') ?? []) as string[]) : [];
+    return this.pluginSettingsComponent.settings.shouldIgnoreExcludedFiles ? (this.app.vault.getConfig('userIgnoreFilters') ?? []) : [];
   }
 
   /**

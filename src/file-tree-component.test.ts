@@ -37,7 +37,7 @@ function createMockFileExplorerView(overrides: Partial<MockFileExplorerView> = {
   };
 }
 
-function setup(fileExplorerView?: MockFileExplorerView): SetupResult {
+function setup(fileExplorerView?: object): SetupResult {
   const leaves = fileExplorerView ? [{ view: fileExplorerView }] : [];
 
   const app = strictProxy<App>({
@@ -68,6 +68,12 @@ describe('FileTreeComponent', () => {
       const { app, component } = setup();
       component.deleteFromFilesPane('some/path');
       expect(vi.mocked(app.workspace.getLeavesOfType)).toHaveBeenCalledWith('file-explorer');
+    });
+
+    it('returns early when the file explorer view is still deferred', () => {
+      const { app, component } = setup({});
+      component.deleteFromFilesPane('some/path');
+      expect(vi.mocked(app.vault.getAbstractFileByPath)).not.toHaveBeenCalled();
     });
 
     it('returns early when the file item does not exist in the view', () => {

@@ -1,5 +1,6 @@
 import type { FileExplorerView } from '@obsidian-typings/obsidian-public-latest';
 
+import { ViewType } from '@obsidian-typings/obsidian-public-latest/implementations';
 import {
   App,
   TAbstractFile
@@ -56,7 +57,8 @@ export class FileExplorerViewOnCreatePatchComponent extends MonkeyAroundComponen
   }
 
   private getFileExplorerView(): FileExplorerView | undefined {
-    return this.app.workspace.getLeavesOfType('file-explorer')[0]?.view as FileExplorerView | undefined;
+    const view = this.app.workspace.getLeavesOfType(ViewType.FileExplorer)[0]?.view;
+    return view && 'fileItems' in view ? view : undefined;
   }
 
   private onCreate(originalFunction: OnCreateFunction, view: FileExplorerView, file: TAbstractFile): void {

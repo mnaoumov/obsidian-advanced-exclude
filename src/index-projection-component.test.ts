@@ -1,9 +1,13 @@
-import type { DataAdapterEx } from '@obsidian-typings/obsidian-public-latest';
+import type {
+  BacklinkView,
+  DataAdapterEx,
+  OutgoingLinkView
+} from '@obsidian-typings/obsidian-public-latest';
 import type {
   App,
   EventRef,
   TAbstractFile,
-  View,
+  TFile,
   WorkspaceLeaf
 } from 'obsidian';
 import type { Mock } from 'vitest';
@@ -35,7 +39,8 @@ import { IndexProjectionComponent } from './index-projection-component.ts';
 import { ExcludeMode } from './plugin-settings.ts';
 import { computeUniverseSignature } from './universe-signature.ts';
 
-vi.mock('@obsidian-typings/obsidian-public-latest/implementations', () => ({
+vi.mock('@obsidian-typings/obsidian-public-latest/implementations', async (importOriginal) => ({
+  ...await importOriginal<typeof import('@obsidian-typings/obsidian-public-latest/implementations')>(),
   getDataAdapterEx: vi.fn()
 }));
 
@@ -495,19 +500,28 @@ describe('IndexProjectionComponent', () => {
   });
 
   describe('link view refresh (Full mode)', () => {
-    function linkLeaf(backlink: View['backlink'], outgoingLink: View['outgoingLink']): WorkspaceLeaf {
-      return strictProxy<WorkspaceLeaf>({ view: strictProxy<View>({ backlink, outgoingLink }) });
+    function backlinkLeaf(backlink: BacklinkView['backlink']): WorkspaceLeaf {
+      return strictProxy<WorkspaceLeaf>({ view: strictProxy<BacklinkView>({ backlink }) });
+    }
+
+    function outgoingLinkLeaf(outgoingLink: OutgoingLinkView['outgoingLink']): WorkspaceLeaf {
+      return strictProxy<WorkspaceLeaf>({ view: strictProxy<OutgoingLinkView>({ outgoingLink }) });
+    }
+
+    function deferredLeaf(): WorkspaceLeaf {
+      return strictProxy<WorkspaceLeaf>({ view: strictProxy<BacklinkView>({}) });
     }
 
     it('recomputes the open Backlinks and Outgoing Links views after a projection', async () => {
       const { app, component } = setup({ entries: [{ isFolderFlag: false, path: 'a.md' }], isIgnored: () => false });
-      const backlink = { backlinkFile: 'stale', unlinkedFile: 'stale', update: vi.fn() };
-      const outgoingLink = { outgoingFile: 'stale', unlinkedFile: 'stale', update: vi.fn() };
+      const staleFile = strictProxy<TFile>({});
+      const backlink = strictProxy<BacklinkView['backlink']>({ backlinkFile: staleFile, unlinkedFile: staleFile, update: vi.fn() });
+      const outgoingLink = strictProxy<OutgoingLinkView['outgoingLink']>({ outgoingFile: staleFile, unlinkedFile: staleFile, update: vi.fn() });
       vi.mocked(app.workspace.getLeavesOfType).mockImplementation((viewType) => {
         if (viewType === 'backlink') {
-          return [linkLeaf(backlink, undefined)];
+          return [backlinkLeaf(backlink)];
         }
-        return viewType === 'outgoing-link' ? [linkLeaf(undefined, outgoingLink)] : [];
+        return viewType === 'outgoing-link' ? [outgoingLinkLeaf(outgoingLink)] : [];
       });
 
       await component.update();
@@ -517,11 +531,12 @@ describe('IndexProjectionComponent', () => {
       expect(backlink.unlinkedFile).toBeNull();
       expect(outgoingLink.update).toHaveBeenCalledTimes(1);
       expect(outgoingLink.outgoingFile).toBeNull();
+      expect(outgoingLink.unlinkedFile).toBeNull();
     });
 
-    it('ignores a link view that exposes no renderer', async () => {
+    it('skips a deferred link view, which has no component yet', async () => {
       const { app, component } = setup({ entries: [{ isFolderFlag: false, path: 'a.md' }], isIgnored: () => false });
-      vi.mocked(app.workspace.getLeavesOfType).mockReturnValue([linkLeaf(undefined, undefined)]);
+      vi.mocked(app.workspace.getLeavesOfType).mockReturnValue([deferredLeaf()]);
 
       await expect(component.update()).resolves.toBeUndefined();
     });
