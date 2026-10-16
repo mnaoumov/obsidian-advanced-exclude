@@ -21,7 +21,7 @@ interface DemoSettingsPatch {
  * pattern set this vault teaches gets a button.
  *
  * Manual equivalent: paste the same lines into **Ignore patterns** in **Settings -> Community plugins
- * -> Advanced Exclude** and click **Apply**. The same text also lives in `.obsidianignore` at the vault
+ * -> `Advanced Exclude`** and click **Apply**. The same text also lives in `.obsidianignore` at the vault
  * root, which you can edit directly.
  */
 export async function setIgnorePatterns(app: App, obsidianIgnoreContent: string): Promise<void> {
@@ -67,7 +67,7 @@ export async function clearIgnorePatterns(app: App): Promise<void> {
 /**
  * Applies any other settings patch, live.
  *
- * Manual equivalent: change the same option in **Settings -> Community plugins -> Advanced Exclude**.
+ * Manual equivalent: change the same option in **Settings -> Community plugins -> `Advanced Exclude`**.
  */
 export async function changeSettings(app: App, patch: DemoSettingsPatch): Promise<void> {
   await configureCommunityPlugin({ app, pluginId: PLUGIN_ID, settings: patch });
