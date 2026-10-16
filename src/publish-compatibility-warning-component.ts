@@ -8,6 +8,7 @@ import { InternalPluginName } from '@obsidian-typings/obsidian-public-latest/imp
 import { convertAsyncToSync } from 'obsidian-dev-utils/async';
 import { registerAsyncEvent } from 'obsidian-dev-utils/obsidian/components/async-events-component';
 import { LayoutReadyComponent } from 'obsidian-dev-utils/obsidian/components/layout-ready-component';
+import { appendCodeBlock } from 'obsidian-dev-utils/obsidian/html-element';
 
 import type { IgnorePatternsComponent } from './ignore-patterns-component.ts';
 import type { PluginSettingsComponent } from './plugin-settings-component.ts';
@@ -17,7 +18,7 @@ import { ExcludeMode } from './plugin-settings.ts';
 interface AddButtonParams {
   readonly containerEl: HTMLElement;
   readonly listener: (this: void) => void;
-  readonly text: string;
+  readonly text: DocumentFragment | string;
 }
 
 interface PublishCompatibilityWarningComponentConstructorParams {
@@ -115,7 +116,14 @@ export class PublishCompatibilityWarningComponent extends LayoutReadyComponent {
           + 'Choose how to resolve this:'
       );
       const buttonsEl = f.createDiv({ cls: 'advanced-exclude-publish-warning-buttons' });
-      addButton({ containerEl: buttonsEl, listener: convertAsyncToSync(() => this.disableThisPlugin()), text: 'Disable Advanced Exclude' });
+      addButton({
+        containerEl: buttonsEl,
+        listener: convertAsyncToSync(() => this.disableThisPlugin()),
+        text: createFragment((buttonText) => {
+          buttonText.appendText('Disable ');
+          appendCodeBlock(buttonText, 'Advanced Exclude');
+        })
+      });
       addButton({ containerEl: buttonsEl, listener: convertAsyncToSync(() => this.switchToFilesPaneMode()), text: 'Switch to Files Pane mode' });
       addButton({
         containerEl: buttonsEl,

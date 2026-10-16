@@ -104,6 +104,7 @@ describe('PublishCompatibilityWarningComponent', () => {
       'Disable Publish',
       'Cancel (I am aware of the risks)'
     ]);
+    expect(getButton(fragment, 'Disable Advanced Exclude').querySelector('code')?.textContent).toBe('Advanced Exclude');
   });
 
   it('should validate on layout ready', async () => {
