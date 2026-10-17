@@ -1,5 +1,17 @@
 # CHANGELOG
 
+## 4.1.4
+
+- chore: link Discussions from the issue chooser for questions
+- fix: re-apply Files Pane hiding to an explorer built after the projection
+- ci: merge attesting release assets through the toolkit's reusable workflow
+- build(demo-vault): require CodeScript Toolkit 13.8.0 for the obsidian-lib demo script
+- docs: document # comments in .obsidianignore, with a regression test
+- build: move off obsidian-dev-utils onto the @mnaoumov packages
+- fix: mark plugin names as code in markdown, comments and UI
+- refactor: merge typing Obsidian internals from obsidian-typings
+- test: merge using the obsidian-typings declarations of Obsidian internals
+
 ## 4.1.3
 
 - test(screenshots): merge setting the desktop capture theme with applyObsidianTheme
