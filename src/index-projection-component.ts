@@ -226,6 +226,9 @@ export class IndexProjectionComponent extends ComponentEx {
   }
 
   public async onLayoutReady(): Promise<void> {
+    // At startup the load-time projection runs before Obsidian builds the file explorer, so
+    // its `FilesPane` hides all no-op'd and the explorer then lists every loaded file (#13).
+    this.reapplyToFilesPane();
     // The fast-enable path already applied the persisted hide; a full `update()` here
     // would trigger a whole-vault `applyFull` and undo the win.
     if (this.fastEnableApplied) {
@@ -269,6 +272,24 @@ export class IndexProjectionComponent extends ComponentEx {
     // here so the index is still restored if the child add-order ever changes.
     this.restoreHiddenFilesOnUnload();
     super.onunload();
+  }
+
+  /**
+   * In `FilesPane` mode, removes the model's hidden set from the file explorer again.
+   *
+   * The explorer fills itself from the whole loaded vault when it is built, so a hide issued
+   * before it existed is lost: at startup (the load-time projection precedes the explorer),
+   * and whenever a deferred explorer leaf is first revealed or a new explorer is opened. The
+   * model needs no rebuild — `recordCreate` keeps it current through the vault load.
+   */
+  public reapplyToFilesPane(): void {
+    if (this.excludeMode !== ExcludeMode.FilesPane) {
+      return;
+    }
+    const targets = this.vaultModel.getPathsByVisibility(false).sort((a, b) => pathDepth(b.path) - pathDepth(a.path));
+    for (const target of targets) {
+      this.deleteFromFilesPane(target.path);
+    }
   }
 
   /**

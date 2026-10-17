@@ -11,10 +11,12 @@ import {
   vi
 } from 'vitest';
 
+import type { FileTreeComponent } from './file-tree-component.ts';
 import type { IgnorePatternsComponent } from './ignore-patterns-component.ts';
 
 import { Plugin } from './plugin.ts';
 
+type FileTreeComponentConstructorParams = ConstructorParameters<typeof FileTreeComponent>[0];
 type IgnorePatternsComponentConstructorParams = ConstructorParameters<typeof IgnorePatternsComponent>[0];
 
 /*
@@ -42,16 +44,20 @@ class MockFileTreeComponent extends Component {
   public deleteFromFilesPane = vi.fn();
 }
 
+let capturedOnFileExplorerViewBuilt: (() => void) | undefined;
 vi.mock('./file-tree-component.ts', () => ({
   // eslint-disable-next-line prefer-arrow-callback, func-names -- mock must be constructable with `new` and return a real loadable Component.
-  FileTreeComponent: vi.fn(function () {
+  FileTreeComponent: vi.fn(function (params: FileTreeComponentConstructorParams) {
+    capturedOnFileExplorerViewBuilt = params.onFileExplorerViewBuilt;
     return new MockFileTreeComponent();
   })
 }));
 
+const mockReapplyToFilesPane = vi.fn();
 const mockUpdate = vi.fn().mockResolvedValue(undefined);
 
 class MockIndexProjectionComponent extends Component {
+  public reapplyToFilesPane = mockReapplyToFilesPane;
   public update = mockUpdate;
 }
 
@@ -122,6 +128,10 @@ vi.mock('./publish-compatibility-warning-component.ts', () => ({
 vi.mock('./vault-path-store.ts', () => ({
   IndexedDatabaseVaultPathStore: vi.fn()
 }));
+
+function resetCapturedOnFileExplorerViewBuilt(): void {
+  capturedOnFileExplorerViewBuilt = undefined;
+}
 
 function resetCapturedOnUpdateFileTree(): void {
   capturedOnUpdateFileTree = undefined;
@@ -206,5 +216,16 @@ describe('Plugin', () => {
       capturedOnUpdateFileTree().catch(() => undefined);
     }
     expect(mockUpdate).toHaveBeenCalled();
+  });
+
+  it('should wire onFileExplorerViewBuilt callback to indexProjectionComponent.reapplyToFilesPane', async () => {
+    resetCapturedOnFileExplorerViewBuilt();
+    mockReapplyToFilesPane.mockClear();
+
+    const plugin = new Plugin(app.asOriginalType__(), manifest);
+    await plugin.onload();
+
+    capturedOnFileExplorerViewBuilt?.();
+    expect(mockReapplyToFilesPane).toHaveBeenCalledOnce();
   });
 });

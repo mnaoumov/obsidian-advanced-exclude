@@ -36,20 +36,17 @@ export class FileExplorerViewOnCreatePatchComponent extends MonkeyAroundComponen
   }
 
   public onLayoutReady(): void {
-    const view = this.getFileExplorerView();
-    if (view) {
-      this.registerMethodPatch({
-        $object: getPrototypeOf(view),
-        methodName: 'onCreate',
-        patchHandler: ({
-          originalArguments: [file],
-          originalMethod,
-          originalThis
-        }) => {
-          this.onCreate(originalMethod, originalThis, file);
-        }
-      });
+    if (this.tryPatch()) {
+      return;
     }
+    // A deferred explorer leaf has no real view yet, and the prototype is reachable only through an
+    // instance, so retry once one is built.
+    const layoutChangeEventRef = this.app.workspace.on('layout-change', () => {
+      if (this.tryPatch()) {
+        this.app.workspace.offref(layoutChangeEventRef);
+      }
+    });
+    this.registerEvent(layoutChangeEventRef);
   }
 
   public override onload(): void {
@@ -72,5 +69,24 @@ export class FileExplorerViewOnCreatePatchComponent extends MonkeyAroundComponen
       return;
     }
     originalFunction.call(view, file);
+  }
+
+  private tryPatch(): boolean {
+    const view = this.getFileExplorerView();
+    if (!view) {
+      return false;
+    }
+    this.registerMethodPatch({
+      $object: getPrototypeOf(view),
+      methodName: 'onCreate',
+      patchHandler: ({
+        originalArguments: [file],
+        originalMethod,
+        originalThis
+      }) => {
+        this.onCreate(originalMethod, originalThis, file);
+      }
+    });
+    return true;
   }
 }

@@ -1,11 +1,14 @@
 import type { FileExplorerView } from '@obsidian-typings/obsidian-public-latest';
 import type {
   App,
+  EventRef,
   TAbstractFile
 } from 'obsidian';
 
+import { castTo } from '@mnaoumov/typescript-lib/object-utils';
 import { strictProxy } from '@mnaoumov/typescript-test-toolkit/strict-proxy';
 import {
+  afterEach,
   beforeEach,
   describe,
   expect,
@@ -23,9 +26,17 @@ interface MockFileExplorerView {
   onDelete: ReturnType<typeof vi.fn>;
 }
 
+interface MockLeaf {
+  readonly view: object;
+}
+
 interface SetupResult {
   readonly app: App;
   readonly component: FileTreeComponent;
+  readonly fireLayoutChange: () => void;
+  readonly fireLayoutReady: () => void;
+  readonly leaves: MockLeaf[];
+  readonly onFileExplorerViewBuilt: ReturnType<typeof vi.fn>;
 }
 
 function createMockFileExplorerView(overrides: Partial<MockFileExplorerView> = {}): MockFileExplorerView {
@@ -38,19 +49,46 @@ function createMockFileExplorerView(overrides: Partial<MockFileExplorerView> = {
 }
 
 function setup(fileExplorerView?: object): SetupResult {
-  const leaves = fileExplorerView ? [{ view: fileExplorerView }] : [];
+  const leaves: MockLeaf[] = fileExplorerView ? [{ view: fileExplorerView }] : [];
+  let layoutChangeCallback: (() => void) | undefined;
+  let layoutReadyCallback: (() => void) | undefined;
 
   const app = strictProxy<App>({
     vault: {
       getAbstractFileByPath: vi.fn().mockReturnValue(null)
     },
     workspace: {
-      getLeavesOfType: vi.fn().mockReturnValue(leaves)
+      getLeavesOfType: castTo<App['workspace']['getLeavesOfType']>(vi.fn(() => leaves)),
+      on: castTo<App['workspace']['on']>(vi.fn((name: string, callback: () => void) => {
+        if (name === 'layout-change') {
+          layoutChangeCallback = callback;
+        }
+        // A plain stub (not a strictProxy): `registerEvent`'s unload cleanup reads
+        // `ref.e?.offref`, and a strictProxy would throw on the unmocked `e` read.
+        return castTo<EventRef>({});
+      })),
+      onLayoutReady: vi.fn((callback: () => void) => {
+        layoutReadyCallback = callback;
+      })
     }
   });
 
-  const component = new FileTreeComponent({ app });
-  return { app, component };
+  const onFileExplorerViewBuilt = vi.fn();
+  const component = new FileTreeComponent({ app, onFileExplorerViewBuilt });
+  return {
+    app,
+    component,
+    fireLayoutChange: (): void => {
+      layoutChangeCallback?.();
+    },
+    fireLayoutReady: (): void => {
+      // The layout-ready component runs its callback on a zero-delay timer.
+      layoutReadyCallback?.();
+      vi.runAllTimers();
+    },
+    leaves,
+    onFileExplorerViewBuilt
+  };
 }
 
 describe('FileTreeComponent', () => {
@@ -97,6 +135,56 @@ describe('FileTreeComponent', () => {
       vi.mocked(app.vault.getAbstractFileByPath).mockReturnValue(file);
       component.deleteFromFilesPane('some/path');
       expect(fileExplorerView.onDelete).toHaveBeenCalledWith(file);
+    });
+  });
+
+  describe('file explorer view tracking', () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('does not report the explorer that already exists at layout ready', () => {
+      const { component, fireLayoutChange, fireLayoutReady, onFileExplorerViewBuilt } = setup(createMockFileExplorerView());
+      component.load();
+      fireLayoutReady();
+      fireLayoutChange();
+      expect(onFileExplorerViewBuilt).not.toHaveBeenCalled();
+    });
+
+    it('reports a deferred explorer once it is built, and only once', () => {
+      const deferredView = {};
+      const { component, fireLayoutChange, fireLayoutReady, leaves, onFileExplorerViewBuilt } = setup(deferredView);
+      component.load();
+      fireLayoutReady();
+      fireLayoutChange();
+      expect(onFileExplorerViewBuilt).not.toHaveBeenCalled();
+
+      leaves[0] = { view: createMockFileExplorerView() };
+      fireLayoutChange();
+      fireLayoutChange();
+      expect(onFileExplorerViewBuilt).toHaveBeenCalledTimes(1);
+    });
+
+    it('reports a new explorer view that replaces the known one', () => {
+      const { component, fireLayoutChange, fireLayoutReady, leaves, onFileExplorerViewBuilt } = setup(createMockFileExplorerView());
+      component.load();
+      fireLayoutReady();
+
+      leaves[0] = { view: createMockFileExplorerView() };
+      fireLayoutChange();
+      expect(onFileExplorerViewBuilt).toHaveBeenCalledTimes(1);
+    });
+
+    it('ignores a layout change while there is no explorer at all', () => {
+      const { component, fireLayoutChange, fireLayoutReady, onFileExplorerViewBuilt } = setup();
+      component.load();
+      fireLayoutReady();
+      fireLayoutChange();
+      expect(onFileExplorerViewBuilt).not.toHaveBeenCalled();
     });
   });
 

@@ -46,11 +46,14 @@ export class Plugin extends PluginBase {
       })
     );
 
-    const fileTreeComponent = this.addChild(
-      new FileTreeComponent({
-        app: this.app
-      })
-    );
+    // Added only once `indexProjectionComponent` exists: its layout-change handler calls into it, and an
+    // event during the awaits below would otherwise reach the `const` before it is initialized.
+    const fileTreeComponent = new FileTreeComponent({
+      app: this.app,
+      onFileExplorerViewBuilt: (): void => {
+        indexProjectionComponent.reapplyToFilesPane();
+      }
+    });
 
     const updateProgressNotice = this.addChild(new UpdateProgressNoticeComponent(this.pluginNoticeComponent));
 
@@ -74,6 +77,7 @@ export class Plugin extends PluginBase {
         vaultPathStore: new IndexedDatabaseVaultPathStore(this.app.appId)
       })
     );
+    this.addChild(fileTreeComponent);
 
     const pluginSettingsTab = new PluginSettingsTab({
       ignorePatternsComponent,

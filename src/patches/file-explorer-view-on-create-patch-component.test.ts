@@ -137,6 +137,23 @@ describe('FileExplorerViewOnCreatePatchComponent', () => {
       expect(registerMethodPatchSpy).not.toHaveBeenCalled();
     });
 
+    it('should register the patch once a deferred file explorer view is built', () => {
+      useFileExplorerView(strictProxy<View>({}));
+
+      const component = createComponent();
+      const registerMethodPatchSpy = vi.spyOn(component, 'registerMethodPatch');
+
+      loadAndFireLayoutReady(component);
+      app.asOriginalType__().workspace.trigger('layout-change');
+      expect(registerMethodPatchSpy).not.toHaveBeenCalled();
+
+      useFileExplorerView(new MockFileExplorerView(WorkspaceLeaf.create2__(app).asOriginalType3__()));
+      app.asOriginalType__().workspace.trigger('layout-change');
+      app.asOriginalType__().workspace.trigger('layout-change');
+
+      expect(registerMethodPatchSpy).toHaveBeenCalledOnce();
+    });
+
     it('should register onCreate patch when file explorer view exists', () => {
       useFileExplorerView(new MockFileExplorerView(WorkspaceLeaf.create2__(app).asOriginalType3__()));
 

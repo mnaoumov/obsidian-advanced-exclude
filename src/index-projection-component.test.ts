@@ -860,6 +860,62 @@ describe('IndexProjectionComponent', () => {
     });
   });
 
+  describe('reapplyToFilesPane', () => {
+    it('re-hides the hidden set from the explorer deepest first in FilesPane mode', async () => {
+      const { component, deleteFromFilesPane } = setup({
+        entries: [
+          { isFolderFlag: true, path: 'a' },
+          { isFolderFlag: false, path: 'a/x.md' },
+          { isFolderFlag: false, path: 'b.md' }
+        ],
+        excludeMode: ExcludeMode.FilesPane,
+        isIgnored: (path) => path === 'a' || path.startsWith('a/')
+      });
+      await component.applyFull();
+      deleteFromFilesPane.mockClear();
+
+      component.reapplyToFilesPane();
+
+      expect(deleteFromFilesPane.mock.calls.map((call) => call[0])).toEqual(['a/x.md', 'a']);
+    });
+
+    it('does nothing in Full mode', async () => {
+      const { component, deleteFromFilesPane } = setup({
+        entries: [{ isFolderFlag: false, path: 'drop.md' }],
+        isIgnored: (path) => path === 'drop.md'
+      });
+      await component.applyFull();
+      deleteFromFilesPane.mockClear();
+
+      component.reapplyToFilesPane();
+
+      expect(deleteFromFilesPane).not.toHaveBeenCalled();
+    });
+
+    it('runs on layout ready even when the vault load was intercepted (startup)', async () => {
+      vi.useFakeTimers();
+      try {
+        const { component, deleteFromFilesPane, fireWorkspaceLayoutReady } = setup({
+          entries: [{ isFolderFlag: false, path: 'drop.md' }],
+          excludeMode: ExcludeMode.FilesPane,
+          isIgnored: (path) => path === 'drop.md',
+          wasVaultLoadCalled: true
+        });
+        const loadPromise = component.loadWithPromises();
+        await vi.runAllTimersAsync();
+        await loadPromise;
+        deleteFromFilesPane.mockClear();
+
+        fireWorkspaceLayoutReady();
+        await vi.runAllTimersAsync();
+
+        expect(deleteFromFilesPane).toHaveBeenCalledExactlyOnceWith('drop.md');
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  });
+
   describe('onunload', () => {
     beforeEach(() => {
       vi.useFakeTimers();
