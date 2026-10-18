@@ -57,7 +57,12 @@ const APPLY_YIELD_INTERVAL_IN_MILLISECONDS = 50;
  */
 const SHOW_CHUNK_SIZE = 200;
 
-export interface IndexProjectionComponentConstructorParams {
+interface ApplyProgress {
+  processed: number;
+  readonly total: number;
+}
+
+interface IndexProjectionComponentConstructorParams {
   readonly addToFilesPane: (this: void, normalizedPath: string) => void;
   readonly app: App;
   readonly deleteFromFilesPane: (this: void, normalizedPath: string) => void;
@@ -71,11 +76,6 @@ export interface IndexProjectionComponentConstructorParams {
   readonly updateProgressNotice: UpdateProgressNoticeComponent;
   readonly vaultLoadPatch: VaultLoadPatchComponent;
   readonly vaultPathStore: VaultPathStore;
-}
-
-interface ApplyProgress {
-  processed: number;
-  readonly total: number;
 }
 
 interface IndexProjectionComponentRecordCreateParams {
