@@ -36,6 +36,7 @@ import type { UpdateProgressNoticeComponent } from './update-progress-notice-com
 import type { VaultModel } from './vault-model.ts';
 
 import { suspendFileRecoveryCreateSnapshots } from './file-recovery-suspension.ts';
+import { skipFolderListings } from './folder-listing-suspension.ts';
 import { IndexProjectionComponent } from './index-projection-component.ts';
 import { ExcludeMode } from './plugin-settings.ts';
 import { suspendRelatedLinksUpdates } from './related-links-batch.ts';
@@ -43,6 +44,10 @@ import { computeUniverseSignature } from './universe-signature.ts';
 
 vi.mock('./file-recovery-suspension.ts', () => ({
   suspendFileRecoveryCreateSnapshots: vi.fn()
+}));
+
+vi.mock('./folder-listing-suspension.ts', () => ({
+  skipFolderListings: vi.fn()
 }));
 
 vi.mock('./related-links-batch.ts', () => ({
@@ -64,6 +69,7 @@ vi.mock('@mnaoumov/obsidian-lib/metadata-cache', () => ({
 
 const mockGetDataAdapterEx = vi.mocked(getDataAdapterEx);
 const mockIsFolder = vi.mocked(isFolder);
+const mockSkipFolderListings = vi.mocked(skipFolderListings);
 const mockSuspendFileRecoveryCreateSnapshots = vi.mocked(suspendFileRecoveryCreateSnapshots);
 const mockSuspendRelatedLinksUpdates = vi.mocked(suspendRelatedLinksUpdates);
 
@@ -118,6 +124,7 @@ interface SetupResult {
   readonly mockAdapter: MockAdapter;
   readonly resumeFileRecoverySnapshots: Mock<() => void>;
   readonly resumeFilesPaneSort: Mock<() => void>;
+  readonly resumeFolderListings: Mock<() => void>;
   readonly resumeRelatedLinksUpdates: Mock<() => void>;
   readonly save: ReturnType<typeof vi.fn>;
   readonly suspendFilesPaneSort: Mock<() => () => void>;
@@ -217,6 +224,8 @@ function setup(params: SetupParams): SetupResult {
   const addToFilesPane = vi.fn<(normalizedPath: string) => void>();
   const resumeFileRecoverySnapshots = vi.fn<() => void>();
   mockSuspendFileRecoveryCreateSnapshots.mockReset().mockReturnValue(resumeFileRecoverySnapshots);
+  const resumeFolderListings = vi.fn<() => void>();
+  mockSkipFolderListings.mockReset().mockReturnValue(resumeFolderListings);
   const resumeRelatedLinksUpdates = vi.fn<() => void>();
   mockSuspendRelatedLinksUpdates.mockReset().mockReturnValue(resumeRelatedLinksUpdates);
   const resumeFilesPaneSort = vi.fn<() => void>();
@@ -260,7 +269,7 @@ function setup(params: SetupParams): SetupResult {
     vaultPathStore
   });
 
-  return { addToFilesPane, app, closeVaultPathStore: vaultPathStore.close, component, deleteFromFilesPane, fireQuit, fireWorkspaceLayoutReady, manualIndexHider, mockAdapter, resumeFileRecoverySnapshots, resumeFilesPaneSort, resumeRelatedLinksUpdates, save, suspendFilesPaneSort };
+  return { addToFilesPane, app, closeVaultPathStore: vaultPathStore.close, component, deleteFromFilesPane, fireQuit, fireWorkspaceLayoutReady, manualIndexHider, mockAdapter, resumeFileRecoverySnapshots, resumeFilesPaneSort, resumeFolderListings, resumeRelatedLinksUpdates, save, suspendFilesPaneSort };
 
   function fireWorkspaceLayoutReady(): void {
     workspaceLayoutReadyCallback?.();
@@ -382,6 +391,28 @@ describe('IndexProjectionComponent', () => {
       expect(suspendOrder).toBeLessThan(reParseOrder ?? 0);
       expect(reParseOrder).toBeLessThan(resumeOrder ?? 0);
     });
+
+    it('skips the adapter listing of each re-shown folder until the re-show ends', async () => {
+      const { component, manualIndexHider, mockAdapter, resumeFolderListings } = setup({
+        entries: [{ isFolderFlag: false, path: 'alpha.md' }],
+        isIgnored: () => false,
+        persistedEntries: [
+          { isFolderFlag: true, path: 'gone' },
+          { isFolderFlag: false, path: 'gone/deep.md' }
+        ]
+      });
+      manualIndexHider.show.mockImplementation((paths: readonly string[]) => [...paths]);
+
+      await component.applyFull();
+
+      expect(mockSkipFolderListings).toHaveBeenCalledExactlyOnceWith(mockGetDataAdapterEx.mock.results[0]?.value, new Set(['gone']));
+      expect(resumeFolderListings).toHaveBeenCalledTimes(1);
+      const [skipOrder] = mockSkipFolderListings.mock.invocationCallOrder;
+      const reParseOrders = mockAdapter.reconcileFile.mock.invocationCallOrder;
+      const [resumeOrder] = resumeFolderListings.mock.invocationCallOrder;
+      expect(skipOrder).toBeLessThan(reParseOrders[0] ?? 0);
+      expect(reParseOrders.at(-1)).toBeLessThan(resumeOrder ?? 0);
+    });
   });
 
   describe('applyFull (FilesPane mode)', () => {
@@ -470,6 +501,7 @@ describe('IndexProjectionComponent', () => {
       expect(addToFilesPane).toHaveBeenCalledExactlyOnceWith('back.md');
       expect(manualIndexHider.hide).not.toHaveBeenCalled();
       expect(manualIndexHider.show).not.toHaveBeenCalled();
+      expect(mockSkipFolderListings).not.toHaveBeenCalled();
     });
   });
 

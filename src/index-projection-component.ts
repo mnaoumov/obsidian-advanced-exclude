@@ -26,6 +26,7 @@ import type { VaultPathStore } from './vault-path-store.ts';
 
 import { ROOT_PATH } from './constants.ts';
 import { suspendFileRecoveryCreateSnapshots } from './file-recovery-suspension.ts';
+import { skipFolderListings } from './folder-listing-suspension.ts';
 import { ExcludeMode } from './plugin-settings.ts';
 import { suspendRelatedLinksUpdates } from './related-links-batch.ts';
 import { computeUniverseSignature } from './universe-signature.ts';
@@ -723,15 +724,23 @@ export class IndexProjectionComponent extends ComponentEx {
    */
   private async showEntries(entries: readonly VaultModelEntry[], progress: ApplyProgress, abortSignal?: AbortSignal): Promise<boolean> {
     const adapter = getDataAdapterEx(this.app);
-    for (const chunk of chunkByDepth(entries, SHOW_CHUNK_SIZE)) {
-      if (abortSignal?.aborted) {
-        return false;
+    // Each re-parsed folder's subtree is shown by the chunks below; see `skipFolderListings`.
+    const resumeFolderListings = this.excludeMode === ExcludeMode.Full
+      ? skipFolderListings(adapter, new Set(entries.filter((entry) => entry.isFolder).map((entry) => entry.path)))
+      : noop;
+    try {
+      for (const chunk of chunkByDepth(entries, SHOW_CHUNK_SIZE)) {
+        if (abortSignal?.aborted) {
+          return false;
+        }
+        await this.showChunk(adapter, chunk);
+        progress.processed += chunk.length;
+        await this.reportApplyProgress(progress);
       }
-      await this.showChunk(adapter, chunk);
-      progress.processed += chunk.length;
-      await this.reportApplyProgress(progress);
+      return true;
+    } finally {
+      resumeFolderListings();
     }
-    return true;
   }
 
   /**
