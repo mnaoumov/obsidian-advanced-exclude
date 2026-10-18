@@ -5,7 +5,7 @@
 - chore: link Discussions from the issue chooser for questions
 - fix: re-apply Files Pane hiding to an explorer built after the projection
 - ci: merge attesting release assets through the toolkit's reusable workflow
-- build(demo-vault): require CodeScript Toolkit 13.8.0 for the obsidian-lib demo script
+- build(demo-vault): require `CodeScript Toolkit` 13.8.0 for the obsidian-lib demo script
 - docs: document # comments in .obsidianignore, with a regression test
 - build: move off obsidian-dev-utils onto the @mnaoumov packages
 - fix: mark plugin names as code in markdown, comments and UI
@@ -134,7 +134,7 @@
 - docs: standardize demo-vault README
 - docs: drop per-plugin demo-vault setup notes (bootstrap covered by the obsidian-dev-utils harness)
 - docs: unnumber demo-vault setup notes
-- docs(demo-vault): create the Advanced Exclude demo vault
+- docs(demo-vault): create the `Advanced Exclude` demo vault
 
 ## 3.1.2
 
