@@ -2,7 +2,7 @@ import { GlobalCommandHandler } from '@mnaoumov/obsidian-lib/command-handlers/gl
 
 import type { PluginSettingsComponent } from '../plugin-settings-component.ts';
 
-export interface UseBaseSettingsCommandHandlerConstructorParams {
+interface UseBaseSettingsCommandHandlerConstructorParams {
   readonly pluginSettingsComponent: PluginSettingsComponent;
 }
 

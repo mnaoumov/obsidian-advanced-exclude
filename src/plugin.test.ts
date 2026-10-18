@@ -13,12 +13,13 @@ import {
 
 import type { FileTreeComponent } from './file-tree-component.ts';
 import type { IgnorePatternsComponent } from './ignore-patterns-component.ts';
-import type { ProfileSwitcherComponentConstructorParams } from './profile-switcher-component.ts';
+import type { ProfileSwitcherComponent } from './profile-switcher-component.ts';
 
 import { Plugin } from './plugin.ts';
 
 type FileTreeComponentConstructorParams = ConstructorParameters<typeof FileTreeComponent>[0];
 type IgnorePatternsComponentConstructorParams = ConstructorParameters<typeof IgnorePatternsComponent>[0];
+type ProfileSwitcherComponentConstructorParams = ConstructorParameters<typeof ProfileSwitcherComponent>[0];
 
 /*
  * The real `PluginBase` (from `@mnaoumov/obsidian-lib`) drives the lifecycle here —

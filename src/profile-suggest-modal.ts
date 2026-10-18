@@ -5,9 +5,9 @@ import { FuzzySuggestModal } from 'obsidian';
 
 import type { PluginSettingsComponent } from './plugin-settings-component.ts';
 
-export const BASE_SETTINGS_LABEL = 'Base settings';
+const BASE_SETTINGS_LABEL = 'Base settings';
 
-export interface ProfileChoice {
+interface ProfileChoice {
   /**
   The profile id, or `null` for the base settings.
   */

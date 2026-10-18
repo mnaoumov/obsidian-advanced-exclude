@@ -6,11 +6,10 @@ import {
   it
 } from 'vitest';
 
-import {
-  BASE_SETTINGS_LABEL,
-  ProfileSuggestModal
-} from './profile-suggest-modal.ts';
+import { ProfileSuggestModal } from './profile-suggest-modal.ts';
 import { createFakeSettings } from './test-helpers/fake-plugin-settings-component.ts';
+
+const BASE_SETTINGS_LABEL = 'Base settings';
 
 describe('ProfileSuggestModal', () => {
   it('should list the base settings first and switch to the chosen entry', async () => {

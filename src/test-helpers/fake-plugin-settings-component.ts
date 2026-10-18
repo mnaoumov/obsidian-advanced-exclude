@@ -14,7 +14,7 @@ import type { EffectiveSettings } from '../profiles.ts';
 import { PluginSettings } from '../plugin-settings.ts';
 import { resolveProfile } from '../profiles.ts';
 
-export interface FakeSettings {
+interface FakeSettings {
   readonly fireActiveProfileChange: () => Promise<void>;
   readonly fireSettingsEvent: (name: string) => void;
   readonly pluginSettingsComponent: PluginSettingsComponent;

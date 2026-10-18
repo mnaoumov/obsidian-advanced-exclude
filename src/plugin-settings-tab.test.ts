@@ -25,7 +25,7 @@ import {
 
 import type { IgnorePatternsComponent } from './ignore-patterns-component.ts';
 import type { PluginSettingsComponent } from './plugin-settings-component.ts';
-import type { ProfileEditModalConstructorParams } from './profile-edit-modal.ts';
+import type { ProfileEditModal } from './profile-edit-modal.ts';
 import type { EffectiveSettings } from './profiles.ts';
 
 import { PluginSettingsTab } from './plugin-settings-tab.ts';
@@ -34,6 +34,8 @@ import {
   PluginSettings
 } from './plugin-settings.ts';
 import { resolveProfile } from './profiles.ts';
+
+type ProfileEditModalConstructorParams = ConstructorParameters<typeof ProfileEditModal>[0];
 
 const mocks = vi.hoisted(() => ({
   confirm: vi.fn<() => Promise<boolean>>(),

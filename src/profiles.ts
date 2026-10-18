@@ -8,13 +8,6 @@ import { PluginSettings } from './plugin-settings.ts';
  */
 export const MAX_IMPORT_DEPTH = 10;
 
-export const PROFILE_SCALAR_SETTING_NAMES = [
-  'excludeMode',
-  'shouldHideEmptyFolders',
-  'shouldIgnoreExcludedFiles',
-  'shouldIncludeGitIgnorePatterns'
-] as const;
-
 const IMPORT_DIRECTIVE = '@import';
 const IMPORT_DIRECTIVE_REG_EXP = /^@import\s+(?<name>.*\S)\s*$/;
 const RESET_DIRECTIVE_REG_EXP = /^@reset\s*$/;
@@ -39,32 +32,6 @@ export interface EffectiveSettings extends ProfileScalarSettings {
   readonly obsidianIgnoreContent: string;
 }
 
-export interface ProfileError {
-  /**
-  1-based line number in {@link profileName}'s pattern text.
-  */
-  readonly lineNumber: number;
-  readonly message: string;
-  readonly profileName: string;
-}
-
-export type ProfileScalarSettingName = typeof PROFILE_SCALAR_SETTING_NAMES[number];
-
-export type ProfileScalarSettings = Pick<PluginSettings, ProfileScalarSettingName>;
-
-export interface ResolvedPatternLine {
-  /**
-  The profile the line came from, or `null` for the base settings.
-  */
-  readonly profileName: null | string;
-  readonly text: string;
-}
-
-export interface ResolveProfileParams {
-  readonly activeProfileId: null | string;
-  readonly settings: ResolveProfileSettings;
-}
-
 export interface ResolveProfileSettings extends Readonly<ProfileScalarSettings> {
   readonly obsidianIgnoreContent: string;
   readonly profiles: readonly Readonly<SettingsProfile>[];
@@ -75,6 +42,32 @@ interface ExpansionState {
   lines: ResolvedPatternLine[];
   readonly profiles: readonly Readonly<SettingsProfile>[];
   scalars: ProfileScalarSettings;
+}
+
+interface ProfileError {
+  /**
+  1-based line number in {@link profileName}'s pattern text.
+  */
+  readonly lineNumber: number;
+  readonly message: string;
+  readonly profileName: string;
+}
+
+type ProfileScalarSettingName = 'excludeMode' | 'shouldHideEmptyFolders' | 'shouldIgnoreExcludedFiles' | 'shouldIncludeGitIgnorePatterns';
+
+type ProfileScalarSettings = Pick<PluginSettings, ProfileScalarSettingName>;
+
+interface ResolvedPatternLine {
+  /**
+  The profile the line came from, or `null` for the base settings.
+  */
+  readonly profileName: null | string;
+  readonly text: string;
+}
+
+interface ResolveProfileParams {
+  readonly activeProfileId: null | string;
+  readonly settings: ResolveProfileSettings;
 }
 
 /**

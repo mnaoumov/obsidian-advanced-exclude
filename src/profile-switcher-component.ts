@@ -12,7 +12,7 @@ import {
   getProfileChoices
 } from './profile-suggest-modal.ts';
 
-export interface ProfileSwitcherComponentConstructorParams {
+interface ProfileSwitcherComponentConstructorParams {
   readonly addStatusBarItem: (this: void) => HTMLElement;
   readonly pluginSettingsComponent: PluginSettingsComponent;
 }

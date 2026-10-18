@@ -26,7 +26,9 @@ const ON_VALUE = 'on';
 const OFF_VALUE = 'off';
 const EXCLUDE_MODE_BY_VALUE = new Map<string, ExcludeMode>([[ExcludeMode.FilesPane, ExcludeMode.FilesPane], [ExcludeMode.Full, ExcludeMode.Full]]);
 
-export interface ProfileEditModalConstructorParams {
+type BooleanScalarName = 'shouldHideEmptyFolders' | 'shouldIgnoreExcludedFiles' | 'shouldIncludeGitIgnorePatterns';
+
+interface ProfileEditModalConstructorParams {
   readonly app: App;
   /**
   Called with the edited copy when the user saves. The modal never mutates {@link profile}.
@@ -38,8 +40,6 @@ export interface ProfileEditModalConstructorParams {
   */
   readonly settings: ResolveProfileSettings;
 }
-
-type BooleanScalarName = 'shouldHideEmptyFolders' | 'shouldIgnoreExcludedFiles' | 'shouldIncludeGitIgnorePatterns';
 
 /**
  * Edits one profile: its name, its pattern text with `@import` / `@reset`, and which settings it overrides. Shows

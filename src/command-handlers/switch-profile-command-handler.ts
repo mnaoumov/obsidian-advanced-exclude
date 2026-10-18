@@ -6,7 +6,7 @@ import type { PluginSettingsComponent } from '../plugin-settings-component.ts';
 
 import { ProfileSuggestModal } from '../profile-suggest-modal.ts';
 
-export interface SwitchProfileCommandHandlerConstructorParams {
+interface SwitchProfileCommandHandlerConstructorParams {
   readonly app: App;
   readonly pluginSettingsComponent: PluginSettingsComponent;
 }

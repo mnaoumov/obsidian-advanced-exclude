@@ -7,9 +7,10 @@ import {
   vi
 } from 'vitest';
 
-import { BASE_SETTINGS_LABEL } from './profile-suggest-modal.ts';
 import { ProfileSwitcherComponent } from './profile-switcher-component.ts';
 import { createFakeSettings } from './test-helpers/fake-plugin-settings-component.ts';
+
+const BASE_SETTINGS_LABEL = 'Base settings';
 
 describe('ProfileSwitcherComponent', () => {
   it('should stay hidden until a profile exists, and show the active one', async () => {
