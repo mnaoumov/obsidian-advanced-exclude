@@ -39,7 +39,7 @@ export class AdapterPatchBaseComponent extends MonkeyAroundComponent {
       this.indexProjectionComponent.recordCreate({ isFolderPath: isFolder, normalizedPath });
       let shouldRemoveFromFilesPane = false;
       if (this.ignorePatternsComponent.isIgnored({ isFolder, normalizedPath })) {
-        if (this.pluginSettingsComponent.settings.excludeMode === ExcludeMode.Full) {
+        if (this.pluginSettingsComponent.effectiveSettings.excludeMode === ExcludeMode.Full) {
           return;
         }
         shouldRemoveFromFilesPane = true;

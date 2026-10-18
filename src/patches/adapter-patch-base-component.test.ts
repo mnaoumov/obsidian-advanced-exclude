@@ -51,7 +51,7 @@ describe('AdapterPatchBaseComponent', () => {
       isIgnored: vi.fn().mockReturnValue(false)
     });
     pluginSettingsComponent = strictProxy<PluginSettingsComponent>({
-      settings: effectiveSettings
+      effectiveSettings
     });
     fileTreeComponent = strictProxy<FileTreeComponent>({
       deleteFromFilesPane: vi.fn()

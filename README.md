@@ -47,6 +47,7 @@ A copy of the vault ships with every release. You can access it via any of the f
 - **Whitelist instead of blacklist**, including the negation trap that catches most people: once `*` ignores everything, folders must be re-included with `!*/` before any `!file` rule can reach inside them. [02 Whitelist with negation](<./demo-vault/02 Whitelist with negation.md>)
 - **Choose where patterns come from and how hard they hide** — your `.gitignore`, Obsidian's own `Excluded files` setting, and how completely an ignored file disappears. Both extra sources are off by default, so a fresh install changes nothing until you turn one on. [03 Exclude mode and sources](<./demo-vault/03 Exclude mode and sources.md>)
 - **Hide folders left empty by exclusion**, cascading up through parents whose whole subtree went away. Genuinely empty folders stay visible. [04 Settings](<./demo-vault/04 Settings.md>)
+- **Switch between profiles** — named sets of patterns and settings that compose with `@import`, so `Focus` can import `Work` and add its own lines, with `!negation` working across them as in one `.gitignore`. The profiles sync with the vault; each device picks its own active one from the status bar. [05 Profiles](<./demo-vault/05 Profiles.md>)
 
 ## Installation
 

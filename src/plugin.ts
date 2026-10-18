@@ -5,6 +5,8 @@ import { PluginDataHandler } from '@mnaoumov/obsidian-lib/data-handler';
 import { PluginBase } from '@mnaoumov/obsidian-lib/plugin/plugin';
 import { PluginEventSourceImpl } from '@mnaoumov/obsidian-lib/plugin/plugin-event-source';
 
+import { SwitchProfileCommandHandler } from './command-handlers/switch-profile-command-handler.ts';
+import { UseBaseSettingsCommandHandler } from './command-handlers/use-base-settings-command-handler.ts';
 import { FileTreeComponent } from './file-tree-component.ts';
 import { IgnorePatternsComponent } from './ignore-patterns-component.ts';
 import { IndexProjectionComponent } from './index-projection-component.ts';
@@ -14,6 +16,7 @@ import { FileExplorerViewOnCreatePatchComponent } from './patches/file-explorer-
 import { VaultLoadPatchComponent } from './patches/vault-load-patch-component.ts';
 import { PluginSettingsComponent } from './plugin-settings-component.ts';
 import { PluginSettingsTab } from './plugin-settings-tab.ts';
+import { ProfileSwitcherComponent } from './profile-switcher-component.ts';
 import { PublishCompatibilityWarningComponent } from './publish-compatibility-warning-component.ts';
 import { RestoreNoticeComponent } from './restore-notice-component.ts';
 import { UpdateProgressNoticeComponent } from './update-progress-notice-component.ts';
@@ -23,6 +26,7 @@ export class Plugin extends PluginBase {
   protected override async onloadImpl(): Promise<void> {
     const pluginSettingsComponent = this.addChild(
       new PluginSettingsComponent({
+        app: this.app,
         dataHandler: new PluginDataHandler(this),
         pluginEventSource: new PluginEventSourceImpl(this)
       })
@@ -127,6 +131,13 @@ export class Plugin extends PluginBase {
       })
     );
 
+    this.addChild(
+      new ProfileSwitcherComponent({
+        addStatusBarItem: (): HTMLElement => this.addStatusBarItem(),
+        pluginSettingsComponent
+      })
+    );
+
     await this.commandHandlerComponent.registerCommandHandlers(() => [
       new OpenSettingsCommandHandler({
         app: this.app,
@@ -137,7 +148,12 @@ export class Plugin extends PluginBase {
         pluginId: this.manifest.id,
         pluginNoticeComponent: this.pluginNoticeComponent,
         pluginVersion: this.manifest.version
-      })
+      }),
+      new SwitchProfileCommandHandler({
+        app: this.app,
+        pluginSettingsComponent
+      }),
+      new UseBaseSettingsCommandHandler({ pluginSettingsComponent })
     ]);
   }
 }

@@ -2,32 +2,50 @@ import type { PluginSettingsTabBaseConstructorParams } from '@mnaoumov/obsidian-
 import type { SettingDefinitionItem } from 'obsidian';
 
 import { appendCodeBlock } from '@mnaoumov/obsidian-lib/html-element';
+import { confirm } from '@mnaoumov/obsidian-lib/modals/confirm';
 import { PluginSettingsTabBase } from '@mnaoumov/obsidian-lib/plugin/plugin-settings-tab';
 import { convertAsyncToSync } from '@mnaoumov/typescript-lib/async';
+import { Setting } from 'obsidian';
 
 import type { IgnorePatternsComponent } from './ignore-patterns-component.ts';
+import type { PluginSettingsComponent } from './plugin-settings-component.ts';
+import type {
+  PluginSettings,
+  SettingsProfile
+} from './plugin-settings.ts';
 
 import {
   GIT_IGNORE_FILE,
   OBSIDIAN_IGNORE_FILE
 } from './constants.ts';
+import { ExcludeMode } from './plugin-settings.ts';
+import { ProfileEditModal } from './profile-edit-modal.ts';
+import { getProfileChoices } from './profile-suggest-modal.ts';
 import {
-  ExcludeMode,
-  PluginSettings
-} from './plugin-settings.ts';
+  createProfileId,
+  createUniqueProfileName,
+  duplicateProfile,
+  saveProfile
+} from './profiles.ts';
 
 const README_URL = 'https://github.com/mnaoumov/obsidian-advanced-exclude';
 
+// A dropdown value cannot be `null`, and a profile id never contains a space.
+const BASE_SETTINGS_VALUE = 'base settings';
+
 interface PluginSettingsTabConstructorParams extends PluginSettingsTabBaseConstructorParams<PluginSettings> {
   readonly ignorePatternsComponent: IgnorePatternsComponent;
+  readonly pluginSettingsComponent: PluginSettingsComponent;
 }
 
 export class PluginSettingsTab extends PluginSettingsTabBase<PluginSettings> {
   private readonly ignorePatternsComponent: IgnorePatternsComponent;
+  private readonly profileSettingsComponent: PluginSettingsComponent;
 
   public constructor(params: PluginSettingsTabConstructorParams) {
     super(params);
     this.ignorePatternsComponent = params.ignorePatternsComponent;
+    this.profileSettingsComponent = params.pluginSettingsComponent;
   }
 
   public override async hideAsync(): Promise<void> {
@@ -160,7 +178,106 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginSettings> {
             });
           });
         }
+      }),
+      this.settingEx({
+        desc: createFragment((f) => {
+          f.appendText('Which profile applies on this device. Each device keeps its own choice; the profiles themselves sync with the vault.');
+          f.createEl('br');
+          f.appendText('The settings above are the base settings, which apply when no profile is active and which a profile inherits.');
+        }),
+        name: 'Active profile on this device',
+        render: (setting) => {
+          setting.addDropdown((dropdown) => {
+            for (const choice of getProfileChoices(this.profileSettingsComponent)) {
+              dropdown.addOption(choice.id ?? BASE_SETTINGS_VALUE, choice.name);
+            }
+            dropdown
+              .setValue(this.profileSettingsComponent.effectiveSettings.activeProfile?.id ?? BASE_SETTINGS_VALUE)
+              .onChange(convertAsyncToSync(async (value: string) => {
+                await this.profileSettingsComponent.setActiveProfileId(value === BASE_SETTINGS_VALUE ? null : value);
+              }));
+          });
+        }
+      }),
+      this.settingEx({
+        desc: createFragment((f) => {
+          f.appendText('Named sets of patterns and settings to switch between. A profile can ');
+          appendCodeBlock(f, '@import');
+          f.appendText(' other profiles, and overrides only the settings it sets.');
+          f.createEl('br');
+          f.createEl('a', { href: `${README_URL}/blob/main/demo-vault/05%20Profiles.md`, text: 'How profiles work' });
+        }),
+        name: 'Profiles',
+        render: (setting) => {
+          setting.addButton((button) => {
+            button.setButtonText('Add profile').onClick(() => {
+              this.openProfileEditor({
+                id: createProfileId(),
+                name: createUniqueProfileName(this.profileSettingsComponent.settings.profiles, 'New profile'),
+                patterns: ''
+              });
+            });
+          });
+          const listEl = setting.settingEl.createDiv({ cls: 'advanced-exclude-profile-list' });
+          for (const profile of this.profileSettingsComponent.settings.profiles) {
+            new Setting(listEl)
+              .setName(profile.name)
+              .addButton((button) => {
+                button.setButtonText('Edit').onClick(() => {
+                  this.openProfileEditor(profile);
+                });
+              })
+              .addButton((button) => {
+                button.setButtonText('Duplicate').onClick(convertAsyncToSync(async () => {
+                  await this.saveProfiles(duplicateProfile(this.profileSettingsComponent.settings.profiles, profile.id));
+                }));
+              })
+              .addButton((button) => {
+                button.setButtonText('Delete').setDestructive().onClick(convertAsyncToSync(async () => {
+                  await this.deleteProfile(profile);
+                }));
+              });
+          }
+        }
       })
     ];
+  }
+
+  private async deleteProfile(profile: Readonly<SettingsProfile>): Promise<void> {
+    const isConfirmed = await confirm({
+      app: this.app,
+      message: `Delete the profile "${profile.name}"? Profiles that import it will report an unknown profile.`,
+      okButtonText: 'Delete',
+      title: 'Delete profile'
+    });
+    if (!isConfirmed) {
+      return;
+    }
+    if (this.profileSettingsComponent.activeProfileId === profile.id) {
+      await this.profileSettingsComponent.setActiveProfileId(null);
+    }
+    await this.saveProfiles(this.profileSettingsComponent.settings.profiles.filter((candidate) => candidate.id !== profile.id));
+  }
+
+  private openProfileEditor(profile: Readonly<SettingsProfile>): void {
+    new ProfileEditModal({
+      app: this.app,
+      onSave: async (editedProfile): Promise<void> => {
+        await this.saveProfiles(saveProfile(this.profileSettingsComponent.settings.profiles, editedProfile));
+      },
+      profile,
+      settings: this.profileSettingsComponent.settings
+    }).open();
+  }
+
+  /**
+   * Saves a new profile list and re-renders the tab. The list is always a fresh array: the effective settings are
+   * memoized on its reference.
+   */
+  private async saveProfiles(profiles: SettingsProfile[]): Promise<void> {
+    await this.profileSettingsComponent.editAndSave((settings) => {
+      settings.profiles = profiles;
+    });
+    this.refresh();
   }
 }

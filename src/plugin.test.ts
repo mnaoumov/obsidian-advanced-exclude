@@ -13,11 +13,13 @@ import {
 
 import type { FileTreeComponent } from './file-tree-component.ts';
 import type { IgnorePatternsComponent } from './ignore-patterns-component.ts';
+import type { ProfileSwitcherComponent } from './profile-switcher-component.ts';
 
 import { Plugin } from './plugin.ts';
 
 type FileTreeComponentConstructorParams = ConstructorParameters<typeof FileTreeComponent>[0];
 type IgnorePatternsComponentConstructorParams = ConstructorParameters<typeof IgnorePatternsComponent>[0];
+type ProfileSwitcherComponentConstructorParams = ConstructorParameters<typeof ProfileSwitcherComponent>[0];
 
 /*
  * The real `PluginBase` (from `@mnaoumov/obsidian-lib`) drives the lifecycle here —
@@ -112,6 +114,15 @@ vi.mock('./plugin-settings-tab.ts', () => ({
   PluginSettingsTab: vi.fn()
 }));
 
+let capturedAddStatusBarItem: (() => HTMLElement) | undefined;
+vi.mock('./profile-switcher-component.ts', () => ({
+  // eslint-disable-next-line prefer-arrow-callback, func-names -- mock must be constructable with `new` and return a real loadable Component.
+  ProfileSwitcherComponent: vi.fn(function (params: ProfileSwitcherComponentConstructorParams) {
+    capturedAddStatusBarItem = params.addStatusBarItem;
+    return new Component();
+  })
+}));
+
 vi.mock('./restore-notice-component.ts', () => ({
   // eslint-disable-next-line prefer-arrow-callback, func-names -- mock must be constructable with `new` and return a real loadable Component.
   RestoreNoticeComponent: vi.fn(function () {
@@ -177,11 +188,11 @@ describe('Plugin', () => {
      * The real `PluginBase` adds its universal child components to an internal
      * wrapper component, and that wrapper to itself through the base
      * `Component.addChild`, so none of them reaches the `addChild` override
-     * spied on here. Every call it sees is one of the plugin's own 11
+     * spied on here. Every call it sees is one of the plugin's own 12
      * `onloadImpl` children, which the override routes into the gated
      * feature-surface tier.
      */
-    const EXPECTED_ADD_CHILD_CALLS = 11;
+    const EXPECTED_ADD_CHILD_CALLS = 12;
     const appOriginal = app.asOriginalType__();
 
     // Spy on the real addChild (calls through) so the real children still load.
@@ -202,6 +213,24 @@ describe('Plugin', () => {
     expect(addCommandSpy).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'open-demo-vault' })
     );
+  });
+
+  it('should register the profile commands', async () => {
+    const plugin = new Plugin(app.asOriginalType__(), manifest);
+    const addCommandSpy = vi.spyOn(plugin, 'addCommand');
+    await plugin.onload();
+    expect(addCommandSpy).toHaveBeenCalledWith(expect.objectContaining({ id: 'switch-profile' }));
+    expect(addCommandSpy).toHaveBeenCalledWith(expect.objectContaining({ id: 'use-base-settings' }));
+  });
+
+  it('should give the profile switcher a status-bar item of the plugin', async () => {
+    const plugin = new Plugin(app.asOriginalType__(), manifest);
+    const statusBarItemEl = createDiv();
+    const addStatusBarItemSpy = vi.spyOn(plugin, 'addStatusBarItem').mockReturnValue(statusBarItemEl);
+    await plugin.onload();
+
+    expect(capturedAddStatusBarItem?.()).toBe(statusBarItemEl);
+    expect(addStatusBarItemSpy).toHaveBeenCalledOnce();
   });
 
   it('should wire onUpdateFileTree callback to indexProjectionComponent.update', async () => {

@@ -6,6 +6,7 @@ import type {
 import { registerAsyncEvent } from '@mnaoumov/obsidian-lib/components/async-events-component';
 import { ensureMetadataCacheReady } from '@mnaoumov/obsidian-lib/metadata-cache';
 import { invokeAsyncSafelyAfterDelay } from '@mnaoumov/typescript-lib/async';
+import { noop } from '@mnaoumov/typescript-lib/function';
 import {
   castTo,
   isDeepEqual
@@ -22,6 +23,7 @@ import {
 } from 'vitest';
 
 import type { PluginSettingsComponent } from './plugin-settings-component.ts';
+import type { EffectiveSettings } from './profiles.ts';
 
 import {
   readSafe,
@@ -30,6 +32,7 @@ import {
 } from './data-adapter-safe.ts';
 import { IgnorePatternsComponent } from './ignore-patterns-component.ts';
 import { PluginSettings } from './plugin-settings.ts';
+import { resolveProfile } from './profiles.ts';
 
 vi.mock('./data-adapter-safe.ts', () => ({
   readSafe: vi.fn().mockResolvedValue(''),
@@ -97,6 +100,10 @@ interface MtimeEntryWithObsidianIgnore {
 
 interface MtimeEntryWithUserIgnoreFilters {
   userIgnoreFiltersString: string;
+}
+
+interface ProfileState {
+  activeProfileId: null | string;
 }
 
 interface SaveSettingsEffectiveValues {
@@ -180,14 +187,20 @@ function createMockTransaction(stores: Record<string, MockIDBObjectStore>): Mock
   };
 }
 
-function createPluginSettingsComponent(settings?: Partial<PluginSettings>): PluginSettingsComponent {
+function createPluginSettingsComponent(settings?: Partial<PluginSettings>, profileState?: ProfileState): PluginSettingsComponent {
   const effectiveSettings = new PluginSettings();
   if (settings) {
     Object.assign(effectiveSettings, settings);
   }
 
   return strictProxy<PluginSettingsComponent>({
+    // A getter, so a test that edits `settings` after construction is seen by the component.
+    get effectiveSettings(): EffectiveSettings {
+      // Not a plain object: strictProxy caches a plain object a getter returns, which would freeze the first answer.
+      return Object.assign(Object.create(null) as EffectiveSettings, resolveProfile({ activeProfileId: profileState?.activeProfileId ?? null, settings: effectiveSettings }));
+    },
     on: vi.fn().mockReturnValue(strictProxy<EventRef>({})),
+    onActiveProfileChange: vi.fn().mockReturnValue(noop),
     setProperty: vi.fn().mockResolvedValue(''),
     settings: effectiveSettings
   });
@@ -867,6 +880,80 @@ describe('IgnorePatternsComponent', () => {
       } else {
         expect.fail('saveSettings event was not registered');
       }
+    });
+  });
+
+  describe('profiles', () => {
+    const PROFILE_SETTINGS: Partial<PluginSettings> = {
+      obsidianIgnoreContent: 'base/*',
+      profiles: [{ id: 'work', name: 'Work', patterns: 'work/\n!base/keep.md' }]
+    };
+
+    function getMtimeEntries(mtimeStore: MockIDBObjectStore): unknown[] {
+      return mtimeStore.put.mock.calls.map(([entry]) => entry as unknown);
+    }
+
+    it('should match against the expanded patterns of the active profile', async () => {
+      setupIndexedDatabase();
+      const pluginSettingsComponent = createPluginSettingsComponent(PROFILE_SETTINGS, { activeProfileId: 'work' });
+      const component = createComponent({ pluginSettingsComponent });
+      await component.loadWithPromises();
+
+      expect(component.isIgnored({ isFolder: false, normalizedPath: 'work/a.md' })).toBe(true);
+      expect(component.isIgnored({ isFolder: false, normalizedPath: 'base/a.md' })).toBe(true);
+      expect(component.isIgnored({ isFolder: false, normalizedPath: 'base/keep.md' })).toBe(false);
+    });
+
+    it('should put the active profile into the verdict fingerprint, and leave it out with none active', async () => {
+      vi.mocked(isDeepEqual).mockReturnValue(false);
+      const withProfile = setupIndexedDatabase();
+      await createComponent({ pluginSettingsComponent: createPluginSettingsComponent(PROFILE_SETTINGS, { activeProfileId: 'work' }) })
+        .loadWithPromises();
+      expect(getMtimeEntries(withProfile.mtimeStore)).toStrictEqual([
+        expect.objectContaining({ profileFingerprint: JSON.stringify(['base/*\nwork/\n!base/keep.md', 'Full', false, false, false]) })
+      ]);
+
+      const withoutProfile = setupIndexedDatabase();
+      await createComponent({ pluginSettingsComponent: createPluginSettingsComponent(PROFILE_SETTINGS) }).loadWithPromises();
+      expect(getMtimeEntries(withoutProfile.mtimeStore)).toHaveLength(1);
+      expect(getMtimeEntries(withoutProfile.mtimeStore)[0]).not.toHaveProperty('profileFingerprint');
+    });
+
+    it('should re-apply through the config-change path when the active profile changes', async () => {
+      setupIndexedDatabase();
+      const profileState: ProfileState = { activeProfileId: null };
+      const pluginSettingsComponent = createPluginSettingsComponent(PROFILE_SETTINGS, profileState);
+      const onUpdateFileTree = vi.fn().mockResolvedValue(undefined);
+      const component = createComponent({ onUpdateFileTree, pluginSettingsComponent });
+      await component.loadWithPromises();
+      expect(component.isIgnored({ isFolder: false, normalizedPath: 'work/a.md' })).toBe(false);
+
+      const [listener] = vi.mocked(pluginSettingsComponent.onActiveProfileChange).mock.calls[0] ?? [];
+      profileState.activeProfileId = 'work';
+      await listener?.();
+
+      expect(onUpdateFileTree).toHaveBeenCalledOnce();
+      expect(component.isIgnored({ isFolder: false, normalizedPath: 'work/a.md' })).toBe(true);
+    });
+
+    it('should re-apply on a synced settings load only when the active profile resolves differently', async () => {
+      setupIndexedDatabase();
+      const settings = { ...PROFILE_SETTINGS };
+      const profileState: ProfileState = { activeProfileId: 'work' };
+      const pluginSettingsComponent = createPluginSettingsComponent(settings, profileState);
+      const onUpdateFileTree = vi.fn().mockResolvedValue(undefined);
+      const component = createComponent({ onUpdateFileTree, pluginSettingsComponent });
+      await component.loadWithPromises();
+
+      const loadSettingsCall = (vi.mocked(pluginSettingsComponent.on).mock.calls as MockCallEntry[]).find(([name]) => name === 'loadSettings');
+      const callback = loadSettingsCall?.[1] as (_loadedState: unknown, isInitialLoad: boolean) => Promise<void>;
+
+      await callback(undefined, false);
+      expect(onUpdateFileTree).not.toHaveBeenCalled();
+
+      (pluginSettingsComponent.settings as PluginSettings).profiles = [{ id: 'work', name: 'Work', patterns: 'other/' }];
+      await callback(undefined, false);
+      expect(onUpdateFileTree).toHaveBeenCalledOnce();
     });
   });
 

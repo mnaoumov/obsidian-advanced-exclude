@@ -52,6 +52,11 @@ interface DatabaseMtimeEntry {
   gitIgnoreMtime: number;
   matcherVersion: number;
   obsidianIgnoreMtime: number;
+  /**
+   * The active profile's expanded patterns and scalars. Present only while a profile is active, so a vault that
+   * uses none keeps the fingerprint, and the cache, it had before profiles existed.
+   */
+  profileFingerprint?: string;
   userIgnoreFiltersString: string;
 }
 
@@ -76,6 +81,8 @@ interface IgnorePatternsComponentIsIgnoredParams {
 export class IgnorePatternsComponent extends LayoutReadyComponent {
   // Initialized so onunload can test it before a load ever opened it.
   private _database: IDBDatabase | undefined = undefined;
+  // The profile fingerprint the verdict store was last reset under; see the `loadSettings` handler.
+  private appliedProfileFingerprint: null | string = null;
   private cachedExcludeRegExps: null | RegExp[] = null;
   private cachedGitIgnoreContent = '';
   private cachedIgnoreTester: ignore.Ignore | null = null;
@@ -121,6 +128,19 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
    * The fast-enable path never calls this; a full recompute calls it first to keep
    * its per-node verdict lookups warm.
    */
+  /**
+   * Re-applies the ignore state after the active profile changed: its patterns and scalars are now the effective
+   * ones, so this runs the same path as an edit in the settings tab.
+   */
+  public async applyProfileChange(): Promise<void> {
+    this.cachedIgnoreTester = null;
+    this.cachedExcludeRegExps = null;
+    await this.readGitIgnore();
+    this.fileIgnoreMap.clear();
+    this.hadConfigChanges = true;
+    await this.processConfigChanges();
+  }
+
   public async ensureVerdictsLoaded(): Promise<void> {
     if (this.verdictsLoaded) {
       return;
@@ -212,11 +232,18 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
     registerAsyncEvent(
       this,
       this.pluginSettingsComponent.on('loadSettings', async (_loadedState, isInitialLoad) => {
-        if (!isInitialLoad) {
-          await this.readObsidianIgnore();
+        if (isInitialLoad) {
+          return;
+        }
+        await this.readObsidianIgnore();
+        // A synced `data.json` can change the active profile's patterns or settings under a running plugin.
+        if (this.getProfileFingerprint() !== this.appliedProfileFingerprint) {
+          await this.applyProfileChange();
         }
       })
     );
+
+    this.register(this.pluginSettingsComponent.onActiveProfileChange(() => this.applyProfileChange()));
 
     registerAsyncEvent(
       this,
@@ -275,7 +302,7 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
 
   private clearCachedExcludeRegExps(): void {
     this.cachedExcludeRegExps = null;
-    if (!this.pluginSettingsComponent.settings.shouldIgnoreExcludedFiles) {
+    if (!this.pluginSettingsComponent.effectiveSettings.shouldIgnoreExcludedFiles) {
       return;
     }
 
@@ -286,18 +313,28 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
   }
 
   private async getCurrentMtimeEntry(): Promise<DatabaseMtimeEntry> {
-    const gitIgnoreStat = this.pluginSettingsComponent.settings.shouldIncludeGitIgnorePatterns ? await statSafe(this.app, GIT_IGNORE_FILE) : null;
+    const gitIgnoreStat = this.pluginSettingsComponent.effectiveSettings.shouldIncludeGitIgnorePatterns ? await statSafe(this.app, GIT_IGNORE_FILE) : null;
     const obsidianIgnoreStat = await statSafe(this.app, OBSIDIAN_IGNORE_FILE);
+    const profileFingerprint = this.getProfileFingerprint();
     return {
       gitIgnoreMtime: gitIgnoreStat?.mtime ?? 0,
       matcherVersion: IGNORE_MATCHER_VERSION,
       obsidianIgnoreMtime: obsidianIgnoreStat?.mtime ?? 0,
+      ...(profileFingerprint !== null && { profileFingerprint }),
       userIgnoreFiltersString: this.getUserIgnoreFilters().join('\n')
     };
   }
 
+  /**
+   * The pattern text the matcher uses: the expanded profile while one is active, else `.obsidianignore` as read.
+   */
+  private getEffectivePatterns(): string {
+    const effectiveSettings = this.pluginSettingsComponent.effectiveSettings;
+    return effectiveSettings.activeProfile ? effectiveSettings.obsidianIgnoreContent : this.cachedObsidianIgnoreContent;
+  }
+
   private getExcludeRegExps(): RegExp[] {
-    if (!this.pluginSettingsComponent.settings.shouldIgnoreExcludedFiles) {
+    if (!this.pluginSettingsComponent.effectiveSettings.shouldIgnoreExcludedFiles) {
       return [];
     }
 
@@ -330,7 +367,7 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
       return this.cachedIgnoreTester;
     }
 
-    const ignorePatternsString = `${this.cachedObsidianIgnoreContent}\n${this.cachedGitIgnoreContent}`;
+    const ignorePatternsString = `${this.getEffectivePatterns()}\n${this.cachedGitIgnoreContent}`;
 
     this.cachedIgnoreTester = ignore({
       ignoreCase: true
@@ -338,8 +375,22 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
     return this.cachedIgnoreTester;
   }
 
+  private getProfileFingerprint(): null | string {
+    const effectiveSettings = this.pluginSettingsComponent.effectiveSettings;
+    if (!effectiveSettings.activeProfile) {
+      return null;
+    }
+    return JSON.stringify([
+      effectiveSettings.obsidianIgnoreContent,
+      effectiveSettings.excludeMode,
+      effectiveSettings.shouldHideEmptyFolders,
+      effectiveSettings.shouldIgnoreExcludedFiles,
+      effectiveSettings.shouldIncludeGitIgnorePatterns
+    ]);
+  }
+
   private getUserIgnoreFilters(): string[] {
-    return this.pluginSettingsComponent.settings.shouldIgnoreExcludedFiles ? (this.app.vault.getConfig('userIgnoreFilters') ?? []) : [];
+    return this.pluginSettingsComponent.effectiveSettings.shouldIgnoreExcludedFiles ? (this.app.vault.getConfig('userIgnoreFilters') ?? []) : [];
   }
 
   /**
@@ -370,6 +421,7 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
 
     const mtimeEntry = await getResult(mtimeStore.get(0)) as DatabaseMtimeEntry | undefined ?? DEFAULT_MTIME_ENTRY;
     const currentMtimeEntry = await this.getCurrentMtimeEntry();
+    this.appliedProfileFingerprint = currentMtimeEntry.profileFingerprint ?? null;
 
     if (!isDeepEqual(currentMtimeEntry, mtimeEntry)) {
       // Config changed: drop the stale verdicts now (this also marks the cache
@@ -389,7 +441,7 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
   }
 
   private async readGitIgnore(): Promise<boolean> {
-    if (!this.pluginSettingsComponent.settings.shouldIncludeGitIgnorePatterns) {
+    if (!this.pluginSettingsComponent.effectiveSettings.shouldIncludeGitIgnorePatterns) {
       this.cachedGitIgnoreContent = '';
       return false;
     }
@@ -432,6 +484,7 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
 
   private async resetDatabase(): Promise<void> {
     const currentMtimeEntry = await this.getCurrentMtimeEntry();
+    this.appliedProfileFingerprint = currentMtimeEntry.profileFingerprint ?? null;
 
     const transaction = this.database.transaction([FILES_STORE_NAME, MTIME_STORE_NAME], 'readwrite');
     const mtimeStore = transaction.objectStore(MTIME_STORE_NAME);

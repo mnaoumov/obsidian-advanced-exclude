@@ -70,6 +70,11 @@ export class PublishCompatibilityWarningComponent extends LayoutReadyComponent {
         this.validate();
       })
     );
+
+    // A profile switch can change the effective exclude mode without saving anything.
+    this.register(this.pluginSettingsComponent.onActiveProfileChange(() => {
+      this.validate();
+    }));
   }
 
   public override onunload(): void {
@@ -145,12 +150,22 @@ export class PublishCompatibilityWarningComponent extends LayoutReadyComponent {
   }
 
   private async switchToFilesPaneMode(): Promise<void> {
-    await this.pluginSettingsComponent.setProperty('excludeMode', ExcludeMode.FilesPane);
+    // With a profile active, the base mode may be overridden, so the switch goes on the active profile itself: its
+    // own setting beats anything it imports. `editAndSave`, not `setProperty`: only a save persists the choice and
+    // raises the config change that `processConfigChanges` applies.
+    const activeProfileId = this.pluginSettingsComponent.effectiveSettings.activeProfile?.id;
+    await this.pluginSettingsComponent.editAndSave((settings) => {
+      if (activeProfileId === undefined) {
+        settings.excludeMode = ExcludeMode.FilesPane;
+        return;
+      }
+      settings.profiles = settings.profiles.map((profile) => profile.id === activeProfileId ? { ...profile, excludeMode: ExcludeMode.FilesPane } : profile);
+    });
     await this.ignorePatternsComponent.processConfigChanges();
   }
 
   private validate(): void {
-    const isUnsafe = this.pluginSettingsComponent.settings.excludeMode === ExcludeMode.Full
+    const isUnsafe = this.pluginSettingsComponent.effectiveSettings.excludeMode === ExcludeMode.Full
       && this.isPublishEnabled();
 
     if (!isUnsafe) {

@@ -73,3 +73,57 @@ export async function changeSettings(app: App, patch: DemoSettingsPatch): Promis
   await configureCommunityPlugin({ app, pluginId: PLUGIN_ID, settings: patch });
   new Notice('Applied.');
 }
+
+interface DemoProfile {
+  id: string;
+  name: string;
+  patterns: string;
+}
+
+interface ProfileSwitcher {
+  setActiveProfileId(profileId: null | string): Promise<void>;
+}
+
+const DEMO_PROFILES: DemoProfile[] = [
+  { id: 'demo-hide-archive', name: 'Hide archive', patterns: 'Archive/' },
+  { id: 'demo-focus', name: 'Focus', patterns: ['@import Hide archive', 'Shared/'].join('\n') }
+];
+
+/**
+ * Creates the two profiles `05 Profiles.md` walks through: `Hide archive`, and `Focus`, which imports it and
+ * hides `Shared/` as well.
+ *
+ * Manual equivalent: **Settings -> Community plugins -> `Advanced Exclude` -> Profiles -> Add profile**, once per
+ * profile, with the same name and patterns.
+ */
+export async function createDemoProfiles(app: App): Promise<void> {
+  await configureCommunityPlugin({ app, pluginId: PLUGIN_ID, settings: { profiles: DEMO_PROFILES } });
+  new Notice('Profiles created. Switch between them from the status bar or the "Switch profile..." command.');
+}
+
+/**
+ * Makes `profileId` the active profile on this device, or goes back to the base settings for `null`.
+ *
+ * Manual equivalent: click the `Exclude:` item in the status bar and pick the profile, or run
+ * **`Advanced Exclude`: Switch profile...**.
+ */
+export async function activateProfile(app: App, profileId: null | string): Promise<void> {
+  const plugin = app.plugins.getPlugin(PLUGIN_ID) as unknown as null | { pluginSettingsComponent: ProfileSwitcher };
+  if (!plugin) {
+    new Notice('Enable Advanced Exclude first.');
+    return;
+  }
+  await plugin.pluginSettingsComponent.setActiveProfileId(profileId);
+  new Notice(profileId === null ? 'Back to the base settings.' : 'Profile active. Look at the Files pane.');
+}
+
+/**
+ * Goes back to the base settings and deletes the demo profiles.
+ *
+ * Manual equivalent: pick **Base settings** in the status-bar menu, then **Delete** each profile in the settings.
+ */
+export async function removeDemoProfiles(app: App): Promise<void> {
+  await activateProfile(app, null);
+  await configureCommunityPlugin({ app, pluginId: PLUGIN_ID, settings: { profiles: [] } });
+  new Notice('Demo profiles removed.');
+}
