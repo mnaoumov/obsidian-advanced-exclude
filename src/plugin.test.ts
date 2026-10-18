@@ -71,11 +71,13 @@ vi.mock('./index-projection-component.ts', () => ({
   })
 }));
 
+let capturedIsSettingsTabOpen: (() => boolean) | undefined;
 let capturedOnUpdateFileTree: (() => Promise<void>) | undefined;
 vi.mock('./ignore-patterns-component.ts', () => ({
   // A ComponentEx, not a plain Component: onloadImpl awaits its `loadWithPromises`.
   // eslint-disable-next-line prefer-arrow-callback, func-names -- mock must be constructable with `new` and return a real loadable Component.
   IgnorePatternsComponent: vi.fn(function (params: IgnorePatternsComponentConstructorParams) {
+    capturedIsSettingsTabOpen = params.isSettingsTabOpen;
     capturedOnUpdateFileTree = params.onUpdateFileTree;
     return new ComponentEx();
   })
@@ -110,8 +112,16 @@ vi.mock('./plugin-settings-component.ts', () => ({
   })
 }));
 
+let isMockSettingsTabOpen = false;
 vi.mock('./plugin-settings-tab.ts', () => ({
-  PluginSettingsTab: vi.fn()
+  // eslint-disable-next-line prefer-arrow-callback, func-names -- mock must be constructable with `new`.
+  PluginSettingsTab: vi.fn(function () {
+    return {
+      get isOpen(): boolean {
+        return isMockSettingsTabOpen;
+      }
+    };
+  })
 }));
 
 let capturedAddStatusBarItem: (() => HTMLElement) | undefined;
@@ -246,6 +256,16 @@ describe('Plugin', () => {
       capturedOnUpdateFileTree().catch(() => undefined);
     }
     expect(mockUpdate).toHaveBeenCalled();
+  });
+
+  it('should wire isSettingsTabOpen to the settings tab', async () => {
+    const plugin = new Plugin(app.asOriginalType__(), manifest);
+    await plugin.onload();
+
+    isMockSettingsTabOpen = true;
+    expect(capturedIsSettingsTabOpen?.()).toBe(true);
+    isMockSettingsTabOpen = false;
+    expect(capturedIsSettingsTabOpen?.()).toBe(false);
   });
 
   it('should wire onFileExplorerViewBuilt callback to indexProjectionComponent.reapplyToFilesPane', async () => {

@@ -40,7 +40,7 @@ Built on `@mnaoumov/obsidian-lib` with tooling from `@mnaoumov/obsidian-dev-tool
 - **`src/`** — plugin source:
   - `main.ts` — Obsidian entry point (default export of `Plugin`)
   - `plugin.ts` — `Plugin` class, wires up child components
-  - `ignore-patterns-component.ts` — owns gitignore matching, IndexedDB cache, `.obsidianignore` / `.gitignore` reads
+  - `ignore-patterns-component.ts` — owns gitignore matching, IndexedDB cache, `.obsidianignore` / `.gitignore` reads. A `saveSettings` made while the settings tab is open only raises `hadConfigChanges`, for the tab's hide or Apply to apply; one made while it is closed (a command, another plugin, the demo vault's `configureCommunityPlugin` buttons) runs `processConfigChanges` at once. Guard: `src/settings-save-outside-tab.desktop.integration.test.ts`
   - `vault-model.ts` — `VaultModel`: the in-memory shadow tree and its bottom-up visibility (`recomputeAll`, `applyDelta`, `seedHidden`)
   - `index-projection-component.ts` — `IndexProjectionComponent`: projects the model onto Obsidian's index in one event-free pass, drives the explorer, owns fast-enable and apply progress
   - `manual-index-hider.ts` — `ManualIndexHider`: S6 direct index mutation — hides/re-inserts files with no events, keeps the in-memory snapshots a same-session un-ignore restores from

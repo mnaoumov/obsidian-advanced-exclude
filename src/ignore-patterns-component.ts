@@ -71,6 +71,7 @@ const DEFAULT_MTIME_ENTRY: DatabaseMtimeEntry = {
 
 interface IgnorePatternsComponentConstructorParams {
   readonly app: App;
+  readonly isSettingsTabOpen: (this: void) => boolean;
   readonly onUpdateFileTree: (this: void) => Promise<void>;
   readonly pluginSettingsComponent: PluginSettingsComponent;
 }
@@ -94,6 +95,7 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
   private configFingerprintMatched = false;
   private readonly fileIgnoreMap = new Map<string, boolean>();
   private hadConfigChanges = false;
+  private readonly isSettingsTabOpen: () => boolean;
   private readonly onUpdateFileTree: () => Promise<void>;
   private pendingStoreActions = new Map<string, (store: IDBObjectStore) => void>();
   private readonly pluginSettingsComponent: PluginSettingsComponent;
@@ -119,6 +121,7 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
 
   public constructor(params: IgnorePatternsComponentConstructorParams) {
     super(params.app);
+    this.isSettingsTabOpen = params.isSettingsTabOpen;
     this.onUpdateFileTree = params.onUpdateFileTree;
     this.pluginSettingsComponent = params.pluginSettingsComponent;
   }
@@ -264,6 +267,12 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
       this.pluginSettingsComponent.on('saveSettings', async (newState: ReadonlyPluginSettingsState<PluginSettings>) => {
         await this.reload(newState.effectiveValues.obsidianIgnoreContent);
         this.hadConfigChanges = true;
+        // While the settings tab is open it applies on its hide or Apply, so typing a pattern never re-applies per
+        // keystroke. A save made anywhere else (a command, another plugin, the demo vault's buttons) has nothing
+        // that would apply it later, so it applies now.
+        if (!this.isSettingsTabOpen()) {
+          await this.processConfigChanges();
+        }
       })
     );
   }

@@ -71,6 +71,7 @@ vi.mock('@mnaoumov/typescript-lib/object-utils', async (importOriginal) => ({
 
 interface CreateComponentOverrides {
   app?: AppOriginal;
+  isSettingsTabOpen?: () => boolean;
   onUpdateFileTree?: () => Promise<void>;
   pluginSettingsComponent?: PluginSettingsComponent;
 }
@@ -161,6 +162,8 @@ function createApp(): AppOriginal {
 function createComponent(overrides?: CreateComponentOverrides): TestIgnorePatternsComponent {
   return new TestIgnorePatternsComponent({
     app: overrides?.app ?? createApp(),
+    // Open by default, so a save only raises the pending change, as it did before saves outside the tab applied.
+    isSettingsTabOpen: overrides?.isSettingsTabOpen ?? ((): boolean => true),
     onUpdateFileTree: overrides?.onUpdateFileTree ?? vi.fn().mockResolvedValue(undefined),
     pluginSettingsComponent: overrides?.pluginSettingsComponent ?? createPluginSettingsComponent()
   });
@@ -899,6 +902,39 @@ describe('IgnorePatternsComponent', () => {
       } else {
         expect.fail('saveSettings event was not registered');
       }
+    });
+
+    it('should leave a save made while the settings tab is open for the tab to apply', async () => {
+      setupIndexedDatabase();
+      const onUpdateFileTree = vi.fn().mockResolvedValue(undefined);
+      const pluginSettingsComponent = createPluginSettingsComponent();
+      const component = createComponent({ isSettingsTabOpen: () => true, onUpdateFileTree, pluginSettingsComponent });
+      await component.loadWithPromises();
+
+      const saveSettingsCall = (vi.mocked(pluginSettingsComponent.on).mock.calls as MockCallEntry[]).find(([name]) => name === 'saveSettings');
+      const callback = saveSettingsCall?.[1] as (newState: SaveSettingsState) => Promise<void>;
+      await callback({ effectiveValues: { obsidianIgnoreContent: 'new-pattern' } });
+
+      expect(onUpdateFileTree).not.toHaveBeenCalled();
+      await component.processConfigChanges();
+      expect(onUpdateFileTree).toHaveBeenCalledOnce();
+    });
+
+    it('should apply a save made while the settings tab is closed', async () => {
+      setupIndexedDatabase();
+      const onUpdateFileTree = vi.fn().mockResolvedValue(undefined);
+      const pluginSettingsComponent = createPluginSettingsComponent();
+      const component = createComponent({ isSettingsTabOpen: () => false, onUpdateFileTree, pluginSettingsComponent });
+      await component.loadWithPromises();
+
+      const saveSettingsCall = (vi.mocked(pluginSettingsComponent.on).mock.calls as MockCallEntry[]).find(([name]) => name === 'saveSettings');
+      const callback = saveSettingsCall?.[1] as (newState: SaveSettingsState) => Promise<void>;
+      await callback({ effectiveValues: { obsidianIgnoreContent: 'new-pattern' } });
+
+      expect(onUpdateFileTree).toHaveBeenCalledOnce();
+      // Applied already, so the tab's own later call has nothing left to do.
+      await component.processConfigChanges();
+      expect(onUpdateFileTree).toHaveBeenCalledOnce();
     });
   });
 
