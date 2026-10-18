@@ -17,6 +17,7 @@ interface MockPathsStore {
 }
 
 interface SetupResult {
+  readonly mockDatabase: IDBDatabase;
   readonly openFunction: ReturnType<typeof vi.fn>;
   readonly pathsStore: MockPathsStore;
   readonly store: IndexedDatabaseVaultPathStore;
@@ -34,7 +35,7 @@ function setupDatabase(getValue: StoredVaultPaths | undefined | VaultModelEntry[
     put: vi.fn()
   };
 
-  const mockDatabase = strictProxy<IDBDatabase>({ createObjectStore: vi.fn() });
+  const mockDatabase = strictProxy<IDBDatabase>({ close: vi.fn(), createObjectStore: vi.fn() });
   Object.defineProperty(mockDatabase, 'transaction', {
     value: vi.fn(() => ({ commit: vi.fn(), objectStore: vi.fn(() => pathsStore) }))
   });
@@ -56,7 +57,7 @@ function setupDatabase(getValue: StoredVaultPaths | undefined | VaultModelEntry[
     writable: true
   });
 
-  return { openFunction, pathsStore, store: new IndexedDatabaseVaultPathStore('app-id') };
+  return { mockDatabase, openFunction, pathsStore, store: new IndexedDatabaseVaultPathStore('app-id') };
 }
 
 describe('IndexedDatabaseVaultPathStore', () => {
@@ -92,6 +93,27 @@ describe('IndexedDatabaseVaultPathStore', () => {
     store.save([{ isFolder: false, path: 'a.md' }], '1:sig');
 
     expect(pathsStore.put).not.toHaveBeenCalled();
+  });
+
+  it('closes the open database, after which a save is a no-op and a load reopens it', async () => {
+    const { mockDatabase, openFunction, pathsStore, store } = setupDatabase(undefined);
+    await store.load();
+
+    store.close();
+    store.save([{ isFolder: false, path: 'a.md' }], '1:sig');
+    await store.load();
+
+    expect(mockDatabase.close).toHaveBeenCalledOnce();
+    expect(pathsStore.put).not.toHaveBeenCalled();
+    expect(openFunction).toHaveBeenCalledTimes(2);
+  });
+
+  it('closes nothing when the database was never opened', () => {
+    const { mockDatabase, store } = setupDatabase(undefined);
+
+    store.close();
+
+    expect(mockDatabase.close).not.toHaveBeenCalled();
   });
 
   it('reuses the open database on a second load', async () => {

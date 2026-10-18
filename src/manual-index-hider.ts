@@ -107,6 +107,7 @@ export class ManualIndexHider {
   public hide(normalizedPaths: readonly string[]): void {
     const { metadataCache, vault } = this.app;
     const hiddenSet = new Set<string>();
+    const removedByParent = new Map<TFolder, Set<TAbstractFile>>();
 
     for (const path of normalizedPaths) {
       const node = vault.getAbstractFileByPath(path);
@@ -139,11 +140,18 @@ export class ManualIndexHider {
       }
       // eslint-disable-next-line @typescript-eslint/no-dynamic-delete -- remove the path from the vault file map.
       delete vault.fileMap[path];
-      removeFromParent(snapshot.parent, node);
+      if (snapshot.parent) {
+        getOrCreate(removedByParent, snapshot.parent).add(node);
+      }
       this.snapshots.set(path, snapshot);
       hiddenSet.add(path);
     }
 
+    // One pass per parent, not an `indexOf` + `splice` per node: a folder with N hidden children
+    // would otherwise cost O(N²), which a wide real-vault folder reaches.
+    for (const [parent, removed] of removedByParent) {
+      removeChildren(parent, removed);
+    }
     this.demoteInboundLinks(hiddenSet);
   }
 
@@ -156,6 +164,7 @@ export class ManualIndexHider {
   public show(normalizedPaths: readonly string[]): string[] {
     const { metadataCache, vault } = this.app;
     const withoutSnapshot: string[] = [];
+    const restoredByParent = new Map<TFolder, Set<TAbstractFile>>();
 
     for (const path of normalizedPaths) {
       const snapshot = this.snapshots.get(path);
@@ -165,9 +174,8 @@ export class ManualIndexHider {
       }
 
       vault.fileMap[path] = snapshot.node;
-      const { parent } = snapshot;
-      if (parent && !parent.children.includes(snapshot.node)) {
-        parent.children.push(snapshot.node);
+      if (snapshot.parent) {
+        getOrCreate(restoredByParent, snapshot.parent).add(snapshot.node);
       }
       if (snapshot.isFile) {
         if (snapshot.fileCache) {
@@ -184,6 +192,10 @@ export class ManualIndexHider {
       this.snapshots.delete(path);
     }
 
+    // Batched per parent for the same reason as in `hide`: `children.includes` per node is O(N²).
+    for (const [parent, restored] of restoredByParent) {
+      addChildren(parent, restored);
+    }
     return withoutSnapshot;
   }
 
@@ -220,12 +232,32 @@ export class ManualIndexHider {
   }
 }
 
-function removeFromParent(parent: null | TFolder, node: TAbstractFile): void {
-  if (!parent) {
-    return;
+function addChildren(parent: TFolder, nodes: ReadonlySet<TAbstractFile>): void {
+  const present = new Set(parent.children);
+  for (const node of nodes) {
+    if (!present.has(node)) {
+      parent.children.push(node);
+    }
   }
-  const index = parent.children.indexOf(node);
-  if (index !== -1) {
-    parent.children.splice(index, 1);
+}
+
+function getOrCreate(map: Map<TFolder, Set<TAbstractFile>>, parent: TFolder): Set<TAbstractFile> {
+  let nodes = map.get(parent);
+  if (!nodes) {
+    nodes = new Set();
+    map.set(parent, nodes);
   }
+  return nodes;
+}
+
+// Filters `parent.children` in place, so any holder of the array sees the change.
+function removeChildren(parent: TFolder, nodes: ReadonlySet<TAbstractFile>): void {
+  const { children } = parent;
+  let kept = 0;
+  for (const child of children) {
+    if (!nodes.has(child)) {
+      children[kept++] = child;
+    }
+  }
+  children.length = kept;
 }

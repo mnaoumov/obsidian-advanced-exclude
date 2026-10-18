@@ -21,7 +21,6 @@ import {
   vi
 } from 'vitest';
 
-import type { VaultLoadPatchComponent } from './patches/vault-load-patch-component.ts';
 import type { PluginSettingsComponent } from './plugin-settings-component.ts';
 
 import {
@@ -66,7 +65,6 @@ interface CreateComponentOverrides {
   app?: AppOriginal;
   onUpdateFileTree?: () => Promise<void>;
   pluginSettingsComponent?: PluginSettingsComponent;
-  vaultLoadPatch?: VaultLoadPatchComponent;
 }
 
 interface FileIgnoreEntry {
@@ -124,6 +122,7 @@ interface SetupIndexedDatabaseResult {
 
 interface TestableIgnorePatternsComponent {
   clearCachedExcludeRegExps: () => void;
+  resetDatabase: () => Promise<void>;
   writeObsidianIgnore: (obsidianIgnoreContent: string) => Promise<void>;
 }
 
@@ -151,8 +150,7 @@ function createComponent(overrides?: CreateComponentOverrides): TestIgnorePatter
   return new TestIgnorePatternsComponent({
     app: overrides?.app ?? createApp(),
     onUpdateFileTree: overrides?.onUpdateFileTree ?? vi.fn().mockResolvedValue(undefined),
-    pluginSettingsComponent: overrides?.pluginSettingsComponent ?? createPluginSettingsComponent(),
-    vaultLoadPatch: overrides?.vaultLoadPatch ?? createVaultLoadPatch()
+    pluginSettingsComponent: overrides?.pluginSettingsComponent ?? createPluginSettingsComponent()
   });
 }
 
@@ -195,18 +193,13 @@ function createPluginSettingsComponent(settings?: Partial<PluginSettings>): Plug
   });
 }
 
-function createVaultLoadPatch(wasVaultLoadCalled = false): VaultLoadPatchComponent {
-  return strictProxy<VaultLoadPatchComponent>({
-    wasVaultLoadCalled
-  });
-}
-
 function setupIndexedDatabase(params?: SetupIndexedDatabaseParams): SetupIndexedDatabaseResult {
   const filesStore = createMockObjectStore(params?.filesEntries ?? []);
   const mtimeStore = createMockObjectStore();
   mtimeStore.get.mockReturnValue(createMockRequest(params?.mtimeEntry));
 
   const mockDatabase = strictProxy<IDBDatabase>({
+    close: vi.fn(),
     createObjectStore: vi.fn()
   });
   const mockTransactionFunction = vi.fn(() => createMockTransaction({ files: filesStore, mtime: mtimeStore }));
@@ -450,6 +443,75 @@ describe('IgnorePatternsComponent', () => {
     });
   });
 
+  describe('onunload', () => {
+    it('drops the queued verdict writes and closes the database', async () => {
+      const { filesStore, mockDatabase } = setupIndexedDatabase();
+      const component = createComponent();
+      await component.loadWithPromises();
+      component.isIgnored({ isFolder: false, normalizedPath: 'test.md' });
+
+      component.unload();
+      vi.runAllTimers();
+
+      expect(filesStore.put).not.toHaveBeenCalled();
+      expect(mockDatabase.close).toHaveBeenCalledOnce();
+    });
+
+    it('flushes a large verdict queue in several transactions, yielding between them', async () => {
+      const { filesStore, mockDatabase } = setupIndexedDatabase();
+      const component = createComponent();
+      await component.loadWithPromises();
+      const transactionCallsBefore = vi.mocked(mockDatabase.transaction).mock.calls.length;
+      for (let index = 0; index < 2500; index++) {
+        component.isIgnored({ isFolder: false, normalizedPath: `note-${String(index)}.md` });
+      }
+
+      vi.runAllTimers();
+
+      expect(filesStore.put).toHaveBeenCalledTimes(2500);
+      expect(vi.mocked(mockDatabase.transaction).mock.calls.length - transactionCallsBefore).toBe(2);
+    });
+
+    it('stops a chunked flush when the store is reset part-way through it', async () => {
+      const { filesStore } = setupIndexedDatabase();
+      const component = createComponent();
+      await component.loadWithPromises();
+      for (let index = 0; index < 2500; index++) {
+        component.isIgnored({ isFolder: false, normalizedPath: `note-${String(index)}.md` });
+      }
+      // Let the debounce fire the first chunk only.
+      vi.advanceTimersByTime(5000);
+      expect(filesStore.put).toHaveBeenCalledTimes(2000);
+
+      // The verdicts were computed for the store just cleared, so the rest must not land.
+      await castTo<TestableIgnorePatternsComponent>(component).resetDatabase();
+      vi.runAllTimers();
+
+      expect(filesStore.put).toHaveBeenCalledTimes(2000);
+    });
+
+    it('drops a verdict write queued after unload instead of using the closed database', async () => {
+      const { filesStore } = setupIndexedDatabase();
+      const component = createComponent();
+      await component.loadWithPromises();
+      component.unload();
+
+      component.isIgnored({ isFolder: false, normalizedPath: 'late.md' });
+      vi.runAllTimers();
+
+      expect(filesStore.put).not.toHaveBeenCalled();
+    });
+
+    it('does nothing to the database when it was never opened', () => {
+      const { mockDatabase } = setupIndexedDatabase();
+      const component = createComponent();
+
+      component.unload();
+
+      expect(mockDatabase.close).not.toHaveBeenCalled();
+    });
+  });
+
   describe('clearCachedExcludeRegExps', () => {
     it('should clear cached regexps', async () => {
       setupIndexedDatabase();
@@ -668,22 +730,10 @@ describe('IgnorePatternsComponent', () => {
       expect(ensureMetadataCacheReady).toHaveBeenCalled();
     });
 
-    it('should call onUpdateFileTree when wasVaultLoadCalled is false', async () => {
+    it('should not update the file tree itself, which the index projection owns', async () => {
       setupIndexedDatabase();
       const onUpdateFileTree = vi.fn().mockResolvedValue(undefined);
-      const vaultLoadPatch = createVaultLoadPatch(false);
-      const component = createComponent({ onUpdateFileTree, vaultLoadPatch });
-      await component.loadWithPromises();
-      await component.invokeOnLayoutReady();
-
-      expect(onUpdateFileTree).toHaveBeenCalled();
-    });
-
-    it('should not call onUpdateFileTree when wasVaultLoadCalled is true', async () => {
-      setupIndexedDatabase();
-      const onUpdateFileTree = vi.fn().mockResolvedValue(undefined);
-      const vaultLoadPatch = createVaultLoadPatch(true);
-      const component = createComponent({ onUpdateFileTree, vaultLoadPatch });
+      const component = createComponent({ onUpdateFileTree });
       await component.loadWithPromises();
       await component.invokeOnLayoutReady();
 
@@ -1246,19 +1296,10 @@ describe('IgnorePatternsComponent', () => {
   });
 
   describe('db getter', () => {
-    it('should throw when database is not set', () => {
+    it('should throw when database is not set', async () => {
       const component = createComponent();
-      // Accessing isIgnored before onload means db is not initialized,
-      // but isIgnored only touches db via addStoreAction which is debounced.
-      // processConfigChanges accesses db through resetDb.
-      // We test via processStoreActions path.
-      expect(() => {
-        // Force processStoreActions by calling isIgnored (adds store action)
-        // then immediately running the debounce
-        component.isIgnored({ isFolder: false, normalizedPath: 'test.md' });
-        // Manually trigger the debounce
-        vi.runAllTimers();
-      }).toThrow('database is not set');
+      // Before onload the verdict store is not open, so reading it must fail loudly.
+      await expect(component.ensureVerdictsLoaded()).rejects.toThrow('database is not set');
     });
   });
 

@@ -51,6 +51,7 @@ Built on `@mnaoumov/obsidian-lib` with tooling from `@mnaoumov/obsidian-dev-tool
   - `indexed-database-utils.ts` — IndexedDB request → promise helper
   - `constants.ts` — shared constants (`.gitignore` / `.obsidianignore` names, root path)
   - `publish-compatibility-warning-component.ts` — warns when Obsidian Publish is on while `excludeMode === Full`
+  - `related-links-batch.ts` — collects Obsidian's per-file `metadataCache.updateRelatedLinks` calls during a bulk re-add and replays them as one `Set`-based pass
   - `restore-notice-component.ts` — restores hidden files synchronously on unload (added last so it unloads first)
   - `update-progress-notice-component.ts` — progress notice shown while a projection is applied
   - `plugin-settings*.ts` — settings model, component, settings tab
@@ -83,6 +84,26 @@ In-memory shadow-tree rewrite. Implemented on branch `feat/in-memory-tree`: `Vau
 `IndexProjectionComponent` exposes `isApplyingProjection` (set for the duration of `update()`); the adapter patch's `reconcileDeletion` skips `recordDelete` while it is set (under S6 this is dormant — the projection no longer issues `reconcileDeletion`, so it only guards against a concurrent *real* delete during a projection). `update()` persists the hidden set after each `applyDelta`, so a later reload reconstructs it. Under S6 the same hidden set is also snapshotted in memory by `ManualIndexHider`, so a same-session un-ignore re-shows hidden files instantly from the snapshot (no reload, no re-parse); a path with no snapshot (hidden by a prior session) falls back to `reconcileFile`. That fallback must first `delete adapter.files[path]`: `ManualIndexHider.hide` leaves the adapter's own stat record intact, so without dropping it `reconcileFile` compares disk against the stale record, sees no change, and re-adds nothing (the file would stay hidden forever).
 
 Disable and enable are both fast (issue #10). On disable, `restoreHiddenFilesOnUnload` re-inserts the hidden set from the in-memory `ManualIndexHider` snapshots synchronously in `onunload` (driven by `RestoreNoticeComponent`, added last so it unloads first) — ~9 ms at 90k, no reload notice. On a **warm re-enable** whose ignore config **and** file universe are unchanged, `IndexProjectionComponent.tryFastEnable` seeds the model from the persisted hidden set (`VaultModel.seedHidden`, O(hidden set)) and re-hides it directly — skipping the ~1.4 s 90k cached-verdict `getAll` (now split out of `loadDb` into `IgnorePatternsComponent.loadFingerprint` + a lazy `ensureVerdictsLoaded`) and the whole-vault `rebuild` + `recomputeAll`; the full model build is deferred to the next config change. A change to the vault **while disabled** — which the ignore-file mtime fingerprint cannot see — is caught by an order-independent universe signature (`universe-signature.ts`) persisted alongside the hidden set in `VaultPathStore`: a mismatch (or a changed config, or `FilesPane` mode) falls back to the proven full `applyFull`. Covered live by `src/fast-enable-reenable.desktop-performance.integration.test.ts` on a linked synthetic vault.
+
+**Measured on a copy of a real 115k-file vault, and what that changed.** Obsidian indexes 90,902 nodes of it (dot-folders are never indexed), so the ~90k synthetic vault matches its size. Its shape is deeper: 15k folders. Copy it with text kept and binaries stubbed, then run `lifecycle-scale` against it with `AE_PERF_VAULT_SOURCE` and `AE_PERF_SCENARIO_FOLDER` (see `scripts/vitest-global-setup-performance.ts`). Un-ignoring a 30k-path folder was the slow path, not hiding it. Before → after:
+
+| Step | Before | After |
+| --- | --- | --- |
+| Same-session re-show | 16.4 s, 118 long tasks | 3.4 s |
+| Cross-session re-show (#16, the `reconcileFile` fallback) | ~13–26 files/s, ~20 min | 16 s |
+| Warm re-enable | 9 s, two racing whole-vault projections | 0.1 s, fast path |
+| Disable | up to 0.9 s | 2 ms |
+
+The worst main-thread task in any step is now ~0.3 s. The causes, each guarded now:
+
+- **The explorer re-sorts the whole vault per change.** `FileExplorerView.onCreate`/`onDelete` call `requestSort`, a 20 ms debounce whose `sort()` re-sorts every folder. The apply loop yields every 50 ms, so it re-sorted a 91k-item tree at every yield. `FileTreeComponent.suspendSort` holds it for the length of an apply and sorts once.
+- **Obsidian re-scans every link per created file.** `metadataCache.onCreate` → `updateRelatedLinks([name])` walks every cached file's links, about 30 ms a file. It also matches with `Array.includes`, so passing all the names at once would be worse still. `related-links-batch.ts` collects the names and runs one `Set`-based pass. Both suspensions live in `IndexProjectionComponent.beginBulkIndexUpdate`; nested scopes share the outermost one.
+- **Shows ran one awaited round trip per path.** The `stat` of the stale-snapshot check, and the `reconcileFile`, ran one at a time. `showEntries` now runs them in chunks of 200 same-depth paths. Shallowest-first order is kept, so a folder still exists before its files.
+- **Up to three whole-vault projections raced on a mid-session enable.** They came from `onloadAsync`, `IndexProjectionComponent.onLayoutReady` and `IgnorePatternsComponent.onLayoutReady`. An aborted one still rebuilt the shared model, because `rebuildModel` had no abort check after its `await`s. The live projection then read every node at its default `isVisible: false` and **hid the whole vault**. The aborted one also persisted that as the hidden set. Now `rebuildModel` checks the signal and never persists an aborted build. The layout-ready re-projection belongs to the projection alone, and is skipped when the plugin loaded after layout ready.
+- **Fast enable now takes an empty persisted hidden set too.** With the config and universe unchanged there is nothing to hide, and it used to rebuild the whole model to find that out.
+- **Neither IndexedDB connection was ever closed.** Every enable opened two more, and an open one blocks `deleteDatabase`. Both close on unload now. Queued verdict writes are dropped on unload rather than flushed, since the store is a cache. The debounced flush writes in transactions of 2,000 instead of one ~1 s task, and stops when a store reset makes its verdicts stale.
+
+The regression guard is `src/lifecycle-scale.desktop-performance.integration.test.ts`. It runs each lifecycle step in both modes on the synthetic vault, hiding all of `big`. It bounds wall time per vault path and the longest main-thread task, and asserts that a warm re-enable keeps the vault indexed and takes the fast path. The cross-session re-show of all ~93k synthetic files takes ~105 s. That cost is Obsidian re-reading and re-parsing every file, which is why its ceiling is 3 ms per path.
 
 Scaling is covered at three levels.
 

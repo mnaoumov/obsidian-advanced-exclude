@@ -24,6 +24,8 @@ interface MockFileExplorerView {
   fileItems: FileExplorerView['fileItems'];
   onCreate: ReturnType<typeof vi.fn>;
   onDelete: ReturnType<typeof vi.fn>;
+  requestSort: FileExplorerView['requestSort'];
+  sort: ReturnType<typeof vi.fn>;
 }
 
 interface MockLeaf {
@@ -44,6 +46,8 @@ function createMockFileExplorerView(overrides: Partial<MockFileExplorerView> = {
     fileItems: {},
     onCreate: vi.fn(),
     onDelete: vi.fn(),
+    requestSort: castTo<FileExplorerView['requestSort']>(vi.fn()),
+    sort: vi.fn(),
     ...overrides
   };
 }
@@ -216,6 +220,72 @@ describe('FileTreeComponent', () => {
       vi.mocked(app.vault.getAbstractFileByPath).mockReturnValue(file);
       component.addToFilesPane('some/path');
       expect(fileExplorerView.onCreate).toHaveBeenCalledWith(file);
+    });
+  });
+
+  describe('suspendSort', () => {
+    it('returns a no-op resume when no file explorer view exists', () => {
+      const { component } = setup();
+      expect(() => {
+        component.suspendSort()();
+      }).not.toThrow();
+    });
+
+    it('holds back every sort request and sorts once on resume, restoring the original', () => {
+      const fileExplorerView = createMockFileExplorerView();
+      const originalRequestSort = fileExplorerView.requestSort;
+      const { component } = setup(fileExplorerView);
+
+      const resume = component.suspendSort();
+      fileExplorerView.requestSort();
+      fileExplorerView.requestSort();
+      expect(originalRequestSort).not.toHaveBeenCalled();
+
+      resume();
+      expect(originalRequestSort).toHaveBeenCalledOnce();
+      expect(fileExplorerView.requestSort).toBe(originalRequestSort);
+    });
+
+    it('does not sort on resume when nothing asked for it, and resumes only once', () => {
+      const fileExplorerView = createMockFileExplorerView();
+      const originalRequestSort = fileExplorerView.requestSort;
+      const { component } = setup(fileExplorerView);
+
+      const resume = component.suspendSort();
+      resume();
+      resume();
+      expect(originalRequestSort).not.toHaveBeenCalled();
+    });
+
+    it('drops a held request on cancel and sorts at once on run', () => {
+      const fileExplorerView = createMockFileExplorerView();
+      const originalRequestSort = fileExplorerView.requestSort;
+      const { component } = setup(fileExplorerView);
+
+      const resume = component.suspendSort();
+      expect(fileExplorerView.requestSort().cancel()).toBe(fileExplorerView.requestSort);
+      fileExplorerView.requestSort();
+      fileExplorerView.requestSort.run();
+      expect(fileExplorerView.sort).toHaveBeenCalledOnce();
+
+      resume();
+      expect(originalRequestSort).not.toHaveBeenCalled();
+    });
+
+    it('leaves a patch layered on top in place and forwards its later calls to the original', () => {
+      const fileExplorerView = createMockFileExplorerView();
+      const originalRequestSort = fileExplorerView.requestSort;
+      const { component } = setup(fileExplorerView);
+
+      const resume = component.suspendSort();
+      const suspendedRequestSort = fileExplorerView.requestSort;
+      const layeredRequestSort = castTo<FileExplorerView['requestSort']>(vi.fn(() => suspendedRequestSort()));
+      fileExplorerView.requestSort = layeredRequestSort;
+
+      resume();
+      expect(fileExplorerView.requestSort).toBe(layeredRequestSort);
+      fileExplorerView.requestSort();
+      expect(originalRequestSort).toHaveBeenCalledOnce();
     });
   });
 });

@@ -24,6 +24,7 @@ export interface StoredVaultPaths {
  * plus a {@link StoredVaultPaths.universeSignature} guarding the fast-enable path.
  */
 export interface VaultPathStore {
+  close: () => void;
   load: () => Promise<StoredVaultPaths>;
   save: (entries: readonly VaultModelEntry[], universeSignature: string) => void;
 }
@@ -40,6 +41,16 @@ export class IndexedDatabaseVaultPathStore implements VaultPathStore {
 
   public constructor(appId: string) {
     this.databaseName = `${appId}/advanced-exclude-vault-paths`;
+  }
+
+  /**
+   * Releases the connection. An open connection blocks every later `deleteDatabase` and version
+   * upgrade, and each enable opened a new one, so a disable must let it go. A pending `save`
+   * still lands: `close` waits for running transactions.
+   */
+  public close(): void {
+    this.database?.close();
+    this.database = null;
   }
 
   public async load(): Promise<StoredVaultPaths> {
