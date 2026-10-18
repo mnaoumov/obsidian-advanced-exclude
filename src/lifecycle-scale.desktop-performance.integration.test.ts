@@ -1,3 +1,4 @@
+import { setTimeout as delay } from 'node:timers/promises';
 import { evalInObsidian } from 'obsidian-integration-testing';
 import { getTemporaryVault } from 'obsidian-integration-testing/vitest-global-setup-plugin';
 import {
@@ -31,6 +32,11 @@ import { ExcludeMode } from './plugin-settings.ts';
  * guards: un-ignoring the folder took 16.4 s → 3.4 s in-session and ~20 min → 16 s across sessions
  * (both bounded by Obsidian re-sorting the whole explorer, and re-scanning every link, once per
  * path); a warm re-enable took 9 s → 0.1 s; the worst main-thread stall fell to ~0.3 s.
+ *
+ * An app start with the folder hidden is measured too, by reloading the window. On that copy it
+ * took 274 s → 12.1 s (11.5 s with nothing ignored): Obsidian's metadata cache purged every hidden
+ * path from its persisted cache one at a time, re-scanning every link per path. In `Full` mode the
+ * start is followed by the real cross-session re-show it sets up.
  */
 
 const PLUGIN_ID = 'advanced-exclude';
@@ -48,6 +54,12 @@ const MAX_CROSS_SESSION_SHOW_MS_PER_PATH = 3;
 // The worst single main-thread task during any step: one this long is a visible freeze while
 // typing. The per-path explorer re-sort produced ~1 s tasks a hundred times over.
 const MAX_LONG_TASK_IN_MS = 1000;
+// An app start is mostly Obsidian's own startup: ~0.04 ms per path on the synthetic vault, up to
+// ~0.3 ms per path until the metadata queue drains. The per-path cache purge cost ~3 ms per path on
+// the real-vault copy, and grows with the vault's size.
+const MAX_RESTART_MS_PER_PATH = 1;
+// Measured below 1 s; the purge held the main thread for 268 s in one stretch.
+const MAX_RESTART_STALL_IN_MS = 5000;
 
 interface ExplorerViewLike {
   readonly fileItems?: Record<string, unknown>;
@@ -73,7 +85,16 @@ interface ProjectionLike {
   readonly updateAbortController: AbortController | null;
 }
 
-type Step = 'coldEnable' | 'hide' | 'showCrossSession' | 'showSameSession' | 'switchMode' | 'warmReEnable';
+interface StartupProbe {
+  readonly explorerFolderItems: number;
+  readonly folderFilesLoaded: number;
+  readonly isSettled: boolean;
+  readonly loadedFiles: number;
+  readonly sinceNavigationMs: number;
+  readonly timeOrigin: number;
+}
+
+type Step = 'coldEnable' | 'hide' | 'restart' | 'showCrossSession' | 'showSameSession' | 'switchMode' | 'warmReEnable';
 
 interface StepResult {
   readonly disableMs?: number;
@@ -100,42 +121,136 @@ afterAll(restorePerformanceVaultExclusions);
 
 describe('Lifecycle at real-vault scale: every step stays bounded', () => {
   it.each([ExcludeMode.Full, ExcludeMode.FilesPane])('in %s mode', async (excludeMode) => {
-    const vaultPath = getTemporaryVault().path;
-    const vaultSize = await settle(vaultPath);
-    expect(vaultSize, 'the vault was populated and indexed').toBeGreaterThan(1000);
-
     const steps: Step[] = excludeMode === ExcludeMode.Full
       ? ['switchMode', 'coldEnable', 'warmReEnable', 'hide', 'showSameSession', 'hide', 'showCrossSession']
       : ['switchMode', 'hide', 'showSameSession'];
-
-    for (const step of steps) {
-      const result = await runStep(vaultPath, step, excludeMode);
-      // Every message carries the step's whole measurement, so a failure reports the numbers.
-      const measured = JSON.stringify(result);
-      expect(result.error, measured).toBeNull();
-      // Soft, so one slow step still lets every later step report its numbers.
-      const msPerPath = step === 'showCrossSession' ? MAX_CROSS_SESSION_SHOW_MS_PER_PATH : MAX_STEP_MS_PER_PATH;
-      expect.soft(result.wallMs, `${step} wall time: ${measured}`).toBeLessThan(vaultSize * msPerPath);
-      expect.soft(result.longTaskMaxMs, `${step} longest main-thread task: ${measured}`).toBeLessThan(MAX_LONG_TASK_IN_MS);
-      if (step === 'coldEnable' || step === 'warmReEnable') {
-        // A re-enable must leave the vault as it found it: nothing is ignored at this point.
-        expect(result.loadedFiles, `${step} kept the vault indexed: ${measured}`).toBe(vaultSize);
-      }
-      if (step === 'warmReEnable' && excludeMode === ExcludeMode.Full) {
-        expect(result.fastEnableApplied, `${step} took the fast path: ${measured}`).toBe(true);
-      }
-      // `Full` mode removes the folder from the index; `FilesPane` mode only from the explorer.
-      const folderVisible = excludeMode === ExcludeMode.Full ? result.folderFilesLoaded : result.explorerFolderItems;
-      if (step === 'hide') {
-        expect(folderVisible, `${step} hid the folder: ${measured}`).toBe(0);
-      } else if (step === 'showSameSession' || step === 'showCrossSession') {
-        expect(folderVisible, `${step} re-showed the folder: ${measured}`).toBeGreaterThan(0);
-      }
-    }
+    await runSteps(steps, excludeMode);
   }, SCENARIO_TIMEOUT_IN_MS);
 });
 
+// Declared last so these run last: after a reload, a connection of the old document kept the
+// `coldEnable` step's `deleteDatabase` blocked.
+describe('App start at real-vault scale with the folder hidden: startup stays bounded', () => {
+  it.each([ExcludeMode.FilesPane, ExcludeMode.Full])('in %s mode', async (excludeMode) => {
+    // After a real restart no hidden path has a snapshot, so the `Full` re-show is the real
+    // cross-session one rather than the simulation the lifecycle above runs.
+    const steps: Step[] = ['switchMode', 'hide', 'restart', excludeMode === ExcludeMode.Full ? 'showCrossSession' : 'showSameSession'];
+    await runSteps(steps, excludeMode);
+  }, SCENARIO_TIMEOUT_IN_MS);
+});
+
+function getMaxMsPerPath(step: Step): number {
+  switch (step) {
+    case 'restart': {
+      return MAX_RESTART_MS_PER_PATH;
+    }
+    case 'showCrossSession': {
+      return MAX_CROSS_SESSION_SHOW_MS_PER_PATH;
+    }
+    default: {
+      return MAX_STEP_MS_PER_PATH;
+    }
+  }
+}
+
+async function probeStartup(vaultPath: string, folder: string): Promise<StartupProbe> {
+  return await evalInObsidian({
+    callback({ app, folder: folderName, PLUGIN_ID: pluginId }): StartupProbe {
+      const folderPrefix = `${folderName}/`;
+      const plugin = app.plugins.getPlugin(pluginId);
+      const projection = plugin ? findComponent(plugin, 'IndexProjectionComponent') as ProjectionLike | undefined : undefined;
+      const explorerView = app.workspace.getLeavesOfType('file-explorer')[0]?.view as ExplorerViewLike | undefined;
+      const loadedFiles = app.vault.getAllLoadedFiles();
+      return {
+        explorerFolderItems: Object.keys(explorerView?.fileItems ?? {}).filter((path) => path.startsWith(folderPrefix)).length,
+        folderFilesLoaded: loadedFiles.filter((file) => file.path.startsWith(folderPrefix)).length,
+        isSettled: app.workspace.layoutReady && app.metadataCache.inProgressTaskCount === 0
+          && projection?.applyingProjectionDepth === 0 && projection.updateAbortController === null,
+        loadedFiles: loadedFiles.length,
+        sinceNavigationMs: Math.round(performance.now()),
+        timeOrigin: performance.timeOrigin
+      };
+
+      function findComponent(root: object, className: string): unknown {
+        if (root.constructor.name === className) {
+          return root;
+        }
+        for (const child of (root as TraversableComponent)._children ?? []) {
+          if (typeof child !== 'object' || child === null) {
+            continue;
+          }
+          const found = findComponent(child, className);
+          if (found) {
+            return found;
+          }
+        }
+        return undefined;
+      }
+    },
+    input: { folder, PLUGIN_ID },
+    vaultPath
+  });
+}
+
+/*
+ * A real app start with the plugin enabled and the folder hidden: the window reloads, so the step
+ * is measured from this side. Its wall time is the new document's own clock when the layout is
+ * ready, the plugin idle and the metadata queue empty, so it includes Obsidian's own startup. No
+ * long-task observer survives the reload, so the longest stall is the longest wait between two
+ * answers to a 250 ms poll.
+ */
+async function restartApp(vaultPath: string, folder: string): Promise<StepResult> {
+  const step = 'restart';
+  const pollInMs = 250;
+  const before = await probeStartup(vaultPath, folder);
+  await evalInObsidian({
+    callback() {
+      // Deferred so this evaluation answers before the document goes away.
+      window.setTimeout(() => {
+        window.location.reload();
+      }, 0);
+    },
+    vaultPath
+  });
+
+  const deadline = Date.now() + SCENARIO_TIMEOUT_IN_MS;
+  let lastAnswerAt: null | number = null;
+  let longestStallMs = 0;
+  while (Date.now() < deadline) {
+    let probe: StartupProbe | undefined;
+    try {
+      probe = await probeStartup(vaultPath, folder);
+    } catch {
+      // The document is between pages.
+    }
+    if (probe && probe.timeOrigin !== before.timeOrigin) {
+      const now = Date.now();
+      if (lastAnswerAt !== null) {
+        longestStallMs = Math.max(longestStallMs, now - lastAnswerAt - pollInMs);
+      }
+      lastAnswerAt = now;
+      if (probe.isSettled) {
+        return {
+          error: null,
+          explorerFolderItems: probe.explorerFolderItems,
+          folderFilesLoaded: probe.folderFilesLoaded,
+          loadedFiles: probe.loadedFiles,
+          longTaskMaxMs: longestStallMs,
+          step,
+          wallMs: probe.sinceNavigationMs
+        };
+      }
+    }
+    // This side runs in Node, which has no `window`.
+    await delay(pollInMs);
+  }
+  return { error: `${step} did not settle`, step };
+}
+
 async function runStep(vaultPath: string, step: Step, excludeMode: ExcludeMode): Promise<StepResult> {
+  if (step === 'restart') {
+    return await restartApp(vaultPath, SCENARIO_FOLDER);
+  }
   return await evalInObsidian({
     async callback({ app, excludeMode: mode, folder, PLUGIN_ID: pluginId, step: currentStep }): Promise<StepResult> {
       const folderPrefix = `${folder}/`;
@@ -315,6 +430,37 @@ async function runStep(vaultPath: string, step: Step, excludeMode: ExcludeMode):
     input: { excludeMode, folder: SCENARIO_FOLDER, PLUGIN_ID, step },
     vaultPath
   });
+}
+
+async function runSteps(steps: readonly Step[], excludeMode: ExcludeMode): Promise<void> {
+  const vaultPath = getTemporaryVault().path;
+  const vaultSize = await settle(vaultPath);
+  expect(vaultSize, 'the vault was populated and indexed').toBeGreaterThan(1000);
+
+  for (const step of steps) {
+    const result = await runStep(vaultPath, step, excludeMode);
+    // Every message carries the step's whole measurement, so a failure reports the numbers.
+    const measured = JSON.stringify(result);
+    expect(result.error, measured).toBeNull();
+    // Soft, so one slow step still lets every later step report its numbers.
+    expect.soft(result.wallMs, `${step} wall time: ${measured}`).toBeLessThan(vaultSize * getMaxMsPerPath(step));
+    const maxLongTaskInMs = step === 'restart' ? MAX_RESTART_STALL_IN_MS : MAX_LONG_TASK_IN_MS;
+    expect.soft(result.longTaskMaxMs, `${step} longest main-thread task: ${measured}`).toBeLessThan(maxLongTaskInMs);
+    if (step === 'coldEnable' || step === 'warmReEnable') {
+      // A re-enable must leave the vault as it found it: nothing is ignored at this point.
+      expect(result.loadedFiles, `${step} kept the vault indexed: ${measured}`).toBe(vaultSize);
+    }
+    if (step === 'warmReEnable' && excludeMode === ExcludeMode.Full) {
+      expect(result.fastEnableApplied, `${step} took the fast path: ${measured}`).toBe(true);
+    }
+    // `Full` mode removes the folder from the index; `FilesPane` mode only from the explorer.
+    const folderVisible = excludeMode === ExcludeMode.Full ? result.folderFilesLoaded : result.explorerFolderItems;
+    if (step === 'hide' || step === 'restart') {
+      expect(folderVisible, `${step} hid the folder: ${measured}`).toBe(0);
+    } else if (step === 'showSameSession' || step === 'showCrossSession') {
+      expect(folderVisible, `${step} re-showed the folder: ${measured}`).toBeGreaterThan(0);
+    }
+  }
 }
 
 async function settle(vaultPath: string): Promise<number> {

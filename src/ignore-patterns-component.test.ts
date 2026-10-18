@@ -108,6 +108,10 @@ interface MtimeEntryWithUserIgnoreFilters {
   userIgnoreFiltersString: string;
 }
 
+interface PendingOpen {
+  succeed?: () => void;
+}
+
 interface ProfileState {
   activeProfileId: null | string;
 }
@@ -544,6 +548,22 @@ describe('IgnorePatternsComponent', () => {
       component.unload();
 
       expect(mockDatabase.close).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('pagehide', () => {
+    it('closes the database and drops the queued verdict writes when the window unloads', async () => {
+      const { filesStore, mockDatabase } = setupIndexedDatabase();
+      const component = createComponent();
+      await component.loadWithPromises();
+      component.isIgnored({ isFolder: false, normalizedPath: 'test.md' });
+
+      window.dispatchEvent(new Event('pagehide'));
+      vi.runAllTimers();
+
+      expect(filesStore.put).not.toHaveBeenCalled();
+      expect(mockDatabase.close).toHaveBeenCalledOnce();
+      component.unload();
     });
   });
 
@@ -1556,6 +1576,41 @@ describe('IgnorePatternsComponent', () => {
       const component = createComponent();
       await component.loadWithPromises();
       expect(component).toBeInstanceOf(IgnorePatternsComponent);
+    });
+
+    it('closes a connection that finishes opening after the component unloaded', async () => {
+      const mockDatabase = strictProxy<IDBDatabase>({ close: vi.fn() });
+      const pendingOpen: PendingOpen = {};
+      const pendingOpenRequest = strictProxy<IDBOpenDBRequest>({
+        readyState: 'pending',
+        result: mockDatabase
+      });
+      Object.defineProperty(pendingOpenRequest, 'addEventListener', {
+        value: vi.fn((event: string, handler: () => void) => {
+          if (event === 'success') {
+            pendingOpen.succeed = handler;
+          }
+        })
+      });
+      Object.defineProperty(window, 'indexedDB', {
+        configurable: true,
+        value: strictProxy<IDBFactory>({
+          open: vi.fn().mockReturnValue(pendingOpenRequest)
+        }),
+        writable: true
+      });
+
+      const component = createComponent();
+      const loadPromise = component.loadWithPromises();
+      // The open is requested only after the imported files are read.
+      await vi.waitFor(() => {
+        expect(pendingOpen.succeed).toBeDefined();
+      });
+      component.unload();
+      pendingOpen.succeed?.();
+      await loadPromise;
+
+      expect(mockDatabase.close).toHaveBeenCalledOnce();
     });
 
     it('should reject via error event when readyState is not done', async () => {
