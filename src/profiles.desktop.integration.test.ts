@@ -1,4 +1,5 @@
 import type { FileExplorerView } from '@obsidian-typings/obsidian-public-latest';
+import type { Plugin } from 'obsidian';
 
 import { evalInObsidian } from 'obsidian-integration-testing';
 import { getTemporaryVault } from 'obsidian-integration-testing/vitest-global-setup-plugin';
@@ -15,6 +16,15 @@ const PLUGIN_ID = 'advanced-exclude';
 const SETTLE_DELAY_IN_MS = 3000;
 const ACTIVE_PROFILE_LOCAL_STORAGE_KEY = 'advanced-exclude:active-profile';
 
+interface FilesSnapshot {
+  explorer: string[];
+  loaded: string[];
+}
+
+interface ProfilesTestPlugin extends Plugin {
+  pluginSettingsComponent: PluginSettingsComponent;
+}
+
 const TEST_FILES = [
   'work/a.md',
   'work/keep.md',
@@ -29,7 +39,7 @@ const TEST_FOLDERS = [
 afterEach(async () => {
   await evalInObsidian({
     async callback({ app, PLUGIN_ID: pluginId, SETTLE_DELAY_IN_MS: settleDelay, TEST_FILES: files, TEST_FOLDERS: folders }) {
-      const plugin = app.plugins.getPlugin(pluginId) as unknown as null | { pluginSettingsComponent: PluginSettingsComponent };
+      const plugin = app.plugins.getPlugin(pluginId) as null | ProfilesTestPlugin;
       if (plugin) {
         await plugin.pluginSettingsComponent.setActiveProfileId(null);
         await plugin.pluginSettingsComponent.editAndSave((settings) => {
@@ -61,13 +71,13 @@ describe('Profiles', () => {
   it('switches the hidden set with the active profile, composed by @import, and keeps the choice on this device', async () => {
     const result = await evalInObsidian({
       async callback({ ACTIVE_PROFILE_LOCAL_STORAGE_KEY: localStorageKey, app, PLUGIN_ID: pluginId, SETTLE_DELAY_IN_MS: settleDelay, TEST_FILES: files }) {
-        const plugin = app.plugins.getPlugin(pluginId) as unknown as null | { manifest: { dir: string }; pluginSettingsComponent: PluginSettingsComponent };
+        const plugin = app.plugins.getPlugin(pluginId) as null | ProfilesTestPlugin;
         if (!plugin) {
           return { error: 'Plugin not loaded' };
         }
         const settingsComponent = plugin.pluginSettingsComponent;
 
-        function snapshot(): { explorer: string[]; loaded: string[] } {
+        function snapshot(): FilesSnapshot {
           const view = app.workspace.getLeavesOfType('file-explorer')[0]?.view as FileExplorerView | undefined;
           return {
             explorer: files.filter((path) => view?.fileItems[path] !== undefined),
@@ -75,7 +85,7 @@ describe('Profiles', () => {
           };
         }
 
-        async function activate(profileId: null | string): Promise<{ explorer: string[]; loaded: string[] }> {
+        async function activate(profileId: null | string): Promise<FilesSnapshot> {
           await settingsComponent.setActiveProfileId(profileId);
           await sleep(settleDelay);
           return snapshot();
@@ -100,7 +110,7 @@ describe('Profiles', () => {
         const work = await activate('work-id');
         const both = await activate('both-id');
         const storedActiveProfileId: unknown = app.loadLocalStorage(localStorageKey);
-        const dataJson = await app.vault.adapter.read(`${plugin.manifest.dir}/data.json`);
+        const dataJson = await app.vault.adapter.read(`${plugin.manifest.dir ?? ''}/data.json`);
         const backToBase = await activate(null);
 
         return { backToBase, base, both, dataJson, error: null, storedActiveProfileId, work };
