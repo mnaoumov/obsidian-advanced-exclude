@@ -4,7 +4,9 @@ import type { App } from 'obsidian';
 import { ComponentEx } from '@mnaoumov/obsidian-lib/components/component-ex';
 import { CallbackLayoutReadyComponent } from '@mnaoumov/obsidian-lib/components/layout-ready-component';
 import { isFolder } from '@mnaoumov/obsidian-lib/file-system';
+import { ensureMetadataCacheReady } from '@mnaoumov/obsidian-lib/metadata-cache';
 import { requestAnimationFrameAsync } from '@mnaoumov/typescript-lib/async';
+import { noop } from '@mnaoumov/typescript-lib/function';
 import {
   getDataAdapterEx,
   ViewType
@@ -24,6 +26,7 @@ import type { VaultPathStore } from './vault-path-store.ts';
 
 import { ROOT_PATH } from './constants.ts';
 import { ExcludeMode } from './plugin-settings.ts';
+import { suspendRelatedLinksUpdates } from './related-links-batch.ts';
 import { computeUniverseSignature } from './universe-signature.ts';
 import { VaultModel } from './vault-model.ts';
 
@@ -47,6 +50,18 @@ const UPDATE_PROGRESS_MESSAGE = 'Updating file tree…';
  */
 const APPLY_YIELD_INTERVAL_IN_MILLISECONDS = 50;
 
+/**
+ * How many same-depth paths a show handles at once. Their disk `stat`s (the stale-snapshot check)
+ * and `reconcileFile` re-reads run concurrently instead of one awaited round trip per path, which
+ * on a 91k-node real vault was most of a 30k-file re-show.
+ */
+const SHOW_CHUNK_SIZE = 200;
+
+interface ApplyProgress {
+  processed: number;
+  readonly total: number;
+}
+
 interface IndexProjectionComponentConstructorParams {
   readonly addToFilesPane: (this: void, normalizedPath: string) => void;
   readonly app: App;
@@ -54,6 +69,10 @@ interface IndexProjectionComponentConstructorParams {
   readonly ignorePatternsComponent: IgnorePatternsComponent;
   readonly manualIndexHider: ManualIndexHider;
   readonly pluginSettingsComponent: PluginSettingsComponent;
+  /**
+   * Holds back the file explorer's whole-tree re-sort until the returned function runs.
+   */
+  readonly suspendFilesPaneSort: (this: void) => () => void;
   readonly updateProgressNotice: UpdateProgressNoticeComponent;
   readonly vaultLoadPatch: VaultLoadPatchComponent;
   readonly vaultPathStore: VaultPathStore;
@@ -62,11 +81,6 @@ interface IndexProjectionComponentConstructorParams {
 interface IndexProjectionComponentRecordCreateParams {
   readonly isFolderPath: boolean;
   readonly normalizedPath: string;
-}
-
-interface IndexProjectionComponentReportApplyProgressParams {
-  readonly processed: number;
-  readonly total: number;
 }
 
 /**
@@ -92,6 +106,9 @@ export class IndexProjectionComponent extends ComponentEx {
   private readonly addToFilesPane: (normalizedPath: string) => void;
   private readonly app: App;
   private applyingProjectionDepth = 0;
+  // Nesting depth of `beginBulkIndexUpdate`: only the outermost scope suspends and resumes, so a
+  // superseding update that overlaps the one it aborts shares a single suspension.
+  private bulkIndexUpdateDepth = 0;
   private readonly deleteFromFilesPane: (normalizedPath: string) => void;
   // Set once the fast-enable path applied the persisted hide directly (no full model
   // build). Suppresses the `onLayoutReady` re-`update()` that would otherwise trigger a
@@ -116,11 +133,16 @@ export class IndexProjectionComponent extends ComponentEx {
   // skipped), so the next update must do a full reconcile instead of a stale delta.
   private needsFullProjection = false;
   private readonly pluginSettingsComponent: PluginSettingsComponent;
+  private resumeBulkIndexUpdate: () => void = noop;
+  private readonly suspendFilesPaneSort: () => () => void;
   private updateAbortController: AbortController | null = null;
   private readonly updateProgressNotice: UpdateProgressNoticeComponent;
   private readonly vaultLoadPatch: VaultLoadPatchComponent;
   private readonly vaultModel: VaultModel;
   private readonly vaultPathStore: VaultPathStore;
+  // Whether the plugin loaded into a session whose layout was already ready (an enable from the
+  // settings, not app startup); see `onLayoutReady`.
+  private wasEnabledAfterLayoutReady = false;
 
   private get excludeMode(): ExcludeMode {
     return this.pluginSettingsComponent.settings.excludeMode;
@@ -136,6 +158,7 @@ export class IndexProjectionComponent extends ComponentEx {
     this.addToFilesPane = params.addToFilesPane;
     this.deleteFromFilesPane = params.deleteFromFilesPane;
     this.manualIndexHider = params.manualIndexHider;
+    this.suspendFilesPaneSort = params.suspendFilesPaneSort;
     this.updateProgressNotice = params.updateProgressNotice;
     this.vaultModel = new VaultModel(
       (normalizedPath, isFolderPath) => params.ignorePatternsComponent.isIgnored({ isFolder: isFolderPath, normalizedPath }),
@@ -154,18 +177,12 @@ export class IndexProjectionComponent extends ComponentEx {
    */
   public async applyDelta(changes: readonly VisibilityChange[], abortSignal?: AbortSignal): Promise<void> {
     this.lastApplyYieldInMilliseconds = performance.now();
-    const adapter = getDataAdapterEx(this.app);
     const shows = changes.filter((change) => change.isVisible).sort((a, b) => pathDepth(a.path) - pathDepth(b.path));
     const hides = changes.filter((change) => !change.isVisible).sort((a, b) => pathDepth(b.path) - pathDepth(a.path));
-    const total = shows.length + hides.length;
-    let processed = 0;
+    const progress: ApplyProgress = { processed: 0, total: shows.length + hides.length };
 
-    for (const change of shows) {
-      if (abortSignal?.aborted) {
-        return;
-      }
-      await this.show(adapter, change);
-      await this.reportApplyProgress({ processed: ++processed, total });
+    if (!await this.showEntries(shows, progress, abortSignal)) {
+      return;
     }
 
     const hiddenPaths: string[] = [];
@@ -175,7 +192,8 @@ export class IndexProjectionComponent extends ComponentEx {
       }
       this.deleteFromFilesPane(change.path);
       hiddenPaths.push(change.path);
-      await this.reportApplyProgress({ processed: ++processed, total });
+      progress.processed++;
+      await this.reportApplyProgress(progress);
     }
     this.hideFromIndex(hiddenPaths);
   }
@@ -189,13 +207,13 @@ export class IndexProjectionComponent extends ComponentEx {
     // A full build replaces any fast-enable seed, so the `onLayoutReady` guard no
     // longer applies.
     this.fastEnableApplied = false;
-    await this.rebuildModel(abortSignal);
+    if (!await this.rebuildModel(abortSignal)) {
+      return;
+    }
     this.lastApplyYieldInMilliseconds = performance.now();
-    const adapter = getDataAdapterEx(this.app);
     const targets = this.vaultModel.getPathsByVisibility(false).sort((a, b) => pathDepth(b.path) - pathDepth(a.path));
-    const missing = this.getMissingVisiblePaths();
-    const total = targets.length + missing.length;
-    let processed = 0;
+    const missing = this.getMissingVisiblePaths().sort((a, b) => pathDepth(a.path) - pathDepth(b.path));
+    const progress: ApplyProgress = { processed: 0, total: targets.length + missing.length };
 
     const hiddenPaths: string[] = [];
     for (const target of targets) {
@@ -204,17 +222,12 @@ export class IndexProjectionComponent extends ComponentEx {
       }
       this.deleteFromFilesPane(target.path);
       hiddenPaths.push(target.path);
-      await this.reportApplyProgress({ processed: ++processed, total });
+      progress.processed++;
+      await this.reportApplyProgress(progress);
     }
     this.hideFromIndex(hiddenPaths);
 
-    for (const entry of missing) {
-      if (abortSignal?.aborted) {
-        return;
-      }
-      await this.show(adapter, entry);
-      await this.reportApplyProgress({ processed: ++processed, total });
-    }
+    await this.showEntries(missing, progress, abortSignal);
   }
 
   /**
@@ -234,9 +247,20 @@ export class IndexProjectionComponent extends ComponentEx {
     if (this.fastEnableApplied) {
       return;
     }
-    if (!this.vaultLoadPatch.wasVaultLoadCalled) {
-      await this.update();
+    // Enabled after layout ready (mid-session): the load-time projection already saw the whole
+    // loaded vault, so a second whole-vault projection here would only repeat it — on a 91k-node
+    // real vault that doubled a re-enable and raced the first one.
+    if (this.wasEnabledAfterLayoutReady) {
+      return;
     }
+    if (this.vaultLoadPatch.wasVaultLoadCalled) {
+      return;
+    }
+
+    // The vault loaded before the plugin did, so the load-time projection may have seen it
+    // half-indexed; project once more on the settled vault.
+    await ensureMetadataCacheReady(this.app);
+    await this.update();
   }
 
   public override async onloadAsync(): Promise<void> {
@@ -246,6 +270,7 @@ export class IndexProjectionComponent extends ComponentEx {
     this.registerEvent(this.app.workspace.on('quit', () => {
       this.isQuitting = true;
     }));
+    this.wasEnabledAfterLayoutReady = this.app.workspace.layoutReady;
     // Own an abort controller for the whole enable up front so an `onunload` during the
     // fast-enable check (its `await` on the persisted store) still aborts the enable —
     // otherwise `update()` would set the controller too late and hide into a torn-down
@@ -271,6 +296,7 @@ export class IndexProjectionComponent extends ComponentEx {
     // later) normally drives the restore before this runs, so this is a no-op then. It stays
     // here so the index is still restored if the child add-order ever changes.
     this.restoreHiddenFilesOnUnload();
+    this.vaultPathStore.close();
     super.onunload();
   }
 
@@ -287,9 +313,11 @@ export class IndexProjectionComponent extends ComponentEx {
       return;
     }
     const targets = this.vaultModel.getPathsByVisibility(false).sort((a, b) => pathDepth(b.path) - pathDepth(a.path));
+    const endBulkIndexUpdate = this.beginBulkIndexUpdate();
     for (const target of targets) {
       this.deleteFromFilesPane(target.path);
     }
+    endBulkIndexUpdate();
   }
 
   /**
@@ -348,9 +376,11 @@ export class IndexProjectionComponent extends ComponentEx {
     const restored = hidden
       .filter((entry) => !withoutSnapshot.has(entry.path))
       .sort((a, b) => pathDepth(a.path) - pathDepth(b.path));
+    const endBulkIndexUpdate = this.beginBulkIndexUpdate();
     for (const entry of restored) {
       this.addToFilesPane(entry.path);
     }
+    endBulkIndexUpdate();
     this.refreshLinkViews();
     return withoutSnapshot.size === 0;
   }
@@ -369,6 +399,7 @@ export class IndexProjectionComponent extends ComponentEx {
     this.updateAbortController = abortController;
     const abortSignal = abortController.signal;
     this.beginProjection();
+    const endBulkIndexUpdate = this.beginBulkIndexUpdate();
     this.updateProgressNotice.start(UPDATE_PROGRESS_MESSAGE);
     try {
       // Let the notice (and its indeterminate bar) paint before the first synchronous
@@ -411,6 +442,7 @@ export class IndexProjectionComponent extends ComponentEx {
         this.refreshLinkViews();
       }
     } finally {
+      endBulkIndexUpdate();
       this.endProjection();
       // Only the current update owns the notice/controller: a superseding update
       // already replaced them, so a superseded run must not hide the new notice.
@@ -419,6 +451,34 @@ export class IndexProjectionComponent extends ComponentEx {
         this.updateAbortController = null;
       }
     }
+  }
+
+  /**
+   * Batches the per-path side effects Obsidian runs for every explorer and index change, until
+   * the returned function runs: the explorer's whole-tree re-sort (see
+   * `FileTreeComponent.suspendSort`) and the vault-wide related-links pass of each re-added file
+   * (see `suspendRelatedLinksUpdates`). Each runs once at the end instead of once per path or per
+   * paint frame. Nested scopes share the outermost one. Call the returned function exactly once.
+   */
+  private beginBulkIndexUpdate(): () => void {
+    if (this.bulkIndexUpdateDepth === 0) {
+      const resumeFilesPaneSort = this.suspendFilesPaneSort();
+      const resumeRelatedLinksUpdates = suspendRelatedLinksUpdates(this.app);
+      this.resumeBulkIndexUpdate = (): void => {
+        resumeRelatedLinksUpdates();
+        resumeFilesPaneSort();
+      };
+    }
+    this.bulkIndexUpdateDepth++;
+    return () => {
+      this.bulkIndexUpdateDepth--;
+      if (this.bulkIndexUpdateDepth !== 0) {
+        return;
+      }
+
+      this.resumeBulkIndexUpdate();
+      this.resumeBulkIndexUpdate = noop;
+    };
   }
 
   private beginProjection(): void {
@@ -518,7 +578,18 @@ export class IndexProjectionComponent extends ComponentEx {
     this.vaultPathStore.save(hidden, this.computeUniverseSignature(hidden));
   }
 
-  private async rebuildModel(abortSignal?: AbortSignal): Promise<void> {
+  /**
+   * Rebuilds the model from the persisted path set merged with Obsidian's loaded tree, and
+   * persists the result. Returns `false`, persisting nothing, when aborted.
+   *
+   * The model is shared by every update, and a superseded update keeps running until its next
+   * abort check. Before these checks an aborted update resumed from its `await`s and rebuilt the
+   * model under the live update mid-recompute: the live update then read every node at its
+   * not-yet-recomputed default (hidden), hid the whole vault, and the aborted one persisted that
+   * partial model as the hidden set the next fast enable would trust. A mid-session enable
+   * reached it, because two updates fire there.
+   */
+  private async rebuildModel(abortSignal?: AbortSignal): Promise<boolean> {
     // A full recompute evaluates every node's ignore verdict, so warm the persisted
     // verdict cache first (deferred off the fast-enable path). A no-op after a config
     // reset, whose recompute is intentionally cold.
@@ -533,6 +604,9 @@ export class IndexProjectionComponent extends ComponentEx {
       byPath.set(entry.path, entry);
     }
     const stored = await this.vaultPathStore.load();
+    if (abortSignal?.aborted) {
+      return false;
+    }
     for (const entry of stored.entries) {
       byPath.set(entry.path, entry);
     }
@@ -543,7 +617,11 @@ export class IndexProjectionComponent extends ComponentEx {
       byPath.set(file.path, { isFolder: isFolder(file), path: file.path });
     }
     await this.vaultModel.rebuild([...byPath.values()], this.createRecomputeOptions(abortSignal));
+    if (abortSignal?.aborted) {
+      return false;
+    }
     this.persistHiddenSet();
+    return true;
   }
 
   /**
@@ -579,8 +657,8 @@ export class IndexProjectionComponent extends ComponentEx {
     }
   }
 
-  private async reportApplyProgress(params: IndexProjectionComponentReportApplyProgressParams): Promise<void> {
-    const { processed, total } = params;
+  private async reportApplyProgress(progress: Readonly<ApplyProgress>): Promise<void> {
+    const { processed, total } = progress;
     // Time-based cadence: yield only once APPLY_YIELD_INTERVAL_IN_MILLISECONDS have
     // elapsed since the last yield (always at completion). A per-item-count cadence
     // made the loop's wall-clock scale with the item count — each yield is ~one frame,
@@ -597,30 +675,58 @@ export class IndexProjectionComponent extends ComponentEx {
   }
 
   /**
-   * In `Full` mode, restores a path that was hidden this session from its snapshot
-   * (no re-parse) and drives the explorer; a path with no snapshot (e.g. hidden by
-   * a prior session and never loaded) is re-parsed via `reconcileFile`, which fires
-   * its own create event that updates the explorer. In `FilesPane` mode the show is
-   * purely the explorer.
+   * Shows one chunk of same-depth paths. In `Full` mode a path hidden this session is restored
+   * from its snapshot (no re-parse) and driven into the explorer; a path with no snapshot (hidden
+   * by a prior session and never loaded) is re-parsed via `reconcileFile`, which fires its own
+   * create event that updates the explorer. The chunk's disk `stat`s and re-parses run
+   * concurrently. In `FilesPane` mode the show is purely the explorer.
    */
-  private async show(adapter: DataAdapterEx, entry: VaultModelEntry): Promise<void> {
+  private async showChunk(adapter: DataAdapterEx, chunk: readonly VaultModelEntry[]): Promise<void> {
     if (this.excludeMode !== ExcludeMode.Full) {
-      this.addToFilesPane(entry.path);
+      for (const entry of chunk) {
+        this.addToFilesPane(entry.path);
+      }
       return;
     }
-    await this.invalidateStaleSnapshot(adapter, entry);
-    const withoutSnapshot = this.manualIndexHider.show([entry.path]);
-    if (withoutSnapshot.length > 0) {
+    await Promise.all(chunk.map(async (entry) => {
+      await this.invalidateStaleSnapshot(adapter, entry);
+    }));
+    const withoutSnapshot = new Set(this.manualIndexHider.show(chunk.map((entry) => entry.path)));
+    const reParsedPaths: string[] = [];
+    for (const entry of chunk) {
+      if (!withoutSnapshot.has(entry.path)) {
+        this.addToFilesPane(entry.path);
+        continue;
+      }
       // The prior session's hide removed the path from `vault.fileMap`/`metadataCache`
       // but left the adapter's own stat record intact, so `reconcileFile` would compare
       // disk against that stale record, see no change, and re-add nothing. Drop the
       // record first so `reconcileFile` treats the still-on-disk file as new.
       // eslint-disable-next-line @typescript-eslint/no-dynamic-delete -- invalidate the adapter's stale stat record so the re-parse re-adds the file.
       delete adapter.files[entry.path];
-      await adapter.reconcileFile(entry.path, entry.path);
-    } else {
-      this.addToFilesPane(entry.path);
+      reParsedPaths.push(entry.path);
     }
+    await Promise.all(reParsedPaths.map(async (path) => {
+      await adapter.reconcileFile(path, path);
+    }));
+  }
+
+  /**
+   * Shows `entries`, which must be sorted shallowest-first, in chunks of same-depth paths, so a
+   * folder exists before any file it must contain while the paths of one depth are handled
+   * concurrently. Returns `false` when aborted.
+   */
+  private async showEntries(entries: readonly VaultModelEntry[], progress: ApplyProgress, abortSignal?: AbortSignal): Promise<boolean> {
+    const adapter = getDataAdapterEx(this.app);
+    for (const chunk of chunkByDepth(entries, SHOW_CHUNK_SIZE)) {
+      if (abortSignal?.aborted) {
+        return false;
+      }
+      await this.showChunk(adapter, chunk);
+      progress.processed += chunk.length;
+      await this.reportApplyProgress(progress);
+    }
+    return true;
   }
 
   /**
@@ -634,9 +740,11 @@ export class IndexProjectionComponent extends ComponentEx {
    *
    * Returns whether the fast path was taken. Ineligible — and the caller falls back to
    * the proven full `update()` — when not in `Full` mode, the config fingerprint
-   * changed, there is no persisted hidden set, or the universe signature does not match
-   * (files changed on disk while disabled, or a cold start where the vault is not yet
-   * loaded so the signature cannot match).
+   * changed, nothing was ever persisted (no signature), or the universe signature does not
+   * match (files changed on disk while disabled, or a cold start where the vault is not yet
+   * loaded so the signature cannot match). An EMPTY persisted hidden set is eligible: with
+   * the config and universe unchanged there is simply nothing to hide, and rebuilding the
+   * whole model to find that out cost ~6 s on a 91k-node real vault.
    */
   private async tryFastEnable(abortSignal: AbortSignal): Promise<boolean> {
     if (this.excludeMode !== ExcludeMode.Full || !this.ignorePatternsComponent.isConfigUnchanged()) {
@@ -645,11 +753,12 @@ export class IndexProjectionComponent extends ComponentEx {
 
     const stored = await this.vaultPathStore.load();
     // A disable during the `load()` above unloaded the component; do not mutate the index.
-    if (abortSignal.aborted || stored.universeSignature === null || stored.entries.length === 0 || (this.computeUniverseSignature(stored.entries) !== stored.universeSignature)) {
+    if (abortSignal.aborted || stored.universeSignature === null || (this.computeUniverseSignature(stored.entries) !== stored.universeSignature)) {
       return false;
     }
 
     this.beginProjection();
+    const endBulkIndexUpdate = this.beginBulkIndexUpdate();
     try {
       this.vaultModel.seedHidden(stored.entries);
       const targets = [...stored.entries].sort((a, b) => pathDepth(b.path) - pathDepth(a.path));
@@ -661,12 +770,35 @@ export class IndexProjectionComponent extends ComponentEx {
       this.hideFromIndex(hiddenPaths);
       this.refreshLinkViews();
     } finally {
+      endBulkIndexUpdate();
       this.endProjection();
     }
 
     this.fastEnableApplied = true;
     return true;
   }
+}
+
+/**
+ * Splits `entries` (sorted by depth) into chunks of at most `chunkSize` paths that all share one depth.
+ */
+function chunkByDepth(entries: readonly VaultModelEntry[], chunkSize: number): VaultModelEntry[][] {
+  const chunks: VaultModelEntry[][] = [];
+  let chunk: VaultModelEntry[] = [];
+  let chunkDepth = 0;
+  for (const entry of entries) {
+    const depth = pathDepth(entry.path);
+    if (chunk.length > 0 && (depth !== chunkDepth || chunk.length === chunkSize)) {
+      chunks.push(chunk);
+      chunk = [];
+    }
+    chunkDepth = depth;
+    chunk.push(entry);
+  }
+  if (chunk.length > 0) {
+    chunks.push(chunk);
+  }
+  return chunks;
 }
 
 function pathDepth(normalizedPath: string): number {

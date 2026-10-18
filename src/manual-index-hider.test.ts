@@ -27,6 +27,18 @@ interface Fixture {
   unresolvedLinks: MetadataCache['unresolvedLinks'];
 }
 
+interface FolderLike {
+  readonly children: unknown[];
+}
+
+interface HiddenSnapshotLike {
+  readonly node: unknown;
+}
+
+interface HiderInternals {
+  readonly snapshots: Map<string, HiddenSnapshotLike>;
+}
+
 let fixture: Fixture;
 let hider: ManualIndexHider;
 
@@ -115,6 +127,26 @@ describe('ManualIndexHider', () => {
       expect(fixture.unresolvedLinks['linker.md']?.['a.md']).toBeUndefined();
       expect(hider.hasSnapshot('a.md')).toBe(false);
       expect(childrenPaths('/')).toContain('a.md');
+    });
+
+    it('hides and restores several children of one folder in one pass each', () => {
+      hider.hide(['a.md', 'linker.md']);
+      expect(childrenPaths('/')).not.toContain('a.md');
+      expect(childrenPaths('/')).not.toContain('linker.md');
+
+      hider.show(['a.md', 'linker.md']);
+      expect(childrenPaths('/')).toEqual(expect.arrayContaining(['a.md', 'linker.md']));
+    });
+
+    it('does not add a restored node twice when its parent already lists it again', () => {
+      hider.hide(['a.md']);
+      // Something else re-listed the hidden node meanwhile; restoring must not duplicate it.
+      const root = castTo<FolderLike>(fixture.fileMap['/']);
+      root.children.push(castTo<HiderInternals>(hider).snapshots.get('a.md')?.node);
+
+      hider.show(['a.md']);
+
+      expect(childrenPaths('/').filter((path) => path === 'a.md')).toHaveLength(1);
     });
 
     it('restores a file with outgoing resolved and unresolved links', () => {

@@ -37,7 +37,12 @@ import type { VaultModel } from './vault-model.ts';
 
 import { IndexProjectionComponent } from './index-projection-component.ts';
 import { ExcludeMode } from './plugin-settings.ts';
+import { suspendRelatedLinksUpdates } from './related-links-batch.ts';
 import { computeUniverseSignature } from './universe-signature.ts';
+
+vi.mock('./related-links-batch.ts', () => ({
+  suspendRelatedLinksUpdates: vi.fn()
+}));
 
 vi.mock('@obsidian-typings/obsidian-public-latest/implementations', async (importOriginal) => ({
   ...await importOriginal<typeof import('@obsidian-typings/obsidian-public-latest/implementations')>(),
@@ -48,8 +53,13 @@ vi.mock('@mnaoumov/obsidian-lib/file-system', () => ({
   isFolder: vi.fn()
 }));
 
+vi.mock('@mnaoumov/obsidian-lib/metadata-cache', () => ({
+  ensureMetadataCacheReady: vi.fn().mockResolvedValue(undefined)
+}));
+
 const mockGetDataAdapterEx = vi.mocked(getDataAdapterEx);
 const mockIsFolder = vi.mocked(isFolder);
+const mockSuspendRelatedLinksUpdates = vi.mocked(suspendRelatedLinksUpdates);
 
 // The disk stat a fresh (non-stale) snapshot matches: getSnapshotStat and adapter.stat
 // both return this by default, so the staleness check finds the snapshot up to date.
@@ -86,19 +96,24 @@ interface SetupParams {
   readonly persistedEntries?: readonly MockEntry[];
   readonly persistedUniverseSignature?: null | string;
   readonly shouldHideEmptyFolders?: boolean;
+  readonly wasLayoutReadyAtLoad?: boolean;
   readonly wasVaultLoadCalled?: boolean;
 }
 
 interface SetupResult {
   readonly addToFilesPane: Mock<(normalizedPath: string) => void>;
   readonly app: App;
+  readonly closeVaultPathStore: Mock;
   readonly component: IndexProjectionComponent;
   readonly deleteFromFilesPane: Mock<(normalizedPath: string) => void>;
   readonly fireQuit: () => void;
   readonly fireWorkspaceLayoutReady: () => void;
   readonly manualIndexHider: MockManualIndexHider;
   readonly mockAdapter: MockAdapter;
+  readonly resumeFilesPaneSort: Mock<() => void>;
+  readonly resumeRelatedLinksUpdates: Mock<() => void>;
   readonly save: ReturnType<typeof vi.fn>;
+  readonly suspendFilesPaneSort: Mock<() => () => void>;
 }
 
 interface TestableIndexProjectionComponent {
@@ -124,6 +139,7 @@ function setup(params: SetupParams): SetupResult {
     persistedEntries = [],
     persistedUniverseSignature = null,
     shouldHideEmptyFolders = false,
+    wasLayoutReadyAtLoad = false,
     wasVaultLoadCalled = false
   } = params;
 
@@ -154,6 +170,7 @@ function setup(params: SetupParams): SetupResult {
     },
     workspace: {
       getLeavesOfType: vi.fn<(viewType: string) => WorkspaceLeaf[]>().mockReturnValue([]),
+      layoutReady: wasLayoutReadyAtLoad,
       // Capture the `'quit'` handler so tests can simulate app shutdown; the returned
       // `EventRef` stub has no `e`, so `registerEvent`'s unload cleanup is a safe no-op.
       on: castTo<App['workspace']['on']>(vi.fn((name: string, callback: () => void) => {
@@ -185,11 +202,16 @@ function setup(params: SetupParams): SetupResult {
   const persisted = persistedEntries.map((entry) => ({ isFolder: entry.isFolderFlag, path: entry.path }));
   const save = vi.fn();
   const vaultPathStore = {
+    close: vi.fn(),
     load: vi.fn().mockResolvedValue({ entries: persisted, universeSignature: persistedUniverseSignature }),
     save
   };
 
   const addToFilesPane = vi.fn<(normalizedPath: string) => void>();
+  const resumeRelatedLinksUpdates = vi.fn<() => void>();
+  mockSuspendRelatedLinksUpdates.mockReset().mockReturnValue(resumeRelatedLinksUpdates);
+  const resumeFilesPaneSort = vi.fn<() => void>();
+  const suspendFilesPaneSort = vi.fn<() => () => void>(() => resumeFilesPaneSort);
   const deleteFromFilesPane = vi.fn<(normalizedPath: string) => void>();
 
   // Snapshot-backed restore is the default (show finds a snapshot, returns no
@@ -223,12 +245,13 @@ function setup(params: SetupParams): SetupResult {
       show: manualIndexHider.show
     }),
     pluginSettingsComponent,
+    suspendFilesPaneSort,
     updateProgressNotice,
     vaultLoadPatch,
     vaultPathStore
   });
 
-  return { addToFilesPane, app, component, deleteFromFilesPane, fireQuit, fireWorkspaceLayoutReady, manualIndexHider, mockAdapter, save };
+  return { addToFilesPane, app, closeVaultPathStore: vaultPathStore.close, component, deleteFromFilesPane, fireQuit, fireWorkspaceLayoutReady, manualIndexHider, mockAdapter, resumeFilesPaneSort, resumeRelatedLinksUpdates, save, suspendFilesPaneSort };
 
   function fireWorkspaceLayoutReady(): void {
     workspaceLayoutReadyCallback?.();
@@ -784,6 +807,74 @@ describe('IndexProjectionComponent', () => {
 
       expect(mockAdapter.reconcileFile).not.toHaveBeenCalled();
     });
+
+    it('re-adds missing paths shallowest-first, so a folder exists before its file', async () => {
+      const { component, manualIndexHider, mockAdapter } = setup({
+        entries: [{ isFolderFlag: false, path: 'alpha.md' }],
+        isIgnored: () => false,
+        persistedEntries: [
+          { isFolderFlag: false, path: 'gone/deep.md' },
+          { isFolderFlag: true, path: 'gone' }
+        ]
+      });
+      // Hidden by a prior session: no in-session snapshot, so each show falls back to a re-parse.
+      manualIndexHider.show.mockImplementation((paths: readonly string[]) => [...paths]);
+
+      await component.applyFull();
+
+      expect(mockAdapter.reconcileFile.mock.calls.map(([path]) => path as string)).toEqual(['gone', 'gone/deep.md']);
+    });
+
+    it('re-adds more same-depth paths than one chunk holds', async () => {
+      const persistedEntries = Array.from({ length: 250 }, (_, index) => ({ isFolderFlag: false, path: `missing-${String(index)}.md` }));
+      const { component, manualIndexHider, mockAdapter } = setup({
+        entries: [{ isFolderFlag: false, path: 'alpha.md' }],
+        isIgnored: () => false,
+        persistedEntries
+      });
+      manualIndexHider.show.mockImplementation((paths: readonly string[]) => [...paths]);
+
+      await component.applyFull();
+
+      expect(mockAdapter.reconcileFile).toHaveBeenCalledTimes(persistedEntries.length);
+    });
+
+    it('stops the hide pass, hiding nothing, when aborted part-way through it', async () => {
+      const controller = new AbortController();
+      const { component, deleteFromFilesPane, manualIndexHider } = setup({
+        entries: [
+          { isFolderFlag: false, path: 'one.md' },
+          { isFolderFlag: false, path: 'two.md' }
+        ],
+        isIgnored: () => true
+      });
+      deleteFromFilesPane.mockImplementationOnce(() => {
+        controller.abort();
+      });
+
+      await component.applyFull(controller.signal);
+
+      expect(deleteFromFilesPane).toHaveBeenCalledOnce();
+      expect(manualIndexHider.hide).not.toHaveBeenCalled();
+    });
+
+    it('persists and hides nothing when aborted while the model rebuilds', async () => {
+      // A superseded update must not leave its half-recomputed model behind: every node it did not
+      // reach still reads hidden, and persisting that would poison the next fast enable.
+      const controller = new AbortController();
+      const { component, manualIndexHider, save } = setup({
+        entries: [{ isFolderFlag: false, path: 'drop.md' }],
+        isIgnored: () => {
+          controller.abort();
+          return false;
+        }
+      });
+
+      await component.applyFull(controller.signal);
+
+      expect(save).not.toHaveBeenCalled();
+      expect(manualIndexHider.hide).not.toHaveBeenCalled();
+    });
   });
 
   describe('lifecycle', () => {
@@ -834,6 +925,29 @@ describe('IndexProjectionComponent', () => {
       await vi.runAllTimersAsync();
 
       expect(manualIndexHider.hide).toHaveBeenCalledWith(['drop.md']);
+    });
+
+    it('skips projecting on layout ready when enabled mid-session, after the layout was ready', async () => {
+      const ignored = new Set<string>();
+      const { component, fireWorkspaceLayoutReady, manualIndexHider } = setup({
+        entries: [{ isFolderFlag: false, path: 'drop.md' }],
+        isIgnored: (path) => ignored.has(path),
+        wasLayoutReadyAtLoad: true,
+        wasVaultLoadCalled: false
+      });
+
+      const loadPromise = component.loadWithPromises();
+      await vi.runAllTimersAsync();
+      await loadPromise;
+      manualIndexHider.hide.mockClear();
+
+      // The load-time projection already saw the whole loaded vault, so layout ready must not
+      // start a second, racing whole-vault projection.
+      ignored.add('drop.md');
+      fireWorkspaceLayoutReady();
+      await vi.runAllTimersAsync();
+
+      expect(manualIndexHider.hide).not.toHaveBeenCalled();
     });
 
     it('skips projecting on layout ready when the vault load was intercepted', async () => {
@@ -925,8 +1039,8 @@ describe('IndexProjectionComponent', () => {
       vi.useRealTimers();
     });
 
-    it('is a no-op when no update is in flight', async () => {
-      const { component } = setup({
+    it('is a no-op when no update is in flight, apart from releasing the path store', async () => {
+      const { closeVaultPathStore, component } = setup({
         entries: [{ isFolderFlag: false, path: 'a.md' }],
         isIgnored: () => false
       });
@@ -940,6 +1054,7 @@ describe('IndexProjectionComponent', () => {
       expect(() => {
         component.unload();
       }).not.toThrow();
+      expect(closeVaultPathStore).toHaveBeenCalledOnce();
     });
 
     it('aborts an in-flight update', async () => {
@@ -1186,8 +1301,8 @@ describe('IndexProjectionComponent', () => {
       expect(manualIndexHider.hide).not.toHaveBeenCalled();
     });
 
-    it('falls back to a full projection when there is no persisted hidden set', async () => {
-      const { component, save } = setup({
+    it('fast-enables an empty persisted hidden set and builds the model only on the next update', async () => {
+      const { component, manualIndexHider, save } = setup({
         configUnchanged: true,
         entries: [{ isFolderFlag: false, path: 'a.md' }],
         isIgnored: () => false,
@@ -1197,8 +1312,18 @@ describe('IndexProjectionComponent', () => {
 
       await runLoad(component);
 
-      // Nothing to fast-hide, so the normal path runs and persists.
+      // Config and universe unchanged with nothing hidden: there is nothing to do, so no
+      // whole-vault rebuild runs (it cost ~6 s on a 91k-node real vault) and nothing persists.
+      expect(manualIndexHider.hide).not.toHaveBeenCalled();
+      expect(save).not.toHaveBeenCalled();
+
+      // The next config change still builds the full model, and hides nothing.
+      const updatePromise = component.update();
+      await vi.runAllTimersAsync();
+      await updatePromise;
       expect(save).toHaveBeenCalled();
+      expect(component.getHiddenCount()).toBe(0);
+      expect(manualIndexHider.hide).not.toHaveBeenCalled();
     });
   });
 

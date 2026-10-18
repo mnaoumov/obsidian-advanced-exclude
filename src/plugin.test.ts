@@ -42,6 +42,7 @@ vi.mock('@mnaoumov/obsidian-lib/components/plugin-settings-tab-component', () =>
 class MockFileTreeComponent extends Component {
   public addToFilesPane = vi.fn();
   public deleteFromFilesPane = vi.fn();
+  public suspendSort = vi.fn();
 }
 
 let capturedOnFileExplorerViewBuilt: (() => void) | undefined;

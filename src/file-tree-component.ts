@@ -3,6 +3,7 @@ import type { App } from 'obsidian';
 
 import { ComponentEx } from '@mnaoumov/obsidian-lib/components/component-ex';
 import { CallbackLayoutReadyComponent } from '@mnaoumov/obsidian-lib/components/layout-ready-component';
+import { noop } from '@mnaoumov/typescript-lib/function';
 import { ViewType } from '@obsidian-typings/obsidian-public-latest/implementations';
 
 interface FileTreeComponentConstructorParams {
@@ -60,6 +61,57 @@ export class FileTreeComponent extends ComponentEx {
 
   public override onload(): void {
     this.addChild(new CallbackLayoutReadyComponent(this.app, this.onLayoutReady.bind(this)));
+  }
+
+  /**
+   * Holds back the explorer's re-sort until the returned `resume` runs, then sorts once if any
+   * change asked for it.
+   *
+   * Every explorer `onCreate` / `onDelete` calls `requestSort`, a 20 ms debounce whose `sort`
+   * re-sorts every folder of the vault. A projection that adds or removes thousands of items and
+   * yields to paint in between let that debounce fire at every yield: un-ignoring a 30k-file folder
+   * spent 13 s of a 16 s apply re-sorting a 91k-item tree. Calls made after `resume` go straight to
+   * the original, so a patch layered on top in the meantime still works.
+   */
+  public suspendSort(): () => void {
+    const fileExplorerView = this.getFileExplorerView();
+    if (!fileExplorerView) {
+      return noop;
+    }
+
+    const originalRequestSort = fileExplorerView.requestSort;
+    let isResumed = false;
+    let wasSortRequested = false;
+    const suspendedRequestSort = Object.assign(() => {
+      if (isResumed) {
+        return originalRequestSort();
+      }
+      wasSortRequested = true;
+      return suspendedRequestSort;
+    }, {
+      cancel: () => {
+        wasSortRequested = false;
+        return suspendedRequestSort;
+      },
+      run: () => {
+        wasSortRequested = false;
+        fileExplorerView.sort();
+      }
+    });
+    fileExplorerView.requestSort = suspendedRequestSort;
+
+    return () => {
+      if (isResumed) {
+        return;
+      }
+      isResumed = true;
+      if (fileExplorerView.requestSort === suspendedRequestSort) {
+        fileExplorerView.requestSort = originalRequestSort;
+      }
+      if (wasSortRequested) {
+        originalRequestSort();
+      }
+    };
   }
 
   private getFileExplorerView(): FileExplorerView | undefined {

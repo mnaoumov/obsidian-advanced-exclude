@@ -41,8 +41,7 @@ export class Plugin extends PluginBase {
       new IgnorePatternsComponent({
         app: this.app,
         onUpdateFileTree: (): Promise<void> => indexProjectionComponent.update(),
-        pluginSettingsComponent,
-        vaultLoadPatch
+        pluginSettingsComponent
       })
     );
 
@@ -72,6 +71,7 @@ export class Plugin extends PluginBase {
         ignorePatternsComponent,
         manualIndexHider: new ManualIndexHider(this.app),
         pluginSettingsComponent,
+        suspendFilesPaneSort: fileTreeComponent.suspendSort.bind(fileTreeComponent),
         updateProgressNotice,
         vaultLoadPatch,
         vaultPathStore: new IndexedDatabaseVaultPathStore(this.app.appId)

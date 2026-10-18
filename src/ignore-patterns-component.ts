@@ -12,7 +12,6 @@ import {
   debounce
 } from 'obsidian';
 
-import type { VaultLoadPatchComponent } from './patches/vault-load-patch-component.ts';
 import type { PluginSettingsComponent } from './plugin-settings-component.ts';
 import type { PluginSettings } from './plugin-settings.ts';
 
@@ -37,6 +36,12 @@ const IGNORE_MATCHER_VERSION = 2;
 const MTIME_STORE_NAME = 'mtime';
 const FILES_STORE_NAME = 'files';
 const PROCESS_STORE_ACTIONS_DEBOUNCE_INTERVAL_IN_MILLISECONDS = 5000;
+/**
+ * How many queued verdict writes one flush transaction takes before yielding. A pattern change
+ * re-verdicts the whole vault, and writing ~91k verdicts in one task froze the window for ~1 s at
+ * a 91k-node real vault's scale.
+ */
+const STORE_ACTIONS_CHUNK_SIZE = 2000;
 
 interface DatabaseFileEntry {
   isIgnored: boolean;
@@ -61,7 +66,6 @@ interface IgnorePatternsComponentConstructorParams {
   readonly app: App;
   readonly onUpdateFileTree: (this: void) => Promise<void>;
   readonly pluginSettingsComponent: PluginSettingsComponent;
-  readonly vaultLoadPatch: VaultLoadPatchComponent;
 }
 
 interface IgnorePatternsComponentIsIgnoredParams {
@@ -70,7 +74,8 @@ interface IgnorePatternsComponentIsIgnoredParams {
 }
 
 export class IgnorePatternsComponent extends LayoutReadyComponent {
-  private _database?: IDBDatabase;
+  // Initialized so onunload can test it before a load ever opened it.
+  private _database: IDBDatabase | undefined = undefined;
   private cachedExcludeRegExps: null | RegExp[] = null;
   private cachedGitIgnoreContent = '';
   private cachedIgnoreTester: ignore.Ignore | null = null;
@@ -83,12 +88,14 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
   private readonly onUpdateFileTree: () => Promise<void>;
   private pendingStoreActions = new Map<string, (store: IDBObjectStore) => void>();
   private readonly pluginSettingsComponent: PluginSettingsComponent;
-
   private readonly processStoreActionsDebounced = debounce(() => {
     this.processStoreActions();
   }, PROCESS_STORE_ACTIONS_DEBOUNCE_INTERVAL_IN_MILLISECONDS);
 
-  private readonly vaultLoadPatch: VaultLoadPatchComponent;
+  // Bumped whenever queued verdicts stop being valid (a store reset, an unload), so a chunked
+  // flush still running from before stops instead of writing stale verdicts into the fresh store.
+  private storeGeneration = 0;
+
   // Whether the persisted per-path verdicts have been hydrated into `fileIgnoreMap`
   // (or there is nothing left to hydrate after a reset). Deferred off the enable
   // path; see `ensureVerdictsLoaded`.
@@ -105,7 +112,6 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
     super(params.app);
     this.onUpdateFileTree = params.onUpdateFileTree;
     this.pluginSettingsComponent = params.pluginSettingsComponent;
-    this.vaultLoadPatch = params.vaultLoadPatch;
   }
 
   /**
@@ -221,6 +227,23 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
     );
   }
 
+  /**
+   * Releases the connection. An open connection blocks every later `deleteDatabase` and version
+   * upgrade, and each enable opened a new one, so a disable must let it go.
+   *
+   * Verdict writes still queued are dropped, not flushed: the store is only a cache that the next
+   * full build refills on a miss, and flushing a whole vault's worth (~91k puts on a 91k-node real
+   * vault) blocked the disable for a second.
+   */
+  public override onunload(): void {
+    this.processStoreActionsDebounced.cancel();
+    this.pendingStoreActions.clear();
+    this.storeGeneration++;
+    this._database?.close();
+    this._database = undefined;
+    super.onunload();
+  }
+
   public async processConfigChanges(): Promise<void> {
     if (!this.hadConfigChanges) {
       return;
@@ -238,10 +261,8 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
         this.clearCachedExcludeRegExps();
       }
     }));
-
-    if (!this.vaultLoadPatch.wasVaultLoadCalled) {
-      await this.onUpdateFileTree();
-    }
+    // The re-projection a layout-ready enable needs is `IndexProjectionComponent.onLayoutReady`'s
+    // alone: a second trigger here raced it on every mid-session enable (see `rebuildModel`).
   }
 
   private addStoreAction(normalizedPath: string, storeAction: (store: IDBObjectStore) => void): void {
@@ -362,15 +383,9 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
   }
 
   private processStoreActions(): void {
-    const pendingStoreActions = this.pendingStoreActions;
+    const storeActions = [...this.pendingStoreActions.values()];
     this.pendingStoreActions = new Map();
-
-    const transaction = this.database.transaction(FILES_STORE_NAME, 'readwrite');
-    const store = transaction.objectStore(FILES_STORE_NAME);
-    for (const action of pendingStoreActions.values()) {
-      action(store);
-    }
-    transaction.commit();
+    this.writeStoreActionChunk(storeActions, 0, this.storeGeneration);
   }
 
   private async readGitIgnore(): Promise<boolean> {
@@ -426,6 +441,7 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
     // Drop any queued writes: they target the store we just cleared and would
     // otherwise repopulate it with stale entries.
     this.pendingStoreActions.clear();
+    this.storeGeneration++;
     // The store is now empty, so there is nothing left for `ensureVerdictsLoaded`
     // to hydrate — `fileIgnoreMap` (empty) is authoritative and repopulates on miss.
     this.verdictsLoaded = true;
@@ -440,5 +456,28 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
     await writeSafe({ app: this.app, content: obsidianIgnoreContent, path: OBSIDIAN_IGNORE_FILE });
     await this.pluginSettingsComponent.setProperty('obsidianIgnoreContent', obsidianIgnoreContent);
     this.cachedObsidianIgnoreContent = obsidianIgnoreContent;
+  }
+
+  /**
+   * Writes `storeActions` from `start` in transactions of {@link STORE_ACTIONS_CHUNK_SIZE},
+   * yielding between them. Stops once `generation` is stale or the connection is gone (a debounced
+   * flush can fire after `onunload` released it).
+   */
+  private writeStoreActionChunk(storeActions: readonly ((store: IDBObjectStore) => void)[], start: number, generation: number): void {
+    if (!this._database || generation !== this.storeGeneration) {
+      return;
+    }
+    const end = Math.min(start + STORE_ACTIONS_CHUNK_SIZE, storeActions.length);
+    const transaction = this._database.transaction(FILES_STORE_NAME, 'readwrite');
+    const store = transaction.objectStore(FILES_STORE_NAME);
+    for (const storeAction of storeActions.slice(start, end)) {
+      storeAction(store);
+    }
+    transaction.commit();
+    if (end < storeActions.length) {
+      window.setTimeout(() => {
+        this.writeStoreActionChunk(storeActions, end, generation);
+      }, 0);
+    }
   }
 }
