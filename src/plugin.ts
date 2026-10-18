@@ -13,6 +13,7 @@ import { IndexProjectionComponent } from './index-projection-component.ts';
 import { ManualIndexHider } from './manual-index-hider.ts';
 import { AdapterPatchComponent } from './patches/adapter-patch-component.ts';
 import { FileExplorerViewOnCreatePatchComponent } from './patches/file-explorer-view-on-create-patch-component.ts';
+import { MetadataCacheInitializePatchComponent } from './patches/metadata-cache-initialize-patch-component.ts';
 import { VaultLoadPatchComponent } from './patches/vault-load-patch-component.ts';
 import { PluginSettingsComponent } from './plugin-settings-component.ts';
 import { PluginSettingsTab } from './plugin-settings-tab.ts';
@@ -33,6 +34,7 @@ export class Plugin extends PluginBase {
     );
     this.pluginSettingsComponent = pluginSettingsComponent;
     const vaultLoadPatch = this.addChild(new VaultLoadPatchComponent(this.app));
+    this.addChild(new MetadataCacheInitializePatchComponent(this.app));
 
     // Since obsidian-dev-utils 90 a child is loaded as it is added, so a component's async load tail runs
     // in parallel with the components added after it instead of before them. IgnorePatternsComponent reads
