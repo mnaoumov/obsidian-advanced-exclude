@@ -38,6 +38,8 @@ type PersistedValue = StoredVaultPaths | VaultModelEntry[];
 export class IndexedDatabaseVaultPathStore implements VaultPathStore {
   private database: IDBDatabase | null = null;
   private readonly databaseName: string;
+  private isClosed = false;
+  private openPromise: null | Promise<IDBDatabase> = null;
 
   public constructor(appId: string) {
     this.databaseName = `${appId}/advanced-exclude-vault-paths`;
@@ -46,15 +48,21 @@ export class IndexedDatabaseVaultPathStore implements VaultPathStore {
   /**
    * Releases the connection. An open connection blocks every later `deleteDatabase` and version
    * upgrade, and each enable opened a new one, so a disable must let it go. A pending `save`
-   * still lands: `close` waits for running transactions.
+   * still lands: `close` waits for running transactions. A connection still opening is closed as
+   * soon as it opens.
    */
   public close(): void {
+    this.isClosed = true;
     this.database?.close();
     this.database = null;
   }
 
   public async load(): Promise<StoredVaultPaths> {
     const database = await this.openDatabase();
+    // Closed by an unload: the caller is aborting, and a closed connection cannot start a transaction.
+    if (this.isClosed) {
+      return normalizeStoredValue(undefined);
+    }
     const store = database.transaction([STORE_NAME], 'readonly').objectStore(STORE_NAME);
     const value = await getResult(store.get(PATHS_KEY)) as PersistedValue | undefined;
     return normalizeStoredValue(value);
@@ -76,17 +84,28 @@ export class IndexedDatabaseVaultPathStore implements VaultPathStore {
     transaction.commit();
   }
 
+  /**
+   * Opens the connection once. Concurrent callers share the one request, and a connection that
+   * finishes opening after {@link close} is closed at once: either way a second connection would
+   * never be closed, and would block every later `deleteDatabase`.
+   */
   private async openDatabase(): Promise<IDBDatabase> {
-    if (this.database) {
-      return this.database;
-    }
+    this.openPromise ??= this.requestDatabase();
+    return await this.openPromise;
+  }
 
+  private async requestDatabase(): Promise<IDBDatabase> {
     const request = window.indexedDB.open(this.databaseName, DB_VERSION);
     request.addEventListener('upgradeneeded', () => {
       request.result.createObjectStore(STORE_NAME);
     });
-    this.database = await getResult(request);
-    return this.database;
+    const database = await getResult(request);
+    if (this.isClosed) {
+      database.close();
+    } else {
+      this.database = database;
+    }
+    return database;
   }
 }
 

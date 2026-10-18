@@ -272,6 +272,11 @@ export class IndexProjectionComponent extends ComponentEx {
     this.registerEvent(this.app.workspace.on('quit', () => {
       this.isQuitting = true;
     }));
+    // A window reload unloads no plugin, so without this the old document's connection stays open
+    // until that dead context is collected, and blocks the new document's `deleteDatabase`.
+    this.registerDomEvent(window, 'pagehide', () => {
+      this.vaultPathStore.close();
+    });
     this.wasEnabledAfterLayoutReady = this.app.workspace.layoutReady;
     // Own an abort controller for the whole enable up front so an `onunload` during the
     // fast-enable check (its `await` on the persisted store) still aborts the enable —

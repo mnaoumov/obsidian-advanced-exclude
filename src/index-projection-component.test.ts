@@ -1117,6 +1117,21 @@ describe('IndexProjectionComponent', () => {
       expect(closeVaultPathStore).toHaveBeenCalledOnce();
     });
 
+    it('releases the path store when the window unloads, before any plugin unload', async () => {
+      const { closeVaultPathStore, component } = setup({
+        entries: [{ isFolderFlag: false, path: 'a.md' }],
+        isIgnored: () => false
+      });
+      const loadPromise = component.loadWithPromises();
+      await vi.runAllTimersAsync();
+      await loadPromise;
+
+      window.dispatchEvent(new Event('pagehide'));
+
+      expect(closeVaultPathStore).toHaveBeenCalledOnce();
+      component.unload();
+    });
+
     it('aborts an in-flight update', async () => {
       const { component, manualIndexHider } = setup({
         entries: [{ isFolderFlag: false, path: 'drop.md' }],

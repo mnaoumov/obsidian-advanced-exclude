@@ -233,6 +233,11 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
   }
 
   public override async onloadAsync(): Promise<void> {
+    // A window reload unloads no plugin, so without this the old document's connection stays open
+    // until that dead context is collected, and blocks the new document's `deleteDatabase`.
+    this.registerDomEvent(window, 'pagehide', () => {
+      this.releaseDatabase();
+    });
     // Before the fingerprint: the imported files' contents are part of the expanded patterns it covers.
     await this.readImportedFiles();
     await this.loadFingerprint();
@@ -286,11 +291,7 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
    * vault) blocked the disable for a second.
    */
   public override onunload(): void {
-    this.processStoreActionsDebounced.cancel();
-    this.pendingStoreActions.clear();
-    this.storeGeneration++;
-    this._database?.close();
-    this._database = undefined;
+    this.releaseDatabase();
     super.onunload();
   }
 
@@ -449,6 +450,12 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
     });
 
     const database = await getResult(request);
+    // Unloaded while the open was pending: `onunload` had no connection to close, and nothing would
+    // ever close this one, which would block every later `deleteDatabase`.
+    if (this.isUnloaded()) {
+      database.close();
+      return;
+    }
 
     this._database = database;
     const transaction = database.transaction([MTIME_STORE_NAME], 'readonly');
@@ -517,6 +524,14 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
     await this.pluginSettingsComponent.setProperty('obsidianIgnoreContent', obsidianIgnoreContent);
     this.cachedObsidianIgnoreContent = obsidianIgnoreContent;
     return true;
+  }
+
+  private releaseDatabase(): void {
+    this.processStoreActionsDebounced.cancel();
+    this.pendingStoreActions.clear();
+    this.storeGeneration++;
+    this._database?.close();
+    this._database = undefined;
   }
 
   private async reload(obsidianIgnoreContent?: string): Promise<void> {

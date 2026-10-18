@@ -16,6 +16,10 @@ interface MockPathsStore {
   put: ReturnType<typeof vi.fn>;
 }
 
+interface PendingOpen {
+  succeed?: () => void;
+}
+
 interface SetupResult {
   readonly mockDatabase: IDBDatabase;
   readonly openFunction: ReturnType<typeof vi.fn>;
@@ -95,17 +99,47 @@ describe('IndexedDatabaseVaultPathStore', () => {
     expect(pathsStore.put).not.toHaveBeenCalled();
   });
 
-  it('closes the open database, after which a save is a no-op and a load reopens it', async () => {
-    const { mockDatabase, openFunction, pathsStore, store } = setupDatabase(undefined);
+  it('closes the open database, after which a save is a no-op and a load reads nothing without reopening', async () => {
+    const { mockDatabase, openFunction, pathsStore, store } = setupDatabase({ entries: [{ isFolder: false, path: 'a.md' }], universeSignature: '1:abc' });
     await store.load();
 
     store.close();
     store.save([{ isFolder: false, path: 'a.md' }], '1:sig');
-    await store.load();
 
+    expect(await store.load()).toEqual({ entries: [], universeSignature: null });
     expect(mockDatabase.close).toHaveBeenCalledOnce();
     expect(pathsStore.put).not.toHaveBeenCalled();
-    expect(openFunction).toHaveBeenCalledTimes(2);
+    expect(openFunction).toHaveBeenCalledOnce();
+  });
+
+  it('shares one open request between concurrent loads', async () => {
+    const { openFunction, store } = setupDatabase(undefined);
+
+    await Promise.all([store.load(), store.load()]);
+
+    expect(openFunction).toHaveBeenCalledOnce();
+  });
+
+  it('closes a connection that finishes opening after close', async () => {
+    const { mockDatabase, openFunction } = setupDatabase(undefined);
+    const pendingOpen: PendingOpen = {};
+    const openRequest = strictProxy<IDBOpenDBRequest>({ readyState: 'pending', result: mockDatabase });
+    Object.defineProperty(openRequest, 'addEventListener', {
+      value: vi.fn((event: string, handler: () => void) => {
+        if (event === 'success') {
+          pendingOpen.succeed = handler;
+        }
+      })
+    });
+    openFunction.mockReturnValue(openRequest);
+    const store = new IndexedDatabaseVaultPathStore('app-id');
+
+    const loadPromise = store.load();
+    store.close();
+    pendingOpen.succeed?.();
+
+    expect(await loadPromise).toEqual({ entries: [], universeSignature: null });
+    expect(mockDatabase.close).toHaveBeenCalledOnce();
   });
 
   it('closes nothing when the database was never opened', () => {
