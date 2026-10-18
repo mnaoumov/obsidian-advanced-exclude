@@ -36,7 +36,10 @@ import { ExcludeMode } from './plugin-settings.ts';
  * An app start with the folder hidden is measured too, by reloading the window. On that copy it
  * took 274 s → 12.1 s (11.5 s with nothing ignored): Obsidian's metadata cache purged every hidden
  * path from its persisted cache one at a time, re-scanning every link per path. In `Full` mode the
- * start is followed by the real cross-session re-show it sets up.
+ * start is followed by the real cross-session re-show it sets up. Those starts run first: in the
+ * harness-owned instance a reload after the whole lifecycle never finished starting. A reload leaves
+ * the old document's IndexedDB connections open for minutes, so the cold enable empties the plugin's
+ * stores rather than deleting them; the plugin itself never deletes them.
  */
 
 const PLUGIN_ID = 'advanced-exclude';
@@ -58,8 +61,11 @@ const MAX_LONG_TASK_IN_MS = 1000;
 // ~0.3 ms per path until the metadata queue drains. The per-path cache purge cost ~3 ms per path on
 // the real-vault copy, and grows with the vault's size.
 const MAX_RESTART_MS_PER_PATH = 1;
-// Measured below 1 s; the purge held the main thread for 268 s in one stretch.
-const MAX_RESTART_STALL_IN_MS = 5000;
+// Obsidian's own vault load held the main thread for 1-5 s on the synthetic vault; the purge held
+// it for 268 s in one stretch.
+const MAX_RESTART_STALL_IN_MS = 15_000;
+// Leaves the scenario time to report the restart's numbers when it does not settle.
+const RESTART_TIMEOUT_IN_MS = 300_000;
 
 interface ExplorerViewLike {
   readonly fileItems?: Record<string, unknown>;
@@ -119,22 +125,21 @@ interface TraversableComponent {
 // The vault is shared with every other suite in this project; leave it fully visible.
 afterAll(restorePerformanceVaultExclusions);
 
+// Declared first so these run first: see the header on why no reload may follow the lifecycle below.
+describe('App start at real-vault scale with the folder hidden: startup stays bounded', () => {
+  it.each([ExcludeMode.FilesPane, ExcludeMode.Full])('in %s mode', async (excludeMode) => {
+    // After a real restart no hidden path has a snapshot, so the `Full` re-show is the real
+    // cross-session one rather than the simulation the lifecycle below runs.
+    const steps: Step[] = ['switchMode', 'hide', 'restart', excludeMode === ExcludeMode.Full ? 'showCrossSession' : 'showSameSession'];
+    await runSteps(steps, excludeMode);
+  }, SCENARIO_TIMEOUT_IN_MS);
+});
+
 describe('Lifecycle at real-vault scale: every step stays bounded', () => {
   it.each([ExcludeMode.Full, ExcludeMode.FilesPane])('in %s mode', async (excludeMode) => {
     const steps: Step[] = excludeMode === ExcludeMode.Full
       ? ['switchMode', 'coldEnable', 'warmReEnable', 'hide', 'showSameSession', 'hide', 'showCrossSession']
       : ['switchMode', 'hide', 'showSameSession'];
-    await runSteps(steps, excludeMode);
-  }, SCENARIO_TIMEOUT_IN_MS);
-});
-
-// Declared last so these run last: after a reload, a connection of the old document kept the
-// `coldEnable` step's `deleteDatabase` blocked.
-describe('App start at real-vault scale with the folder hidden: startup stays bounded', () => {
-  it.each([ExcludeMode.FilesPane, ExcludeMode.Full])('in %s mode', async (excludeMode) => {
-    // After a real restart no hidden path has a snapshot, so the `Full` re-show is the real
-    // cross-session one rather than the simulation the lifecycle above runs.
-    const steps: Step[] = ['switchMode', 'hide', 'restart', excludeMode === ExcludeMode.Full ? 'showCrossSession' : 'showSameSession'];
     await runSteps(steps, excludeMode);
   }, SCENARIO_TIMEOUT_IN_MS);
 });
@@ -213,17 +218,20 @@ async function restartApp(vaultPath: string, folder: string): Promise<StepResult
     vaultPath
   });
 
-  const deadline = Date.now() + SCENARIO_TIMEOUT_IN_MS;
+  const deadline = Date.now() + RESTART_TIMEOUT_IN_MS;
   let lastAnswerAt: null | number = null;
   let longestStallMs = 0;
+  let lastProbe: StartupProbe | undefined;
   while (Date.now() < deadline) {
     let probe: StartupProbe | undefined;
     try {
-      probe = await probeStartup(vaultPath, folder);
+      // A wedged document never answers, so a probe must not outlive the deadline.
+      probe = await Promise.race([probeStartup(vaultPath, folder), delay(Math.max(0, deadline - Date.now())).then(() => undefined)]);
     } catch {
       // The document is between pages.
     }
     if (probe && probe.timeOrigin !== before.timeOrigin) {
+      lastProbe = probe;
       const now = Date.now();
       if (lastAnswerAt !== null) {
         longestStallMs = Math.max(longestStallMs, now - lastAnswerAt - pollInMs);
@@ -244,7 +252,7 @@ async function restartApp(vaultPath: string, folder: string): Promise<StepResult
     // This side runs in Node, which has no `window`.
     await delay(pollInMs);
   }
-  return { error: `${step} did not settle`, step };
+  return { error: `${step} did not settle; last answer: ${JSON.stringify(lastProbe ?? null)}`, step };
 }
 
 async function runStep(vaultPath: string, step: Step, excludeMode: ExcludeMode): Promise<StepResult> {
@@ -285,7 +293,7 @@ async function runStep(vaultPath: string, step: Step, excludeMode: ExcludeMode):
           case 'coldEnable': {
             await disableTimed();
             for (const name of [`${app.appId}/advanced-exclude`, `${app.appId}/advanced-exclude-vault-paths`]) {
-              await deleteDatabase(name);
+              await emptyDatabase(name);
             }
             await enableAndWait();
             break;
@@ -364,20 +372,42 @@ async function runStep(vaultPath: string, step: Step, excludeMode: ExcludeMode):
         return app.vault.getAllLoadedFiles().filter((file) => file.path.startsWith(folderPrefix)).length;
       }
 
-      async function deleteDatabase(name: string): Promise<void> {
-        await new Promise<void>((resolve, reject) => {
-          const request = window.indexedDB.deleteDatabase(name);
+      // Empties rather than deletes: a delete stays blocked while the document before a reload
+      // still holds a connection.
+      async function emptyDatabase(name: string): Promise<void> {
+        const databases = await window.indexedDB.databases();
+        if (databases.every((info) => info.name !== name)) {
+          return;
+        }
+        const database = await new Promise<IDBDatabase>((resolve, reject) => {
+          const request = window.indexedDB.open(name);
           request.addEventListener('success', () => {
-            resolve();
+            resolve(request.result);
           });
           request.addEventListener('error', () => {
-            resolve();
-          });
-          // A connection the plugin left open would block the delete forever.
-          request.addEventListener('blocked', () => {
-            reject(new Error(`${name} is still open after the plugin was disabled`));
+            reject(request.error ?? new Error(`Could not open ${name}`));
           });
         });
+        try {
+          const storeNames = [...database.objectStoreNames];
+          if (storeNames.length === 0) {
+            return;
+          }
+          const transaction = database.transaction(storeNames, 'readwrite');
+          for (const storeName of storeNames) {
+            transaction.objectStore(storeName).clear();
+          }
+          await new Promise<void>((resolve, reject) => {
+            transaction.addEventListener('complete', () => {
+              resolve();
+            });
+            transaction.addEventListener('error', () => {
+              reject(transaction.error ?? new Error(`Could not empty ${name}`));
+            });
+          });
+        } finally {
+          database.close();
+        }
       }
 
       async function disableTimed(): Promise<void> {
