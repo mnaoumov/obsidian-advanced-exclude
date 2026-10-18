@@ -35,10 +35,15 @@ import type { PluginSettingsComponent } from './plugin-settings-component.ts';
 import type { UpdateProgressNoticeComponent } from './update-progress-notice-component.ts';
 import type { VaultModel } from './vault-model.ts';
 
+import { suspendFileRecoveryCreateSnapshots } from './file-recovery-suspension.ts';
 import { IndexProjectionComponent } from './index-projection-component.ts';
 import { ExcludeMode } from './plugin-settings.ts';
 import { suspendRelatedLinksUpdates } from './related-links-batch.ts';
 import { computeUniverseSignature } from './universe-signature.ts';
+
+vi.mock('./file-recovery-suspension.ts', () => ({
+  suspendFileRecoveryCreateSnapshots: vi.fn()
+}));
 
 vi.mock('./related-links-batch.ts', () => ({
   suspendRelatedLinksUpdates: vi.fn()
@@ -59,6 +64,7 @@ vi.mock('@mnaoumov/obsidian-lib/metadata-cache', () => ({
 
 const mockGetDataAdapterEx = vi.mocked(getDataAdapterEx);
 const mockIsFolder = vi.mocked(isFolder);
+const mockSuspendFileRecoveryCreateSnapshots = vi.mocked(suspendFileRecoveryCreateSnapshots);
 const mockSuspendRelatedLinksUpdates = vi.mocked(suspendRelatedLinksUpdates);
 
 // The disk stat a fresh (non-stale) snapshot matches: getSnapshotStat and adapter.stat
@@ -110,6 +116,7 @@ interface SetupResult {
   readonly fireWorkspaceLayoutReady: () => void;
   readonly manualIndexHider: MockManualIndexHider;
   readonly mockAdapter: MockAdapter;
+  readonly resumeFileRecoverySnapshots: Mock<() => void>;
   readonly resumeFilesPaneSort: Mock<() => void>;
   readonly resumeRelatedLinksUpdates: Mock<() => void>;
   readonly save: ReturnType<typeof vi.fn>;
@@ -208,6 +215,8 @@ function setup(params: SetupParams): SetupResult {
   };
 
   const addToFilesPane = vi.fn<(normalizedPath: string) => void>();
+  const resumeFileRecoverySnapshots = vi.fn<() => void>();
+  mockSuspendFileRecoveryCreateSnapshots.mockReset().mockReturnValue(resumeFileRecoverySnapshots);
   const resumeRelatedLinksUpdates = vi.fn<() => void>();
   mockSuspendRelatedLinksUpdates.mockReset().mockReturnValue(resumeRelatedLinksUpdates);
   const resumeFilesPaneSort = vi.fn<() => void>();
@@ -251,7 +260,7 @@ function setup(params: SetupParams): SetupResult {
     vaultPathStore
   });
 
-  return { addToFilesPane, app, closeVaultPathStore: vaultPathStore.close, component, deleteFromFilesPane, fireQuit, fireWorkspaceLayoutReady, manualIndexHider, mockAdapter, resumeFilesPaneSort, resumeRelatedLinksUpdates, save, suspendFilesPaneSort };
+  return { addToFilesPane, app, closeVaultPathStore: vaultPathStore.close, component, deleteFromFilesPane, fireQuit, fireWorkspaceLayoutReady, manualIndexHider, mockAdapter, resumeFileRecoverySnapshots, resumeFilesPaneSort, resumeRelatedLinksUpdates, save, suspendFilesPaneSort };
 
   function fireWorkspaceLayoutReady(): void {
     workspaceLayoutReadyCallback?.();
@@ -353,6 +362,25 @@ describe('IndexProjectionComponent', () => {
       expect(mockAdapter.reconcileFile).toHaveBeenCalledWith('beta.md', 'beta.md');
       // The stale record was dropped so the re-parse treats the on-disk file as new.
       expect('beta.md' in mockAdapter.files).toBe(false);
+    });
+
+    it('re-parses with File recovery create snapshots suspended, and resumes them afterwards', async () => {
+      const { app, component, manualIndexHider, mockAdapter, resumeFileRecoverySnapshots } = setup({
+        entries: [{ isFolderFlag: false, path: 'alpha.md' }],
+        isIgnored: () => false,
+        persistedEntries: [{ isFolderFlag: false, path: 'beta.md' }]
+      });
+      manualIndexHider.show.mockReturnValue(['beta.md']);
+
+      await component.update();
+
+      expect(mockSuspendFileRecoveryCreateSnapshots).toHaveBeenCalledExactlyOnceWith(app);
+      expect(resumeFileRecoverySnapshots).toHaveBeenCalledTimes(1);
+      const [suspendOrder] = mockSuspendFileRecoveryCreateSnapshots.mock.invocationCallOrder;
+      const [reParseOrder] = mockAdapter.reconcileFile.mock.invocationCallOrder;
+      const [resumeOrder] = resumeFileRecoverySnapshots.mock.invocationCallOrder;
+      expect(suspendOrder).toBeLessThan(reParseOrder ?? 0);
+      expect(reParseOrder).toBeLessThan(resumeOrder ?? 0);
     });
   });
 

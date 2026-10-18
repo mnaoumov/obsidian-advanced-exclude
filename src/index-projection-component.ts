@@ -25,6 +25,7 @@ import type {
 import type { VaultPathStore } from './vault-path-store.ts';
 
 import { ROOT_PATH } from './constants.ts';
+import { suspendFileRecoveryCreateSnapshots } from './file-recovery-suspension.ts';
 import { ExcludeMode } from './plugin-settings.ts';
 import { suspendRelatedLinksUpdates } from './related-links-batch.ts';
 import { computeUniverseSignature } from './universe-signature.ts';
@@ -458,13 +459,17 @@ export class IndexProjectionComponent extends ComponentEx {
    * the returned function runs: the explorer's whole-tree re-sort (see
    * `FileTreeComponent.suspendSort`) and the vault-wide related-links pass of each re-added file
    * (see `suspendRelatedLinksUpdates`). Each runs once at the end instead of once per path or per
-   * paint frame. Nested scopes share the outermost one. Call the returned function exactly once.
+   * paint frame. `File recovery`'s snapshot of each re-added note is skipped outright (see
+   * `suspendFileRecoveryCreateSnapshots`). Nested scopes share the outermost one. Call the returned
+   * function exactly once.
    */
   private beginBulkIndexUpdate(): () => void {
     if (this.bulkIndexUpdateDepth === 0) {
       const resumeFilesPaneSort = this.suspendFilesPaneSort();
       const resumeRelatedLinksUpdates = suspendRelatedLinksUpdates(this.app);
+      const resumeFileRecoverySnapshots = suspendFileRecoveryCreateSnapshots(this.app);
       this.resumeBulkIndexUpdate = (): void => {
+        resumeFileRecoverySnapshots();
         resumeRelatedLinksUpdates();
         resumeFilesPaneSort();
       };
