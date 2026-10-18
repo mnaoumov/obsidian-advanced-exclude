@@ -97,6 +97,13 @@ vi.mock('./patches/file-explorer-view-on-create-patch-component.ts', () => ({
   })
 }));
 
+vi.mock('./patches/metadata-cache-initialize-patch-component.ts', () => ({
+  // eslint-disable-next-line prefer-arrow-callback, func-names -- mock must be constructable with `new` and return a real loadable Component.
+  MetadataCacheInitializePatchComponent: vi.fn(function () {
+    return new Component();
+  })
+}));
+
 vi.mock('./patches/vault-load-patch-component.ts', () => ({
   // eslint-disable-next-line prefer-arrow-callback, func-names -- mock must be constructable with `new` and return a real loadable Component.
   VaultLoadPatchComponent: vi.fn(function () {
@@ -198,11 +205,11 @@ describe('Plugin', () => {
      * The real `PluginBase` adds its universal child components to an internal
      * wrapper component, and that wrapper to itself through the base
      * `Component.addChild`, so none of them reaches the `addChild` override
-     * spied on here. Every call it sees is one of the plugin's own 12
+     * spied on here. Every call it sees is one of the plugin's own 13
      * `onloadImpl` children, which the override routes into the gated
      * feature-surface tier.
      */
-    const EXPECTED_ADD_CHILD_CALLS = 12;
+    const EXPECTED_ADD_CHILD_CALLS = 13;
     const appOriginal = app.asOriginalType__();
 
     // Spy on the real addChild (calls through) so the real children still load.
