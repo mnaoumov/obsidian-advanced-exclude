@@ -23,9 +23,13 @@ import {
 } from 'vitest';
 
 import type { PluginSettingsComponent } from './plugin-settings-component.ts';
-import type { EffectiveSettings } from './profiles.ts';
+import type {
+  EffectiveSettings,
+  ImportedFileContents
+} from './profiles.ts';
 
 import {
+  readIfExists,
   readSafe,
   statSafe,
   writeSafe
@@ -35,6 +39,7 @@ import { PluginSettings } from './plugin-settings.ts';
 import { resolveProfile } from './profiles.ts';
 
 vi.mock('./data-adapter-safe.ts', () => ({
+  readIfExists: vi.fn().mockResolvedValue(null),
   readSafe: vi.fn().mockResolvedValue(''),
   statSafe: vi.fn().mockResolvedValue(null),
   writeSafe: vi.fn().mockResolvedValue(undefined)
@@ -193,17 +198,31 @@ function createPluginSettingsComponent(settings?: Partial<PluginSettings>, profi
     Object.assign(effectiveSettings, settings);
   }
 
+  let importedFileContents: ImportedFileContents = new Map();
   return strictProxy<PluginSettingsComponent>({
     // A getter, so a test that edits `settings` after construction is seen by the component.
     get effectiveSettings(): EffectiveSettings {
       // Not a plain object: strictProxy caches a plain object a getter returns, which would freeze the first answer.
-      return Object.assign(Object.create(null) as EffectiveSettings, resolveProfile({ activeProfileId: profileState?.activeProfileId ?? null, settings: effectiveSettings }));
+      return Object.assign(
+        Object.create(null) as EffectiveSettings,
+        resolveProfile({ activeProfileId: profileState?.activeProfileId ?? null, importedFileContents, settings: effectiveSettings })
+      );
+    },
+    get importedFileContents(): ImportedFileContents {
+      return importedFileContents;
     },
     on: vi.fn().mockReturnValue(strictProxy<EventRef>({})),
     onActiveProfileChange: vi.fn().mockReturnValue(noop),
+    setImportedFileContents: vi.fn((contents: ImportedFileContents) => {
+      importedFileContents = contents;
+    }),
     setProperty: vi.fn().mockResolvedValue(''),
     settings: effectiveSettings
   });
+}
+
+function getMtimeEntries(mtimeStore: MockIDBObjectStore): unknown[] {
+  return mtimeStore.put.mock.calls.map(([entry]) => entry as unknown);
 }
 
 function setupIndexedDatabase(params?: SetupIndexedDatabaseParams): SetupIndexedDatabaseResult {
@@ -889,10 +908,6 @@ describe('IgnorePatternsComponent', () => {
       profiles: [{ id: 'work', name: 'Work', patterns: 'work/\n!base/keep.md' }]
     };
 
-    function getMtimeEntries(mtimeStore: MockIDBObjectStore): unknown[] {
-      return mtimeStore.put.mock.calls.map(([entry]) => entry as unknown);
-    }
-
     it('should match against the expanded patterns of the active profile', async () => {
       setupIndexedDatabase();
       const pluginSettingsComponent = createPluginSettingsComponent(PROFILE_SETTINGS, { activeProfileId: 'work' });
@@ -953,6 +968,67 @@ describe('IgnorePatternsComponent', () => {
 
       (pluginSettingsComponent.settings as PluginSettings).profiles = [{ id: 'work', name: 'Work', patterns: 'other/' }];
       await callback(undefined, false);
+      expect(onUpdateFileTree).toHaveBeenCalledOnce();
+    });
+  });
+
+  describe('imported files', () => {
+    const IMPORT_SETTINGS: Partial<PluginSettings> = { profiles: [{ id: 'work', name: 'Work', patterns: '@import file:ignores/work.txt' }] };
+
+    function getRawListener(vaultOnCalls: unknown[][]): (path: string) => void {
+      const rawCall = (vaultOnCalls as MockCallEntry[]).find(([name]) => name === 'raw');
+      return rawCall?.[1] as (path: string) => void;
+    }
+
+    it('should read an imported file before the fingerprint, so it reaches both the matcher and the fingerprint', async () => {
+      vi.mocked(isDeepEqual).mockReturnValue(false);
+      vi.mocked(readIfExists).mockResolvedValue('from-file/');
+      const { mtimeStore } = setupIndexedDatabase();
+      const component = createComponent({ pluginSettingsComponent: createPluginSettingsComponent(IMPORT_SETTINGS, { activeProfileId: 'work' }) });
+      await component.loadWithPromises();
+
+      expect(readIfExists).toHaveBeenCalledWith(expect.anything(), 'ignores/work.txt');
+      expect(component.isIgnored({ isFolder: false, normalizedPath: 'from-file/a.md' })).toBe(true);
+      expect(getMtimeEntries(mtimeStore)[0]).toStrictEqual(expect.objectContaining({ profileFingerprint: JSON.stringify(['from-file/', 'Full', false, false, false]) }));
+    });
+
+    it('should re-apply when an imported file changes on disk, and only then', async () => {
+      vi.mocked(readIfExists).mockResolvedValue('from-file/');
+      setupIndexedDatabase();
+      const app = createApp();
+      const vaultOnSpy = vi.spyOn(app.vault, 'on');
+      const onUpdateFileTree = vi.fn().mockResolvedValue(undefined);
+      const component = createComponent({ app, onUpdateFileTree, pluginSettingsComponent: createPluginSettingsComponent(IMPORT_SETTINGS, { activeProfileId: 'work' }) });
+      await component.loadWithPromises();
+      const rawListener = getRawListener(vaultOnSpy.mock.calls);
+
+      rawListener('unrelated.md');
+      rawListener('ignores/work.txt');
+      await vi.runAllTimersAsync();
+      expect(onUpdateFileTree).not.toHaveBeenCalled();
+
+      vi.mocked(readIfExists).mockResolvedValue('changed/');
+      rawListener('ignores/work.txt');
+      await vi.runAllTimersAsync();
+
+      expect(onUpdateFileTree).toHaveBeenCalledOnce();
+      expect(component.isIgnored({ isFolder: false, normalizedPath: 'changed/a.md' })).toBe(true);
+      expect(component.isIgnored({ isFolder: false, normalizedPath: 'from-file/a.md' })).toBe(false);
+    });
+
+    it('should treat a file that appeared under a known path as changed', async () => {
+      vi.mocked(readIfExists).mockResolvedValue(null);
+      setupIndexedDatabase();
+      const app = createApp();
+      const vaultOnSpy = vi.spyOn(app.vault, 'on');
+      const onUpdateFileTree = vi.fn().mockResolvedValue(undefined);
+      const component = createComponent({ app, onUpdateFileTree, pluginSettingsComponent: createPluginSettingsComponent(IMPORT_SETTINGS, { activeProfileId: 'work' }) });
+      await component.loadWithPromises();
+
+      vi.mocked(readIfExists).mockResolvedValue('');
+      getRawListener(vaultOnSpy.mock.calls)('ignores/work.txt');
+      await vi.runAllTimersAsync();
+
       expect(onUpdateFileTree).toHaveBeenCalledOnce();
     });
   });

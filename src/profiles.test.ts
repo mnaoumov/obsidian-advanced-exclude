@@ -16,6 +16,7 @@ import {
   createUniqueProfileName,
   duplicateProfile,
   findProfileByName,
+  isFileImportName,
   MAX_IMPORT_DEPTH,
   renameProfileImports,
   resolveProfile,
@@ -31,6 +32,48 @@ function profile(name: string, patterns: string, overrides?: Partial<SettingsPro
 }
 
 describe('resolveProfile', () => {
+  it('should expand an imported file at its line, taking its lines literally', () => {
+    const settings = createSettings({ profiles: [profile('Work', 'a/\n@import file:/ignores//work.txt \n!a/keep.md')] });
+    const importedFileContents = new Map([['ignores/work.txt', '@literal\r\nb/']]);
+
+    const result = resolveProfile({ activeProfileId: 'work', importedFileContents, settings });
+
+    expect(result.errors).toStrictEqual([]);
+    expect(result.importedFilePaths).toStrictEqual(['ignores/work.txt']);
+    expect(result.lines).toStrictEqual([
+      { profileName: 'Work', text: 'a/' },
+      { filePath: 'ignores/work.txt', profileName: 'Work', text: '@literal' },
+      { filePath: 'ignores/work.txt', profileName: 'Work', text: 'b/' },
+      { profileName: 'Work', text: '!a/keep.md' }
+    ]);
+  });
+
+  it('should list an imported file that has not been read yet and expand it to nothing', () => {
+    const settings = createSettings({ profiles: [profile('Work', '@import File:.gitignore\n@import file:.gitignore')] });
+
+    const result = resolveProfile({ activeProfileId: 'work', settings });
+
+    expect(result.errors).toStrictEqual([]);
+    expect(result.importedFilePaths).toStrictEqual(['.gitignore']);
+    expect(result.lines).toStrictEqual([]);
+  });
+
+  it('should report a missing imported file and a file import with no path', () => {
+    const settings = createSettings({ profiles: [profile('Work', '@import file:gone.txt\n@import file:  ')] });
+
+    const result = resolveProfile({ activeProfileId: 'work', importedFileContents: new Map([['gone.txt', null]]), settings });
+
+    expect(result.errors).toStrictEqual([
+      { lineNumber: 1, message: 'File `gone.txt` does not exist.', profileName: 'Work' },
+      { lineNumber: 2, message: '`@import file:` needs a vault path.', profileName: 'Work' }
+    ]);
+    expect(result.importedFilePaths).toStrictEqual(['gone.txt']);
+  });
+
+  it('should list no imported files when no profile is active', () => {
+    expect(resolveProfile({ activeProfileId: null, settings: createSettings({}) }).importedFilePaths).toStrictEqual([]);
+  });
+
   it('should return the base settings unchanged when no profile is active', () => {
     const settings = createSettings({ excludeMode: ExcludeMode.FilesPane, obsidianIgnoreContent: 'a/\nb/', profiles: [profile('Work', 'w/')] });
 
@@ -272,5 +315,12 @@ describe('saveProfile', () => {
       { id: 'work', name: 'Office', patterns: '@import Office' },
       profile('Home', '@import Office\nh/')
     ]);
+  });
+});
+
+describe('isFileImportName', () => {
+  it('should tell a file import from a profile name, ignoring case and surrounding spaces', () => {
+    expect(isFileImportName(' File:x')).toBe(true);
+    expect(isFileImportName('files')).toBe(false);
   });
 });

@@ -167,6 +167,7 @@ describe('PluginSettingsTab', () => {
         // Not a plain object: strictProxy caches a plain object a getter returns, which would freeze the first answer.
         return Object.assign(Object.create(null) as EffectiveSettings, resolveProfile({ activeProfileId, settings }));
       },
+      importedFileContents: new Map(),
       on: castTo<PluginSettingsComponentBase<PluginSettings>['on']>(vi.fn((_name: string, _callback: GenericVoidFunction) => ({
         asyncEventSource: {
           offref: vi.fn()

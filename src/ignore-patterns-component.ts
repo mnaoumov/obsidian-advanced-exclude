@@ -14,6 +14,7 @@ import {
 
 import type { PluginSettingsComponent } from './plugin-settings-component.ts';
 import type { PluginSettings } from './plugin-settings.ts';
+import type { ImportedFileContents } from './profiles.ts';
 
 import {
   GIT_IGNORE_FILE,
@@ -21,6 +22,7 @@ import {
   ROOT_PATH
 } from './constants.ts';
 import {
+  readIfExists,
   readSafe,
   statSafe,
   writeSafe
@@ -135,6 +137,7 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
   public async applyProfileChange(): Promise<void> {
     this.cachedIgnoreTester = null;
     this.cachedExcludeRegExps = null;
+    await this.readImportedFiles();
     await this.readGitIgnore();
     this.fileIgnoreMap.clear();
     this.hadConfigChanges = true;
@@ -227,6 +230,8 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
   }
 
   public override async onloadAsync(): Promise<void> {
+    // Before the fingerprint: the imported files' contents are part of the expanded patterns it covers.
+    await this.readImportedFiles();
     await this.loadFingerprint();
     await this.reload();
     registerAsyncEvent(
@@ -236,6 +241,7 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
           return;
         }
         await this.readObsidianIgnore();
+        await this.readImportedFiles();
         // A synced `data.json` can change the active profile's patterns or settings under a running plugin.
         if (this.getProfileFingerprint() !== this.appliedProfileFingerprint) {
           await this.applyProfileChange();
@@ -244,6 +250,14 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
     );
 
     this.register(this.pluginSettingsComponent.onActiveProfileChange(() => this.applyProfileChange()));
+
+    // `raw` is the one event every change on disk raises, a dot file's and a file this plugin hides included, so it
+    // is the watcher for whatever file the active profile imports.
+    this.registerEvent(this.app.vault.on('raw', (path: string) => {
+      invokeAsyncSafelyAfterDelay({
+        asyncFunction: () => this.handleImportedFileChange(path)
+      });
+    }));
 
     registerAsyncEvent(
       this,
@@ -394,6 +408,18 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
   }
 
   /**
+   * Re-applies the ignore state when {@link path} is a file the active profile imports and its content changed.
+   */
+  private async handleImportedFileChange(path: string): Promise<void> {
+    if (!this.pluginSettingsComponent.effectiveSettings.importedFilePaths.includes(path) || !await this.readImportedFiles()) {
+      return;
+    }
+    this.cachedIgnoreTester = null;
+    this.hadConfigChanges = true;
+    await this.processConfigChanges();
+  }
+
+  /**
    * Opens the verdict DB and validates the config fingerprint, but does **not**
    * eagerly load the (up to ~90k) cached per-path verdicts — that `getAll` was the
    * dominant enable cost and is deferred to {@link ensureVerdictsLoaded}, run only
@@ -455,6 +481,24 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
     return true;
   }
 
+  /**
+   * Reads every file the active profile imports with `@import file:` into the settings component, so the effective
+   * patterns expand them.
+   *
+   * @returns Whether any content changed.
+   */
+  private async readImportedFiles(): Promise<boolean> {
+    const contents = new Map<string, null | string>();
+    for (const path of this.pluginSettingsComponent.effectiveSettings.importedFilePaths) {
+      contents.set(path, await readIfExists(this.app, path));
+    }
+    if (isSameImportedFileContents(this.pluginSettingsComponent.importedFileContents, contents)) {
+      return false;
+    }
+    this.pluginSettingsComponent.setImportedFileContents(contents);
+    return true;
+  }
+
   private async readObsidianIgnore(): Promise<boolean> {
     const obsidianIgnoreContent = await readSafe(this.app, OBSIDIAN_IGNORE_FILE);
     if (obsidianIgnoreContent === this.cachedObsidianIgnoreContent) {
@@ -476,8 +520,9 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
       await this.writeObsidianIgnore(obsidianIgnoreContent);
     }
 
+    const hasImportChanges = await this.readImportedFiles();
     const hasGitIgnoreChanges = await this.readGitIgnore();
-    if (hasPatternChanges || hasGitIgnoreChanges) {
+    if (hasPatternChanges || hasImportChanges || hasGitIgnoreChanges) {
       this.fileIgnoreMap.clear();
     }
   }
@@ -533,4 +578,8 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
       }, 0);
     }
   }
+}
+
+function isSameImportedFileContents(a: ImportedFileContents, b: ImportedFileContents): boolean {
+  return a.size === b.size && [...a].every(([path, content]) => b.has(path) && b.get(path) === content);
 }

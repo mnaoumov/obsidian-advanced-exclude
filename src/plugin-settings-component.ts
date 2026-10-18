@@ -7,6 +7,7 @@ import { PluginSettingsComponentBase } from '@mnaoumov/obsidian-lib/components/p
 
 import type {
   EffectiveSettings,
+  ImportedFileContents,
   ResolveProfileSettings
 } from './profiles.ts';
 
@@ -22,6 +23,7 @@ export const ACTIVE_PROFILE_LOCAL_STORAGE_KEY = 'advanced-exclude:active-profile
 interface EffectiveSettingsCache {
   readonly activeProfileId: null | string;
   readonly effectiveSettings: EffectiveSettings;
+  readonly importedFileContents: ImportedFileContents;
   readonly settings: ResolveProfileSettings;
 }
 
@@ -47,21 +49,34 @@ export class PluginSettingsComponent extends PluginSettingsComponentBase<PluginS
   public get effectiveSettings(): EffectiveSettings {
     const settings = this.settings;
     const cache = this.effectiveSettingsCache;
-    if (cache?.activeProfileId === this._activeProfileId && isSameSettings(cache.settings, settings)) {
+    if (
+      cache?.activeProfileId === this._activeProfileId && cache.importedFileContents === this._importedFileContents
+      && isSameSettings(cache.settings, settings)
+    ) {
       return cache.effectiveSettings;
     }
 
-    const effectiveSettings = resolveProfile({ activeProfileId: this._activeProfileId, settings });
+    const effectiveSettings = resolveProfile({ activeProfileId: this._activeProfileId, importedFileContents: this._importedFileContents, settings });
     this.effectiveSettingsCache = {
       activeProfileId: this._activeProfileId,
       effectiveSettings,
+      importedFileContents: this._importedFileContents,
       // The settings object is mutated in place on an edit, so the cache keeps a copy of the references it saw.
       settings: { ...settings }
     };
     return effectiveSettings;
   }
 
+  /**
+   * The contents of the vault files the active profile imports with `@import file:`, as last read by
+   * `IgnorePatternsComponent`.
+   */
+  public get importedFileContents(): ImportedFileContents {
+    return this._importedFileContents;
+  }
+
   private _activeProfileId: null | string;
+  private _importedFileContents: ImportedFileContents = new Map();
   private readonly activeProfileChangeListeners = new Set<() => Promisable<void>>();
   private readonly app: App;
   private effectiveSettingsCache: EffectiveSettingsCache | null = null;
@@ -101,6 +116,14 @@ export class PluginSettingsComponent extends PluginSettingsComponentBase<PluginS
     for (const listener of this.activeProfileChangeListeners) {
       await listener();
     }
+  }
+
+  /**
+   * Replaces the imported files' contents the effective settings expand. Pass a new map: the memo compares it by
+   * reference.
+   */
+  public setImportedFileContents(importedFileContents: ImportedFileContents): void {
+    this._importedFileContents = importedFileContents;
   }
 }
 
