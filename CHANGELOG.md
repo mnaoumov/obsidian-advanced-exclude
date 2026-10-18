@@ -1,5 +1,18 @@
 # CHANGELOG
 
+## 4.2.0
+
+- test(lifecycle): measure a real app start with the folder hidden
+- fix(startup): batch the related-links passes of the metadata cache's startup purge
+- fix(projection): skip the adapter's recursive folder listing during a re-show
+- fix(projection): skip `File recovery` snapshots of re-shown notes
+- fix(settings): apply a settings save made outside the settings tab
+- fix(settings): link the whitelist demo note instead of a missing README heading
+- feat(profiles): import a vault file with `@import file:<path>`
+- feat: add switchable settings profiles composed with `@import`
+- perf: keep pattern edits and re-enables fast at real-vault scale
+- docs: mark plugin names as code
+
 ## 4.1.4
 
 - chore: link Discussions from the issue chooser for questions
