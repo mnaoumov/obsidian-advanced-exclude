@@ -66,8 +66,8 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginSettings> {
           f.appendText(' syntax.');
           f.createEl('br');
           f.appendText('See ');
-          f.createEl('a', { href: `${README_URL}#pattern-examples`, text: 'Pattern examples' });
-          f.appendText(' (including how to whitelist only certain files).');
+          f.createEl('a', { href: `${README_URL}/blob/main/demo-vault/02%20Whitelist%20with%20negation.md`, text: 'Whitelist with negation' });
+          f.appendText(' for how to whitelist only certain files.');
           f.createEl('br');
           f.appendText('You can also edit ');
           appendCodeBlock(f, OBSIDIAN_IGNORE_FILE);
