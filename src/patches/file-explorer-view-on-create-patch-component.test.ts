@@ -70,7 +70,7 @@ describe('FileExplorerViewOnCreatePatchComponent', () => {
       isIgnored: vi.fn().mockReturnValue(false)
     });
     pluginSettingsComponent = strictProxy<PluginSettingsComponent>({
-      settings
+      effectiveSettings: settings
     });
   });
 

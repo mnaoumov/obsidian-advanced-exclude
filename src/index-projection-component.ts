@@ -145,7 +145,7 @@ export class IndexProjectionComponent extends ComponentEx {
   private wasEnabledAfterLayoutReady = false;
 
   private get excludeMode(): ExcludeMode {
-    return this.pluginSettingsComponent.settings.excludeMode;
+    return this.pluginSettingsComponent.effectiveSettings.excludeMode;
   }
 
   public constructor(params: IndexProjectionComponentConstructorParams) {
@@ -162,7 +162,7 @@ export class IndexProjectionComponent extends ComponentEx {
     this.updateProgressNotice = params.updateProgressNotice;
     this.vaultModel = new VaultModel(
       (normalizedPath, isFolderPath) => params.ignorePatternsComponent.isIgnored({ isFolder: isFolderPath, normalizedPath }),
-      () => this.pluginSettingsComponent.settings.shouldHideEmptyFolders
+      () => this.pluginSettingsComponent.effectiveSettings.shouldHideEmptyFolders
     );
   }
 

@@ -16,3 +16,4 @@ Every pattern set these notes teach has a button, because multi-line `gitignore`
 - [02 Whitelist with negation](<./02 Whitelist with negation.md>)
 - [03 Exclude mode and sources](<./03 Exclude mode and sources.md>)
 - [04 Settings](<./04 Settings.md>)
+- [05 Profiles](<./05 Profiles.md>)

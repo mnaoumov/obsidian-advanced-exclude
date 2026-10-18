@@ -6,7 +6,9 @@ import type {
   AsyncEventRef,
   GenericAsyncEventSource
 } from '@mnaoumov/typescript-lib/async-events';
+import type { Promisable } from 'type-fest';
 
+import { noop } from '@mnaoumov/typescript-lib/function';
 import { waitForAllAsyncOperations } from '@mnaoumov/typescript-test-toolkit/async-operation-tracking';
 import { strictProxy } from '@mnaoumov/typescript-test-toolkit/strict-proxy';
 import {
@@ -25,11 +27,13 @@ import {
 
 import type { IgnorePatternsComponent } from './ignore-patterns-component.ts';
 import type { PluginSettingsComponent } from './plugin-settings-component.ts';
+import type { EffectiveSettings } from './profiles.ts';
 
 import {
   ExcludeMode,
   PluginSettings
 } from './plugin-settings.ts';
+import { resolveProfile } from './profiles.ts';
 import { PublishCompatibilityWarningComponent } from './publish-compatibility-warning-component.ts';
 
 const PLUGIN_ID = 'advanced-exclude';
@@ -47,17 +51,19 @@ const showNoticeMock = vi.fn(
 interface Harness {
   component: PublishCompatibilityWarningComponent;
   disablePluginAndSave: ReturnType<typeof vi.fn>;
+  editAndSave: ReturnType<typeof vi.fn>;
   effectiveSettings: PluginSettings;
+  fireActiveProfileChange: () => Promise<void>;
   fireInternalPluginsChange: () => void;
   fireSaveSettings: () => void;
   processConfigChanges: ReturnType<typeof vi.fn>;
   publishDisable: ReturnType<typeof vi.fn>;
-  setProperty: ReturnType<typeof vi.fn>;
   state: HarnessState;
   triggerLayoutReady: () => Promise<void>;
 }
 
 interface HarnessState {
+  activeProfileId: null | string;
   excludeMode: ExcludeMode;
   publishEnabled: boolean;
   publishPluginExists: boolean;
@@ -155,8 +161,42 @@ describe('PublishCompatibilityWarningComponent', () => {
     getButton(getFragment(showNoticeMock.mock.calls[0]?.[0]), 'Switch to Files Pane mode').click();
     await waitForAllAsyncOperations();
 
-    expect(harness.setProperty).toHaveBeenCalledWith('excludeMode', ExcludeMode.FilesPane);
+    expect(harness.editAndSave).toHaveBeenCalledTimes(1);
+    expect(harness.effectiveSettings.excludeMode).toBe(ExcludeMode.FilesPane);
     expect(harness.processConfigChanges).toHaveBeenCalledTimes(1);
+  });
+
+  it('should switch the active profile, not the base settings, to Files Pane mode', async () => {
+    const harness = createHarness({ activeProfileId: 'work', excludeMode: ExcludeMode.FilesPane, publishEnabled: true });
+    harness.effectiveSettings.profiles = [
+      { excludeMode: ExcludeMode.Full, id: 'work', name: 'Work', patterns: '' },
+      { id: 'other', name: 'Other', patterns: '' }
+    ];
+    harness.component.load();
+    harness.fireSaveSettings();
+
+    getButton(getFragment(showNoticeMock.mock.calls[0]?.[0]), 'Switch to Files Pane mode').click();
+    await waitForAllAsyncOperations();
+
+    expect(harness.effectiveSettings.excludeMode).toBe(ExcludeMode.FilesPane);
+    expect(harness.effectiveSettings.profiles).toStrictEqual([
+      { excludeMode: ExcludeMode.FilesPane, id: 'work', name: 'Work', patterns: '' },
+      { id: 'other', name: 'Other', patterns: '' }
+    ]);
+    expect(harness.processConfigChanges).toHaveBeenCalledTimes(1);
+  });
+
+  it('should revalidate when the active profile changes', async () => {
+    const harness = createHarness({ excludeMode: ExcludeMode.FilesPane, publishEnabled: true });
+    harness.effectiveSettings.profiles = [{ excludeMode: ExcludeMode.Full, id: 'work', name: 'Work', patterns: '' }];
+    harness.component.load();
+    harness.fireSaveSettings();
+    expect(shownNotices).toHaveLength(0);
+
+    harness.state.activeProfileId = 'work';
+    await harness.fireActiveProfileChange();
+
+    expect(shownNotices).toHaveLength(1);
   });
 
   it('should disable the Publish core plugin when the Disable Publish button is clicked', () => {
@@ -224,6 +264,7 @@ function createAsyncEventRef(): AsyncEventRef {
 
 function createHarness(overrides?: Partial<HarnessState>): Harness {
   const state: HarnessState = {
+    activeProfileId: overrides?.activeProfileId ?? null,
     excludeMode: overrides?.excludeMode ?? ExcludeMode.Full,
     publishEnabled: overrides?.publishEnabled ?? true,
     publishPluginExists: overrides?.publishPluginExists ?? true
@@ -272,10 +313,21 @@ function createHarness(overrides?: Partial<HarnessState>): Harness {
     }
     return createAsyncEventRef();
   });
-  const setProperty = vi.fn().mockResolvedValue('');
+  const editAndSave = vi.fn(async (editor: (settings: PluginSettings) => Promisable<void>) => {
+    await editor(effectiveSettings);
+  });
+  let activeProfileChangeListener: (() => Promisable<void>) | undefined;
   const pluginSettingsComponent = strictProxy<PluginSettingsComponent>({
+    editAndSave,
+    get effectiveSettings(): EffectiveSettings {
+      // Not a plain object: strictProxy caches a plain object a getter returns, which would freeze the first answer.
+      return Object.assign(Object.create(null) as EffectiveSettings, resolveProfile({ activeProfileId: state.activeProfileId, settings: effectiveSettings }));
+    },
     on: settingsOn,
-    setProperty,
+    onActiveProfileChange: vi.fn((listener: () => Promisable<void>) => {
+      activeProfileChangeListener = listener;
+      return noop;
+    }),
     settings: effectiveSettings
   });
 
@@ -295,7 +347,11 @@ function createHarness(overrides?: Partial<HarnessState>): Harness {
   return {
     component,
     disablePluginAndSave,
+    editAndSave,
     effectiveSettings,
+    fireActiveProfileChange: async (): Promise<void> => {
+      await activeProfileChangeListener?.();
+    },
     fireInternalPluginsChange: (): void => {
       changeListener?.();
     },
@@ -304,7 +360,6 @@ function createHarness(overrides?: Partial<HarnessState>): Harness {
     },
     processConfigChanges,
     publishDisable,
-    setProperty,
     state,
     triggerLayoutReady: async (): Promise<void> => {
       layoutReadyCallback?.();

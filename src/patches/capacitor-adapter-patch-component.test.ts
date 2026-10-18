@@ -47,7 +47,7 @@ describe('CapacitorAdapterPatchComponent', () => {
       recordCreate: vi.fn()
     });
     pluginSettingsComponent = strictProxy<PluginSettingsComponent>({
-      settings
+      effectiveSettings: settings
     });
     fileTreeComponent = strictProxy<FileTreeComponent>({
       deleteFromFilesPane: vi.fn()

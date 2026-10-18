@@ -59,7 +59,7 @@ export class FileExplorerViewOnCreatePatchComponent extends MonkeyAroundComponen
   }
 
   private onCreate(originalFunction: OnCreateFunction, view: FileExplorerView, file: TAbstractFile): void {
-    if (this.pluginSettingsComponent.settings.excludeMode !== ExcludeMode.FilesPane) {
+    if (this.pluginSettingsComponent.effectiveSettings.excludeMode !== ExcludeMode.FilesPane) {
       originalFunction.call(view, file);
       return;
     }

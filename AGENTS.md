@@ -54,7 +54,9 @@ Built on `@mnaoumov/obsidian-lib` with tooling from `@mnaoumov/obsidian-dev-tool
   - `related-links-batch.ts` — collects Obsidian's per-file `metadataCache.updateRelatedLinks` calls during a bulk re-add and replays them as one `Set`-based pass
   - `restore-notice-component.ts` — restores hidden files synchronously on unload (added last so it unloads first)
   - `update-progress-notice-component.ts` — progress notice shown while a projection is applied
-  - `plugin-settings*.ts` — settings model, component, settings tab
+  - `plugin-settings*.ts` — settings model, component, settings tab. `PluginSettingsComponent.settings` is the base layer the tab edits; every runtime decision reads `effectiveSettings` (base overlaid by the active profile, memoized on the input references, so replace `profiles` with a new array rather than mutating it)
+  - `profiles.ts` — profile resolution: `@import <name>` expands linearly, `@reset` clears, `\@` escapes; a profile's own scalars beat its imports; errors skip the line and are reported
+  - `profile-switcher-component.ts`, `profile-suggest-modal.ts`, `profile-edit-modal.ts`, `command-handlers/` — the status-bar switcher, the "Switch profile..." picker, the profile editor, and the two profile commands. The active profile id is per device, in `app.loadLocalStorage('advanced-exclude:active-profile')`; a switch runs `IgnorePatternsComponent.applyProfileChange`, the ordinary config-change path
   - `patches/` — monkey-patches on Obsidian internals:
     - `adapter-patch-component.ts` — dispatches to file-system or capacitor variant
     - `adapter-patch-base-component.ts` — shared `MonkeyAroundComponent` base for both adapter patches
