@@ -44,6 +44,9 @@ export class Plugin extends PluginBase {
     const ignorePatternsComponent: IgnorePatternsComponent = this.addChild(
       new IgnorePatternsComponent({
         app: this.app,
+        // Closes over `pluginSettingsTab`, created further down: it is only called from a `saveSettings` handler,
+        // and nothing saves the settings before the tab exists.
+        isSettingsTabOpen: (): boolean => pluginSettingsTab.isOpen,
         onUpdateFileTree: (): Promise<void> => indexProjectionComponent.update(),
         pluginSettingsComponent
       })
