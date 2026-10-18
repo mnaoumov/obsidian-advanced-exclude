@@ -11,11 +11,16 @@ import {
 
 import type { SettingsProfile } from './plugin-settings.ts';
 
+import { readIfExists } from './data-adapter-safe.ts';
 import {
   ExcludeMode,
   PluginSettings
 } from './plugin-settings.ts';
 import { ProfileEditModal } from './profile-edit-modal.ts';
+
+vi.mock('./data-adapter-safe.ts', () => ({
+  readIfExists: vi.fn()
+}));
 
 interface OpenModalResult {
   readonly modal: ProfileEditModal;
@@ -104,6 +109,32 @@ describe('ProfileEditModal', () => {
     expect(onSave).not.toHaveBeenCalled();
   });
 
+  it('should show an imported file the plugin already read, labelled with its path', () => {
+    const { modal } = openModal({ id: 'work', name: 'Work', patterns: '@import file:.gitignore' }, new Map([['.gitignore', 'node_modules/']]));
+
+    expect(getText(modal, '.advanced-exclude-profile-expansion')).toContain('Work (.gitignore): node_modules/');
+    expect(readIfExists).not.toHaveBeenCalled();
+  });
+
+  it('should read a file the draft newly imports and show it, or report it missing', async () => {
+    vi.mocked(readIfExists).mockImplementation((_app, path) => Promise.resolve(path === 'work.txt' ? 'from-file/' : null));
+    const { modal } = openModal({ id: 'work', name: 'Work', patterns: '' });
+
+    typeInto(getTextArea(modal), '@import file:work.txt\n@import file:gone.txt');
+    await waitForAllAsyncOperations();
+
+    expect(getText(modal, '.advanced-exclude-profile-expansion')).toContain('Work (work.txt): from-file/');
+    expect(modal.contentEl.textContent).toContain('Work, line 2: File `gone.txt` does not exist.');
+  });
+
+  it('should refuse a name that would read as a file import', () => {
+    const { modal } = openModal({ id: 'work', name: 'Work', patterns: '' });
+
+    typeInto(getInput(modal), 'file:x');
+
+    expect(getText(modal, '.advanced-exclude-profile-error')).toBe('A profile name cannot start with "file:": that imports a file.');
+  });
+
   it('should close without saving on Cancel', () => {
     const { modal, onSave } = openModal({ id: 'work', name: 'Work', patterns: '' });
 
@@ -154,7 +185,7 @@ function getTextArea(modal: ProfileEditModal): HTMLTextAreaElement {
   return textArea;
 }
 
-function openModal(profile: SettingsProfile): OpenModalResult {
+function openModal(profile: SettingsProfile, importedFileContents: ReadonlyMap<string, null | string> = new Map()): OpenModalResult {
   const settings = Object.assign(new PluginSettings(), {
     obsidianIgnoreContent: 'base/',
     profiles: [{ id: 'base', name: 'Base', patterns: 'from-base/' }, profile]
@@ -162,6 +193,7 @@ function openModal(profile: SettingsProfile): OpenModalResult {
   const onSave = vi.fn<(editedProfile: SettingsProfile) => Promise<void>>().mockResolvedValue(undefined);
   const modal = new ProfileEditModal({
     app: App.createConfigured__().asOriginalType__(),
+    importedFileContents,
     onSave,
     profile,
     settings

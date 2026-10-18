@@ -64,7 +64,16 @@ drafts/*
 - A profile's own settings beat the ones it imports, and of two imports the later one wins.
 - Renaming a profile rewrites the `@import` lines that name it.
 
-Mistakes are reported, never silently dropped: the profile editor lists an unknown profile name, an import cycle (`Alpha` imports `Beta`, which imports `Alpha`) and an import chain nested too deep, with the profile and line of each. The editor also shows the full expansion, each line labelled with the profile it came from.
+## Import a file with `@import file:`
+
+A line `@import file:<vault path>` pastes the patterns of a file in the vault at that line, the same way. `@import file:.gitignore` puts the vault's `.gitignore` exactly where you want it in a profile, which the **Include .gitignore patterns** setting cannot: that one always adds it after every other line.
+
+- The path is relative to the vault root, and the file may be one the plugin hides, or a dot file such as `.gitignore`.
+- The file's lines are taken literally, as in a `.gitignore`: a line starting with `@` in it is a pattern, not a directive, so a file cannot import anything.
+- Editing the file applies at once, while the plugin runs, like editing `.obsidianignore`.
+- A profile cannot be named starting with `file:`, since `@import file:...` would read as a file.
+
+Mistakes are reported, never silently dropped: the profile editor lists an unknown profile name, a file that does not exist, an import cycle (`Alpha` imports `Beta`, which imports `Alpha`) and an import chain nested too deep, with the profile and line of each. The editor also shows the full expansion, each line labelled with the profile it came from, and with the file for a line a file import pasted.
 
 ## Clean up
 

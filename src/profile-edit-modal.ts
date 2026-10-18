@@ -3,7 +3,10 @@ import type {
   DropdownComponent
 } from 'obsidian';
 
-import { convertAsyncToSync } from '@mnaoumov/typescript-lib/async';
+import {
+  convertAsyncToSync,
+  invokeAsyncSafely
+} from '@mnaoumov/typescript-lib/async';
 import {
   Modal,
   Setting
@@ -13,11 +16,17 @@ import type {
   PluginSettings,
   SettingsProfile
 } from './plugin-settings.ts';
-import type { ResolveProfileSettings } from './profiles.ts';
+import type {
+  ImportedFileContents,
+  ResolveProfileSettings
+} from './profiles.ts';
 
+import { readIfExists } from './data-adapter-safe.ts';
 import { ExcludeMode } from './plugin-settings.ts';
 import {
+  FILE_IMPORT_PREFIX,
   findProfileByName,
+  isFileImportName,
   resolveProfile
 } from './profiles.ts';
 
@@ -30,6 +39,10 @@ type BooleanScalarName = 'shouldHideEmptyFolders' | 'shouldIgnoreExcludedFiles' 
 
 interface ProfileEditModalConstructorParams {
   readonly app: App;
+  /**
+  The imported files' contents as the plugin last read them. A file the draft imports beyond these is read on demand.
+  */
+  readonly importedFileContents: ImportedFileContents;
   /**
   Called with the edited copy when the user saves. The modal never mutates {@link profile}.
   */
@@ -50,6 +63,7 @@ export class ProfileEditModal extends Modal {
   // Created detached, so an input handler can always reach them; onOpen puts them in place.
   private readonly errorsEl = createDiv();
   private readonly expansionEl = createEl('pre', { cls: 'advanced-exclude-profile-expansion' });
+  private readonly importedFileContents: Map<string, null | string>;
   private readonly nameErrorEl = createDiv({ cls: 'advanced-exclude-profile-error' });
   private readonly onSave: (profile: SettingsProfile) => Promise<void>;
   private readonly originalName: string;
@@ -58,6 +72,7 @@ export class ProfileEditModal extends Modal {
   public constructor(params: ProfileEditModalConstructorParams) {
     super(params.app);
     this.draft = { ...params.profile };
+    this.importedFileContents = new Map(params.importedFileContents);
     this.onSave = params.onSave;
     this.originalName = params.profile.name;
     this.settings = params.settings;
@@ -89,6 +104,8 @@ export class ProfileEditModal extends Modal {
         f.appendText('gitignore syntax, one pattern per line. ');
         f.createEl('code', { text: '@import <profile>' });
         f.appendText(' inserts another profile\'s patterns at that line, ');
+        f.createEl('code', { text: '@import file:<vault path>' });
+        f.appendText(' inserts a file\'s patterns, ');
         f.createEl('code', { text: '@reset' });
         f.appendText(' drops everything collected before it, and ');
         f.createEl('code', { text: String.raw`\@` });
@@ -164,13 +181,28 @@ export class ProfileEditModal extends Modal {
       });
   }
 
+  /**
+   * Reads files the draft imports that no one has read yet, then shows the expansion again with them.
+   */
+  private async readFiles(paths: readonly string[]): Promise<void> {
+    for (const path of paths) {
+      this.importedFileContents.set(path, await readIfExists(this.app, path));
+    }
+    this.renderResolution();
+  }
+
   private renderResolution(): void {
     const { errorsEl, expansionEl } = this;
     const otherProfiles = this.settings.profiles.filter((profile) => profile.id !== this.draft.id);
     const effectiveSettings = resolveProfile({
       activeProfileId: this.draft.id,
+      importedFileContents: this.importedFileContents,
       settings: { ...this.settings, profiles: [...otherProfiles, this.draft] }
     });
+    const unreadPaths = effectiveSettings.importedFilePaths.filter((path) => !this.importedFileContents.has(path));
+    if (unreadPaths.length > 0) {
+      invokeAsyncSafely(() => this.readFiles(unreadPaths));
+    }
 
     errorsEl.empty();
     if (effectiveSettings.errors.length === 0) {
@@ -186,7 +218,8 @@ export class ProfileEditModal extends Modal {
     expansionEl.empty();
     for (const line of effectiveSettings.lines) {
       const lineEl = expansionEl.createDiv();
-      lineEl.createSpan({ cls: 'advanced-exclude-profile-source', text: `${line.profileName ?? 'base'}: ` });
+      const source = line.profileName ?? 'base';
+      lineEl.createSpan({ cls: 'advanced-exclude-profile-source', text: `${line.filePath === undefined ? source : `${source} (${line.filePath})`}: ` });
       lineEl.appendText(line.text);
     }
     expansionEl.createDiv({ cls: 'advanced-exclude-profile-source', text: describeScalars(effectiveSettings) });
@@ -198,6 +231,8 @@ export class ProfileEditModal extends Modal {
     let message = '';
     if (name === '') {
       message = 'A profile needs a name.';
+    } else if (isFileImportName(name)) {
+      message = `A profile name cannot start with "${FILE_IMPORT_PREFIX}": that imports a file.`;
     } else if (findProfileByName(otherProfiles, name)) {
       message = `Another profile is already named "${name}".`;
     }

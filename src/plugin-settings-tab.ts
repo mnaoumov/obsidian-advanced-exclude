@@ -262,6 +262,7 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginSettings> {
   private openProfileEditor(profile: Readonly<SettingsProfile>): void {
     new ProfileEditModal({
       app: this.app,
+      importedFileContents: this.profileSettingsComponent.importedFileContents,
       onSave: async (editedProfile): Promise<void> => {
         await this.saveProfiles(saveProfile(this.profileSettingsComponent.settings.profiles, editedProfile));
       },

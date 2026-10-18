@@ -15,9 +15,12 @@ interface WriteSafeParams {
   readonly path: string;
 }
 
-export async function readSafe(app: App, path: string): Promise<string> {
+/**
+ * Reads {@link path}, or returns `null` when it does not exist.
+ */
+export async function readIfExists(app: App, path: string): Promise<null | string> {
   if (!await doesExistSafe(app, path)) {
-    return '';
+    return null;
   }
 
   const adapter = getDataAdapterEx(app);
@@ -31,6 +34,10 @@ export async function readSafe(app: App, path: string): Promise<string> {
   }
 
   throw new Error('Unknown adapter');
+}
+
+export async function readSafe(app: App, path: string): Promise<string> {
+  return await readIfExists(app, path) ?? '';
 }
 
 export async function statSafe(app: App, path: string): Promise<null | Stat> {

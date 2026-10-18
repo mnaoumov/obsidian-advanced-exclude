@@ -92,6 +92,20 @@ describe('PluginSettingsComponent', () => {
     }
   });
 
+  it('should expand the imported files it is handed, and resolve again when handed new ones', () => {
+    const { component, settings } = createComponent('work');
+    settings.profiles = [{ id: 'work', name: 'Work', patterns: '@import file:work.txt' }];
+    const before = component.effectiveSettings;
+    expect(before.obsidianIgnoreContent).toBe('');
+
+    const importedFileContents = new Map([['work.txt', 'from-file/']]);
+    component.setImportedFileContents(importedFileContents);
+
+    expect(component.importedFileContents).toBe(importedFileContents);
+    expect(component.effectiveSettings).not.toBe(before);
+    expect(component.effectiveSettings.obsidianIgnoreContent).toBe('from-file/');
+  });
+
   it('should store a new active profile, notify the listeners, and resolve against it', async () => {
     const { component, saveLocalStorage, settings } = createComponent(null);
     settings.profiles = [{ id: 'work', name: 'Work', patterns: '' }];

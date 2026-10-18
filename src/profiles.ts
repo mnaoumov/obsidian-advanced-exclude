@@ -1,3 +1,5 @@
+import { normalizePath } from 'obsidian';
+
 import type { SettingsProfile } from './plugin-settings.ts';
 
 import { PluginSettings } from './plugin-settings.ts';
@@ -7,6 +9,12 @@ import { PluginSettings } from './plugin-settings.ts';
  * runaway chain; a cycle is reported as a cycle before it gets here.
  */
 export const MAX_IMPORT_DEPTH = 10;
+
+/**
+ * The prefix that makes an `@import` line import a vault file rather than a profile, so no profile may be named
+ * with it.
+ */
+export const FILE_IMPORT_PREFIX = 'file:';
 
 const IMPORT_DIRECTIVE = '@import';
 const IMPORT_DIRECTIVE_REG_EXP = /^@import\s+(?<name>.*\S)\s*$/;
@@ -23,6 +31,11 @@ export interface EffectiveSettings extends ProfileScalarSettings {
   readonly activeProfile: null | Readonly<SettingsProfile>;
   readonly errors: readonly ProfileError[];
   /**
+  The normalized vault paths the expansion imports with `@import file:`, each once, in first-import order. They
+  depend on the profiles alone, never on the files' contents, so reading them all once is enough to resolve.
+  */
+  readonly importedFilePaths: readonly string[];
+  /**
   The expanded pattern lines, each labelled with the profile it came from.
   */
   readonly lines: readonly ResolvedPatternLine[];
@@ -32,6 +45,12 @@ export interface EffectiveSettings extends ProfileScalarSettings {
   readonly obsidianIgnoreContent: string;
 }
 
+/**
+ * The contents of the vault files an `@import file:` line names, by normalized path: `null` for a file that does not
+ * exist. A path missing from the map has not been read yet and expands to nothing, without an error.
+ */
+export type ImportedFileContents = ReadonlyMap<string, null | string>;
+
 export interface ResolveProfileSettings extends Readonly<ProfileScalarSettings> {
   readonly obsidianIgnoreContent: string;
   readonly profiles: readonly Readonly<SettingsProfile>[];
@@ -39,6 +58,8 @@ export interface ResolveProfileSettings extends Readonly<ProfileScalarSettings> 
 
 interface ExpansionState {
   readonly errors: ProfileError[];
+  readonly importedFileContents: ImportedFileContents;
+  readonly importedFilePaths: Set<string>;
   lines: ResolvedPatternLine[];
   readonly profiles: readonly Readonly<SettingsProfile>[];
   scalars: ProfileScalarSettings;
@@ -59,6 +80,10 @@ type ProfileScalarSettings = Pick<PluginSettings, ProfileScalarSettingName>;
 
 interface ResolvedPatternLine {
   /**
+  The vault file the line came from, when {@link profileName} imported it with `@import file:`.
+  */
+  readonly filePath?: string;
+  /**
   The profile the line came from, or `null` for the base settings.
   */
   readonly profileName: null | string;
@@ -67,6 +92,7 @@ interface ResolvedPatternLine {
 
 interface ResolveProfileParams {
   readonly activeProfileId: null | string;
+  readonly importedFileContents?: ImportedFileContents;
   readonly settings: ResolveProfileSettings;
 }
 
@@ -117,6 +143,13 @@ export function findProfileByName<Profile extends Readonly<SettingsProfile>>(pro
 }
 
 /**
+ * Whether {@link name} would be read as a file import rather than a profile name by an `@import` line.
+ */
+export function isFileImportName(name: string): boolean {
+  return normalizeProfileName(name).startsWith(FILE_IMPORT_PREFIX);
+}
+
+/**
  * Rewrites every `@import` line naming {@link oldName} to name {@link newName}, so a rename does not break the
  * profiles that import the renamed one.
  */
@@ -138,10 +171,13 @@ export function renameProfileImports(patterns: string, oldName: string, newName:
  * line in the profile that imports it. `@reset` drops every line collected so far, the base settings' included,
  * and returns every scalar to its default.
  *
+ * `@import file:<vault path>` pastes the lines of a vault file, read from `importedFileContents`, the same way. They
+ * are taken literally, as in a `.gitignore`: a file cannot import anything.
+ *
  * Errors never stop the resolution: the offending line is skipped and reported.
  */
 export function resolveProfile(params: ResolveProfileParams): EffectiveSettings {
-  const { activeProfileId, settings } = params;
+  const { activeProfileId, importedFileContents = new Map<string, null | string>(), settings } = params;
   const activeProfile = activeProfileId === null ? undefined : settings.profiles.find((profile) => profile.id === activeProfileId);
   const baseScalars = pickScalars(settings);
 
@@ -150,6 +186,7 @@ export function resolveProfile(params: ResolveProfileParams): EffectiveSettings 
       ...baseScalars,
       activeProfile: null,
       errors: [],
+      importedFilePaths: [],
       lines: splitLines(settings.obsidianIgnoreContent).map((text) => ({ profileName: null, text })),
       obsidianIgnoreContent: settings.obsidianIgnoreContent
     };
@@ -157,6 +194,8 @@ export function resolveProfile(params: ResolveProfileParams): EffectiveSettings 
 
   const state: ExpansionState = {
     errors: [],
+    importedFileContents,
+    importedFilePaths: new Set(),
     lines: splitLines(settings.obsidianIgnoreContent).map((text) => ({ profileName: null, text })),
     profiles: settings.profiles,
     scalars: baseScalars
@@ -167,6 +206,7 @@ export function resolveProfile(params: ResolveProfileParams): EffectiveSettings 
     ...state.scalars,
     activeProfile,
     errors: state.errors,
+    importedFilePaths: [...state.importedFilePaths],
     lines: state.lines,
     obsidianIgnoreContent: state.lines.map((line) => line.text).join('\n')
   };
@@ -190,6 +230,30 @@ export function saveProfile(profiles: readonly Readonly<SettingsProfile>[], edit
     result.push({ ...edited });
   }
   return result;
+}
+
+/**
+ * Expands an `@import file:<path>` line of {@link profile} into {@link state}.
+ *
+ * @returns The error to report for the line, or `null` when it expanded cleanly.
+ */
+function expandFileImport(state: ExpansionState, profile: Readonly<SettingsProfile>, rawPath: string): null | string {
+  const trimmedPath = rawPath.trim();
+  if (trimmedPath === '') {
+    return '`@import file:` needs a vault path.';
+  }
+
+  const filePath = normalizePath(trimmedPath);
+  state.importedFilePaths.add(filePath);
+  const content = state.importedFileContents.get(filePath);
+  if (content === null) {
+    return `File \`${filePath}\` does not exist.`;
+  }
+
+  for (const text of splitLines(content ?? '')) {
+    state.lines.push({ filePath, profileName: profile.name, text });
+  }
+  return null;
 }
 
 /**
@@ -220,6 +284,10 @@ function expandLine(state: ExpansionState, profile: Readonly<SettingsProfile>, c
     return directive === IMPORT_DIRECTIVE
       ? '`@import` needs a profile name.'
       : `Unknown directive \`${directive}\`. Write \`\\@\` for a pattern that starts with \`@\`.`;
+  }
+
+  if (isFileImportName(importedName)) {
+    return expandFileImport(state, profile, importedName.trim().slice(FILE_IMPORT_PREFIX.length));
   }
 
   const importedProfile = findProfileByName(state.profiles, importedName);
