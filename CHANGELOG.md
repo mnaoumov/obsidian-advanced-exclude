@@ -10,16 +10,16 @@
 - fix(settings): link the whitelist demo note instead of a missing README heading
 - feat(profiles): import a vault file with `@import file:<path>`
 - feat: add switchable settings profiles composed with `@import`
-- perf: keep pattern edits and re-enables fast at real-vault scale (re #16 - [BUG] Are .gitignore comments supported?)
+- perf: keep pattern edits and re-enables fast at real-vault scale (re #16 - \[BUG\] Are .gitignore comments supported?)
 - docs: mark plugin names as code
 
 ## 4.1.4
 
 - chore: link Discussions from the issue chooser for questions
-- fix: re-apply Files Pane hiding to an explorer built after the projection (re #13 - [BUG] Exclude mode - FIles Pane : is not working for me)
+- fix: re-apply Files Pane hiding to an explorer built after the projection (re #13 - \[BUG\] Exclude mode - FIles Pane : is not working for me)
 - ci: merge attesting release assets through the toolkit's reusable workflow
 - build(demo-vault): require `CodeScript Toolkit` 13.8.0 for the obsidian-lib demo script
-- docs: document # comments in .obsidianignore, with a regression test (re #16 - [BUG] Are .gitignore comments supported?)
+- docs: document # comments in .obsidianignore, with a regression test (re #16 - \[BUG\] Are .gitignore comments supported?)
 - build: move off obsidian-dev-utils onto the @mnaoumov packages
 - fix: mark plugin names as code in markdown, comments and UI
 - refactor: merge typing Obsidian internals from obsidian-typings
