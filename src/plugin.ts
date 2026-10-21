@@ -36,7 +36,7 @@ export class Plugin extends PluginBase {
     const vaultLoadPatch = this.addChild(new VaultLoadPatchComponent(this.app));
     this.addChild(new MetadataCacheInitializePatchComponent(this.app));
 
-    // Since obsidian-dev-utils 90 a child is loaded as it is added, so a component's async load tail runs
+    // A child is loaded as it is added, so a component's async load tail runs
     // in parallel with the components added after it instead of before them. IgnorePatternsComponent reads
     // the settings while it loads — `loadFingerprint` fingerprints on `shouldIncludeGitIgnorePatterns` and
     // `reload` writes `obsidianIgnoreContent` back — so without this wait it would fingerprint against the
