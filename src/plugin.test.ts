@@ -30,7 +30,7 @@ type ProfileSwitcherComponentConstructorParams = ConstructorParameters<typeof Pr
  * returns a real `Component` (carrying only the methods `plugin.ts` calls on it).
  */
 
-// `PluginDataHandler` is NOT stubbed: since obsidian-dev-utils 93.2 the base builds its own settings
+// `PluginDataHandler` is NOT stubbed: the base builds its own settings
 // component out of one during `onload` and really calls `dataHandler.loadData()`, which a bare `vi.fn()`
 // double does not answer.
 
