@@ -55,7 +55,7 @@ vi.mock('./profile-edit-modal.ts', () => ({
 }));
 
 /*
- * Return-value stub of a dev-utils utility. appendCodeBlock writes into a DOM
+ * Return-value stub of an obsidian-lib utility. appendCodeBlock writes into a DOM
  * fragment that the test does not assert on; the real implementation is exercised
  * elsewhere.
  */
@@ -64,7 +64,7 @@ vi.mock('@mnaoumov/typescript-lib/html-element', () => ({
 }));
 
 /*
- * Return-value stub of a dev-utils utility. The real base's `bind` duck-types every
+ * Return-value stub of an obsidian-lib utility. The real base's `bind` duck-types every
  * value component it receives via `getTextBasedComponentValue` -> `isTextBasedComponent`,
  * which READS `setPlaceholderValue` on the component to decide whether it is text-based.
  * The obsidian-test-mocks value components are wrapped in a strict proxy that THROWS on
@@ -72,8 +72,8 @@ vi.mock('@mnaoumov/typescript-lib/html-element', () => ({
  * probe would simply move on), so the read blows up before `bind` can continue. Stubbing
  * the probe's return value to `null` (its real result for a non-text-based component)
  * lets the REAL base `bind` run end to end over the REAL test-mocks
- * `Setting` controls. This only neutralizes a dev-utils-internal text-placeholder branch
- * that is covered by dev-utils' own tests; the lines under test here merely call
+ * `Setting` controls. This only neutralizes an obsidian-lib-internal text-placeholder branch
+ * that is covered by obsidian-lib's own tests; the lines under test here merely call
  * `this.bind(...)` and are exercised regardless.
  */
 vi.mock('@mnaoumov/obsidian-lib/setting-components/text-based-component', () => ({

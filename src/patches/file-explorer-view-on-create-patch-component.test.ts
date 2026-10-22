@@ -44,7 +44,7 @@ class MockFileExplorerView extends View {
   }
 }
 
-// Return-value stub of a dev-utils utility — the test controls what counts as a folder.
+// Return-value stub of an obsidian-lib utility — the test controls what counts as a folder.
 vi.mock('@mnaoumov/obsidian-lib/file-system', () => ({
   isFolder: vi.fn().mockReturnValue(false)
 }));
