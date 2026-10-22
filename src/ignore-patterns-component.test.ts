@@ -53,7 +53,7 @@ vi.mock('@mnaoumov/obsidian-lib/components/async-events-component', () => ({
   registerAsyncEvent: vi.fn()
 }));
 
-// Keep the REAL invokeAsyncSafelyAfterDelay (so its genuine dev-utils scheduling/error-handling runs).
+// Keep the REAL invokeAsyncSafelyAfterDelay (so its genuine obsidian-lib scheduling/error-handling runs).
 // It is wrapped in a vi.fn pass-through purely so tests can assert it was invoked.
 // The real body is not re-created: vi.fn delegates every call to actual.invokeAsyncSafelyAfterDelay unchanged.
 vi.mock('@mnaoumov/typescript-lib/async', async (importOriginal) => {
