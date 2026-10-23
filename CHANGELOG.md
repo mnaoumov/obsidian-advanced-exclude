@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## 4.2.1
+
+- fix: show the profile pattern syntax in the profile editor as rendered inline code
+- build(deps): float brace-expansion, sharp and fast-uri to their patched versions
+- chore(deps): move to obsidian-lib 6 and obsidian-dev-toolkit 5
+- docs(readme): lead the Debugging section with `Advanced Debug Mode`
+
 ## 4.2.0
 
 - test(lifecycle): measure a real app start with the folder hidden
