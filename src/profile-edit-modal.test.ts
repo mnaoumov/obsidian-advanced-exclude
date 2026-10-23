@@ -51,6 +51,17 @@ describe('ProfileEditModal', () => {
     expect(modal.contentEl.textContent).toContain('None.');
   });
 
+  it('should render the pattern syntax tokens as inline code', () => {
+    const { modal } = openModal({ id: 'work', name: 'Work', patterns: '' });
+
+    const codeEls = [...modal.contentEl.querySelectorAll('code')];
+
+    expect(codeEls.map((codeEl) => codeEl.textContent)).toStrictEqual(['@import <profile>', '@import file:<vault path>', '@reset', String.raw`\@`, '@']);
+    for (const codeEl of codeEls) {
+      expect(codeEl.parentElement?.matches('.markdown-rendered.code')).toBe(true);
+    }
+  });
+
   it('should show the errors of the edited patterns as they are typed', () => {
     const { modal } = openModal({ id: 'work', name: 'Work', patterns: '' });
 
