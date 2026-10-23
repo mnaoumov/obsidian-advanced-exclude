@@ -3,6 +3,7 @@ import type {
   DropdownComponent
 } from 'obsidian';
 
+import { appendCodeBlock } from '@mnaoumov/obsidian-lib/html-element';
 import {
   convertAsyncToSync,
   invokeAsyncSafely
@@ -102,15 +103,15 @@ export class ProfileEditModal extends Modal {
       .setName('Patterns')
       .setDesc(createFragment((f) => {
         f.appendText('gitignore syntax, one pattern per line. ');
-        f.createEl('code', { text: '@import <profile>' });
+        appendCodeBlock(f, '@import <profile>');
         f.appendText(' inserts another profile\'s patterns at that line, ');
-        f.createEl('code', { text: '@import file:<vault path>' });
+        appendCodeBlock(f, '@import file:<vault path>');
         f.appendText(' inserts a file\'s patterns, ');
-        f.createEl('code', { text: '@reset' });
+        appendCodeBlock(f, '@reset');
         f.appendText(' drops everything collected before it, and ');
-        f.createEl('code', { text: String.raw`\@` });
+        appendCodeBlock(f, String.raw`\@`);
         f.appendText(' starts a pattern that begins with ');
-        f.createEl('code', { text: '@' });
+        appendCodeBlock(f, '@');
         f.appendText('.');
       }))
       .addTextArea((textArea) => {
