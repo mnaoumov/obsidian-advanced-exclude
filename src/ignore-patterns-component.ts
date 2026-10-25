@@ -88,6 +88,14 @@ interface IgnorePatternsComponentIsIgnoredParams {
   readonly normalizedPath: string;
 }
 
+interface ObsidianIgnoreReadResult {
+  readonly hasPatternChanges: boolean;
+  /**
+   * Whether the file's raw content or existence changed, which can leave its patterns as they were.
+   */
+  readonly isFileChanged: boolean;
+}
+
 export class IgnorePatternsComponent extends LayoutReadyComponent {
   // Initialized so onunload can test it before a load ever opened it.
   private _database: IDBDatabase | undefined = undefined;
@@ -188,10 +196,14 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
     }
 
     let shouldRefresh = false;
-    if (normalizedPath === OBSIDIAN_IGNORE_FILE && await this.readObsidianIgnore()) {
-      shouldRefresh = true;
-      for (const listener of this.localPatternsChangeListeners) {
-        listener();
+    if (normalizedPath === OBSIDIAN_IGNORE_FILE) {
+      const { hasPatternChanges, isFileChanged } = await this.readObsidianIgnore();
+      shouldRefresh = hasPatternChanges;
+      // Also when only the file's existence or line endings changed: the tab shows the header for a missing file.
+      if (isFileChanged) {
+        for (const listener of this.localPatternsChangeListeners) {
+          listener();
+        }
       }
     }
 
@@ -588,20 +600,20 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
   /**
    * Reads `.obsidianignore` once a save in flight has finished.
    *
-   * @returns Whether its content changed since it was last read or written.
+   * @returns What changed since it was last read or written.
    */
-  private async readObsidianIgnore(): Promise<boolean> {
+  private async readObsidianIgnore(): Promise<ObsidianIgnoreReadResult> {
     await this.localPatternsWrite;
     const content = await readIfExists(this.app, OBSIDIAN_IGNORE_FILE);
     if (content === this.localPatternsFileContent) {
-      return false;
+      return { hasPatternChanges: false, isFileChanged: false };
     }
 
     this.localPatternsFileContent = content;
     const localPatterns = normalizeLocalPatterns(content ?? '');
     const hasPatternChanges = localPatterns !== this.cachedLocalPatterns;
     this.cachedLocalPatterns = localPatterns;
-    return hasPatternChanges;
+    return { hasPatternChanges, isFileChanged: true };
   }
 
   private releaseDatabase(): void {
@@ -619,7 +631,7 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
     const effectivePatterns = this.getEffectivePatterns();
     const hasPatternChanges = effectivePatterns !== this.cachedEffectivePatterns;
     this.cachedEffectivePatterns = effectivePatterns;
-    const hasObsidianIgnoreChanges = await this.readObsidianIgnore();
+    const { hasPatternChanges: hasObsidianIgnoreChanges } = await this.readObsidianIgnore();
     const hasGitIgnoreChanges = await this.readGitIgnore();
     if (hasPatternChanges || hasImportChanges || hasObsidianIgnoreChanges || hasGitIgnoreChanges) {
       this.fileIgnoreMap.clear();

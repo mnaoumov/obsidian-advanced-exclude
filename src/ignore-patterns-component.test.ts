@@ -1255,6 +1255,24 @@ describe('IgnorePatternsComponent', () => {
       expect(onUpdateFileTree).toHaveBeenCalledOnce();
     });
 
+    it('should tell its listeners when an empty file is deleted, though no pattern changed', async () => {
+      setupIndexedDatabase();
+      vi.mocked(readIfExists).mockResolvedValueOnce('');
+      const onUpdateFileTree = vi.fn().mockResolvedValue(undefined);
+      const component = createComponent({ isSettingsTabOpen: () => false, onUpdateFileTree });
+      await component.loadWithPromises();
+      expect(component.getLocalPatternsText()).toBe('');
+      const listener = vi.fn();
+      component.onLocalPatternsChange(listener);
+
+      await component.refreshLocalPatterns();
+      await vi.runAllTimersAsync();
+
+      expect(listener).toHaveBeenCalledOnce();
+      expect(component.getLocalPatternsText()).toBe(LOCAL_PATTERNS_HEADER);
+      expect(onUpdateFileTree).not.toHaveBeenCalled();
+    });
+
     it('should drop the local patterns and offer the header again once the file is deleted', async () => {
       setupIndexedDatabase();
       vi.mocked(readIfExists).mockResolvedValueOnce('local/');
