@@ -43,7 +43,7 @@ describe('ProfileEditModal', () => {
     expect(modal.titleEl.textContent).toBe('Edit profile: Work');
     expect(getInput(modal).value).toBe('Work');
     expect(getTextArea(modal).value).toBe('@import Base\nwork/');
-    expect(getSelects(modal).map((select) => select.value)).toStrictEqual(['inherit', 'inherit', 'off', 'on']);
+    expect(getSelects(modal).map((select) => select.value)).toStrictEqual(['inherit', 'inherit', 'inherit', 'off', 'on']);
     expect(getText(modal, '.advanced-exclude-profile-expansion')).toContain('base: base/');
     expect(getText(modal, '.advanced-exclude-profile-expansion')).toContain('Base: from-base/');
     expect(getText(modal, '.advanced-exclude-profile-expansion')).toContain('Work: work/');
@@ -72,15 +72,16 @@ describe('ProfileEditModal', () => {
 
   it('should save the edited name, patterns and overrides', async () => {
     const { modal, onSave } = openModal({ excludeMode: ExcludeMode.Full, id: 'work', name: 'Work', patterns: 'a/' });
-    const [excludeModeSelect, gitIgnoreSelect, excludedFilesSelect, emptyFoldersSelect] = getSelects(modal);
+    const [excludeModeSelect, obsidianIgnoreSelect, gitIgnoreSelect, excludedFilesSelect, emptyFoldersSelect] = getSelects(modal);
 
     typeInto(getInput(modal), '  Office  ');
     typeInto(getTextArea(modal), 'b/');
     choose(excludeModeSelect, 'inherit');
+    choose(obsidianIgnoreSelect, 'on');
     choose(gitIgnoreSelect, 'on');
     choose(excludedFilesSelect, 'off');
     choose(emptyFoldersSelect, 'inherit');
-    expect(getText(modal, '.advanced-exclude-profile-expansion')).toContain('.gitignore patterns: on');
+    expect(getText(modal, '.advanced-exclude-profile-expansion')).toContain('.obsidianignore patterns: on; .gitignore patterns: on');
     clickButton(modal, 'Save');
     await waitForAllAsyncOperations();
 
@@ -91,7 +92,8 @@ describe('ProfileEditModal', () => {
       patterns: 'b/',
       shouldHideEmptyFolders: undefined,
       shouldIgnoreExcludedFiles: false,
-      shouldIncludeGitIgnorePatterns: true
+      shouldIncludeGitIgnorePatterns: true,
+      shouldIncludeObsidianIgnorePatterns: true
     });
   });
 

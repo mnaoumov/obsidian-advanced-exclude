@@ -34,6 +34,14 @@ import {
   it
 } from 'vitest';
 
+import type { PluginSettingsComponent } from './plugin-settings-component.ts';
+
+interface PluginWithSettingsComponent {
+  readonly pluginSettingsComponent: PluginSettingsComponent;
+}
+
+const PLUGIN_ID = 'advanced-exclude';
+
 const WIDTH_IN_PIXELS = 900;
 const HEIGHT_IN_PIXELS = 1600;
 
@@ -49,13 +57,11 @@ const MOBILE_FONT_SIZE_IN_PIXELS = 13;
 const IGNORED_FOLDER = 'archive';
 
 /**
- * Which of the two frames this run takes. `rules` stages the ignore file with
- * the notes; the plugin is already running by then and applies it as a live
- * ignore-file change.
+ * Which of the two frames this run takes. `rules` saves the ignore rules into the
+ * plugin settings after the notes are staged; the plugin is already running by then
+ * and applies the save at once.
  */
 const SHOULD_IGNORE = process.env['SCREENSHOT_IGNORE_RULES'] === 'rules';
-
-const IGNORE_FILE_PATH = '.obsidianignore';
 
 const IMAGES_DIRECTORY = join(process.cwd(), 'images', 'screenshots');
 
@@ -66,7 +72,6 @@ beforeAll(async () => {
     [`${IGNORED_FOLDER}/2019 notes.md`]: '# 2019 notes\n',
     [`${IGNORED_FOLDER}/2020 notes.md`]: '# 2020 notes\n',
     [`${IGNORED_FOLDER}/old drafts/scratch.md`]: '# Scratch\n',
-    [IGNORE_FILE_PATH]: SHOULD_IGNORE ? buildIgnoreRules() : '# Nothing ignored yet\n',
     'Projects/Alpha.md': '# Alpha\n',
     'Projects/Beta.md': '# Beta\n',
     'Reading list.md': '# Reading list\n'
@@ -74,11 +79,17 @@ beforeAll(async () => {
   await vault.syncToDevice();
 
   await evalInObsidian({
-    async callback({ app, fontSizeInPixels, lib: { waitUntil } }) {
+    async callback({ app, fontSizeInPixels, ignoreRules, lib: { waitUntil }, pluginId }) {
       // A closure runs inside ONE Appium execute/sync call, which WebDriver caps
       // around 30s, so every wait in here stays comfortably under it.
       const SETTLE_TIMEOUT_IN_MILLISECONDS = 15_000;
       const SETTLE_DELAY_IN_MILLISECONDS = 1000;
+
+      // Saved with the settings tab closed, so the plugin applies the rules at once.
+      const plugin = app.plugins.getPlugin(pluginId) as null | PluginWithSettingsComponent;
+      await plugin?.pluginSettingsComponent.editAndSave((settings) => {
+        settings.obsidianIgnoreContent = ignoreRules;
+      });
 
       app.changeTheme('obsidian');
 
@@ -101,7 +112,7 @@ beforeAll(async () => {
 
       await sleep(SETTLE_DELAY_IN_MILLISECONDS);
     },
-    input: { fontSizeInPixels: MOBILE_FONT_SIZE_IN_PIXELS },
+    input: { fontSizeInPixels: MOBILE_FONT_SIZE_IN_PIXELS, ignoreRules: SHOULD_IGNORE ? buildIgnoreRules() : '', pluginId: PLUGIN_ID },
     vaultPath: vaultPath()
   });
 });

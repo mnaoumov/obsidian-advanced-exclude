@@ -31,8 +31,7 @@ import type {
 import {
   readIfExists,
   readSafe,
-  statSafe,
-  writeSafe
+  statSafe
 } from './data-adapter-safe.ts';
 import { IgnorePatternsComponent } from './ignore-patterns-component.ts';
 import { PluginSettings } from './plugin-settings.ts';
@@ -41,8 +40,7 @@ import { resolveProfile } from './profiles.ts';
 vi.mock('./data-adapter-safe.ts', () => ({
   readIfExists: vi.fn().mockResolvedValue(null),
   readSafe: vi.fn().mockResolvedValue(''),
-  statSafe: vi.fn().mockResolvedValue(null),
-  writeSafe: vi.fn().mockResolvedValue(undefined)
+  statSafe: vi.fn().mockResolvedValue(null)
 }));
 
 vi.mock('@mnaoumov/obsidian-lib/metadata-cache', () => ({
@@ -140,7 +138,6 @@ interface SetupIndexedDatabaseResult {
 interface TestableIgnorePatternsComponent {
   clearCachedExcludeRegExps: () => void;
   resetDatabase: () => Promise<void>;
-  writeObsidianIgnore: (obsidianIgnoreContent: string) => Promise<void>;
 }
 
 interface UpgradeEvent {
@@ -201,6 +198,8 @@ function createMockTransaction(stores: Record<string, MockIDBObjectStore>): Mock
 
 function createPluginSettingsComponent(settings?: Partial<PluginSettings>, profileState?: ProfileState): PluginSettingsComponent {
   const effectiveSettings = new PluginSettings();
+  // Most tests feed their patterns through a mocked `.obsidianignore` read, so the file source is on unless a test says otherwise.
+  effectiveSettings.shouldIncludeObsidianIgnorePatterns = true;
   if (settings) {
     Object.assign(effectiveSettings, settings);
   }
@@ -734,47 +733,6 @@ describe('IgnorePatternsComponent', () => {
     });
   });
 
-  describe('writeObsidianIgnore', () => {
-    it('should no-op when content is unchanged', async () => {
-      setupIndexedDatabase();
-      vi.mocked(readSafe).mockResolvedValue('existing-content');
-      const component = createComponent();
-      await component.loadWithPromises();
-
-      vi.mocked(writeSafe).mockClear();
-      await castTo<TestableIgnorePatternsComponent>(component).writeObsidianIgnore('existing-content');
-
-      expect(writeSafe).not.toHaveBeenCalled();
-    });
-
-    it('should write file and update settings when content changes', async () => {
-      setupIndexedDatabase();
-      vi.mocked(readSafe).mockResolvedValue('');
-      const pluginSettingsComponent = createPluginSettingsComponent();
-      const component = createComponent({ pluginSettingsComponent });
-      await component.loadWithPromises();
-
-      await castTo<TestableIgnorePatternsComponent>(component).writeObsidianIgnore('new-content');
-
-      expect(writeSafe).toHaveBeenCalled();
-      expect(pluginSettingsComponent.setProperty).toHaveBeenCalledWith('obsidianIgnoreContent', 'new-content');
-    });
-
-    it('should not write again if called with the same new content twice', async () => {
-      setupIndexedDatabase();
-      vi.mocked(readSafe).mockResolvedValue('');
-      const component = createComponent();
-      await component.loadWithPromises();
-
-      vi.mocked(writeSafe).mockClear();
-      await castTo<TestableIgnorePatternsComponent>(component).writeObsidianIgnore('new-content');
-      vi.mocked(writeSafe).mockClear();
-      await castTo<TestableIgnorePatternsComponent>(component).writeObsidianIgnore('new-content');
-
-      expect(writeSafe).not.toHaveBeenCalled();
-    });
-  });
-
   describe('onLayoutReady', () => {
     it('should call ensureMetadataCacheReady', async () => {
       setupIndexedDatabase();
@@ -871,10 +829,11 @@ describe('IgnorePatternsComponent', () => {
       expect(pluginSettingsComponent.on).toHaveBeenCalledWith('saveSettings', expect.any(Function));
     });
 
-    it('should handle loadSettings event on non-initial load', async () => {
+    it('should re-read the ignore files and re-apply on a synced settings load that changes the patterns', async () => {
       setupIndexedDatabase();
+      const onUpdateFileTree = vi.fn().mockResolvedValue(undefined);
       const pluginSettingsComponent = createPluginSettingsComponent();
-      const component = createComponent({ pluginSettingsComponent });
+      const component = createComponent({ onUpdateFileTree, pluginSettingsComponent });
       await component.loadWithPromises();
 
       const loadSettingsCall = (vi.mocked(pluginSettingsComponent.on).mock.calls as MockCallEntry[]).find(([name]) => name === 'loadSettings');
@@ -882,7 +841,13 @@ describe('IgnorePatternsComponent', () => {
         const callback = loadSettingsCall[1] as (_loadedState: unknown, isInitialLoad: boolean) => Promise<void>;
         vi.mocked(readSafe).mockClear();
         await callback(undefined, false);
+        expect(readSafe).not.toHaveBeenCalled();
+
+        (pluginSettingsComponent.settings as PluginSettings).obsidianIgnoreContent = 'synced/';
+        await callback(undefined, false);
         expect(readSafe).toHaveBeenCalled();
+        expect(onUpdateFileTree).toHaveBeenCalledOnce();
+        expect(component.isIgnored({ isFolder: false, normalizedPath: 'synced/a.md' })).toBe(true);
       } else {
         expect.fail('loadSettings event was not registered');
       }
@@ -913,12 +878,11 @@ describe('IgnorePatternsComponent', () => {
 
       const saveSettingsCall = (vi.mocked(pluginSettingsComponent.on).mock.calls as MockCallEntry[]).find(([name]) => name === 'saveSettings');
       if (saveSettingsCall) {
-        const callback = saveSettingsCall[1] as (newState: SaveSettingsState) => Promise<void>;
-        await callback({ effectiveValues: { obsidianIgnoreContent: 'new-pattern' } });
+        const callback = saveSettingsCall[1] as () => Promise<void>;
+        (pluginSettingsComponent.settings as PluginSettings).obsidianIgnoreContent = 'new-pattern';
+        await callback();
 
-        // hadConfigChanges should be set to true, verifiable by processConfigChanges doing work
-        // we cannot easily re-inject onUpdateFileTree, so just verify no error
-        expect(writeSafe).toHaveBeenCalled();
+        expect(component.isIgnored({ isFolder: false, normalizedPath: 'new-pattern' })).toBe(true);
       } else {
         expect.fail('saveSettings event was not registered');
       }
@@ -981,13 +945,14 @@ describe('IgnorePatternsComponent', () => {
       await createComponent({ pluginSettingsComponent: createPluginSettingsComponent(PROFILE_SETTINGS, { activeProfileId: 'work' }) })
         .loadWithPromises();
       expect(getMtimeEntries(withProfile.mtimeStore)).toStrictEqual([
-        expect.objectContaining({ profileFingerprint: JSON.stringify(['base/*\nwork/\n!base/keep.md', 'Full', false, false, false]) })
+        expect.objectContaining({ settingsFingerprint: JSON.stringify(['base/*\nwork/\n!base/keep.md', 'Full', false, false, false, true]) })
       ]);
 
       const withoutProfile = setupIndexedDatabase();
       await createComponent({ pluginSettingsComponent: createPluginSettingsComponent(PROFILE_SETTINGS) }).loadWithPromises();
-      expect(getMtimeEntries(withoutProfile.mtimeStore)).toHaveLength(1);
-      expect(getMtimeEntries(withoutProfile.mtimeStore)[0]).not.toHaveProperty('profileFingerprint');
+      expect(getMtimeEntries(withoutProfile.mtimeStore)).toStrictEqual([
+        expect.objectContaining({ settingsFingerprint: JSON.stringify(['base/*', 'Full', false, false, false, true]) })
+      ]);
     });
 
     it('should re-apply through the config-change path when the active profile changes', async () => {
@@ -1045,7 +1010,7 @@ describe('IgnorePatternsComponent', () => {
 
       expect(readIfExists).toHaveBeenCalledWith(expect.anything(), 'ignores/work.txt');
       expect(component.isIgnored({ isFolder: false, normalizedPath: 'from-file/a.md' })).toBe(true);
-      expect(getMtimeEntries(mtimeStore)[0]).toStrictEqual(expect.objectContaining({ profileFingerprint: JSON.stringify(['from-file/', 'Full', false, false, false]) }));
+      expect(getMtimeEntries(mtimeStore)[0]).toStrictEqual(expect.objectContaining({ settingsFingerprint: JSON.stringify(['from-file/', 'Full', false, false, false, true]) }));
     });
 
     it('should re-apply when an imported file changes on disk, and only then', async () => {
@@ -1219,14 +1184,30 @@ describe('IgnorePatternsComponent', () => {
   });
 
   describe('readObsidianIgnore', () => {
-    it('should read obsidian ignore and update settings on content change', async () => {
+    it('should match the file patterns after the settings patterns, and never write them into the settings', async () => {
       setupIndexedDatabase();
-      const pluginSettingsComponent = createPluginSettingsComponent();
-      vi.mocked(readSafe).mockResolvedValue('initial-content');
+      const pluginSettingsComponent = createPluginSettingsComponent({ obsidianIgnoreContent: 'notes/*' });
+      vi.mocked(readSafe).mockResolvedValueOnce('!notes/keep.md');
       const component = createComponent({ pluginSettingsComponent });
       await component.loadWithPromises();
 
-      expect(pluginSettingsComponent.setProperty).toHaveBeenCalledWith('obsidianIgnoreContent', 'initial-content');
+      expect(component.isIgnored({ isFolder: false, normalizedPath: 'notes/a.md' })).toBe(true);
+      expect(component.isIgnored({ isFolder: false, normalizedPath: 'notes/keep.md' })).toBe(false);
+      expect(pluginSettingsComponent.setProperty).not.toHaveBeenCalled();
+    });
+
+    it('should not read the file while its source is off', async () => {
+      setupIndexedDatabase();
+      vi.mocked(readSafe).mockResolvedValue('*.md');
+      const pluginSettingsComponent = createPluginSettingsComponent({ obsidianIgnoreContent: 'notes/', shouldIncludeObsidianIgnorePatterns: false });
+      const component = createComponent({ pluginSettingsComponent });
+      await component.loadWithPromises();
+      await component.handleDeletedOrDotFile('.obsidianignore');
+
+      expect(readSafe).not.toHaveBeenCalled();
+      expect(statSafe).not.toHaveBeenCalledWith(expect.anything(), '.obsidianignore');
+      expect(component.isIgnored({ isFolder: false, normalizedPath: 'notes/a.md' })).toBe(true);
+      expect(component.isIgnored({ isFolder: false, normalizedPath: 'a.md' })).toBe(false);
     });
 
     it('should return false when content is unchanged', async () => {
@@ -1247,36 +1228,17 @@ describe('IgnorePatternsComponent', () => {
   });
 
   describe('reload', () => {
-    it('should call writeObsidianIgnore when obsidianIgnoreContent is provided', async () => {
-      setupIndexedDatabase();
-      const pluginSettingsComponent = createPluginSettingsComponent();
-      const component = createComponent({ pluginSettingsComponent });
-      await component.loadWithPromises();
-
-      // Trigger saveSettings which calls reload with content
-      const saveSettingsCall = (vi.mocked(pluginSettingsComponent.on).mock.calls as MockCallEntry[]).find(([name]) => name === 'saveSettings');
-      if (saveSettingsCall) {
-        const callback = saveSettingsCall[1] as (newState: SaveSettingsState) => Promise<void>;
-        vi.mocked(writeSafe).mockClear();
-        await callback({ effectiveValues: { obsidianIgnoreContent: 'new-content' } });
-        expect(writeSafe).toHaveBeenCalled();
-      } else {
-        expect.fail('saveSettings event was not registered');
-      }
-    });
-
-    it('should call readObsidianIgnore when obsidianIgnoreContent is undefined', async () => {
+    it('should read the ignore file on load', async () => {
       setupIndexedDatabase();
       vi.mocked(readSafe).mockResolvedValue('');
       const component = createComponent();
       vi.mocked(readSafe).mockClear();
       await component.loadWithPromises();
 
-      // Onload calls reload() without argument, which triggers readObsidianIgnore
       expect(readSafe).toHaveBeenCalled();
     });
 
-    it('should clear fileIgnoreMap when obsidianignore patterns change', async () => {
+    it('should clear fileIgnoreMap when the settings patterns change', async () => {
       setupIndexedDatabase();
       vi.mocked(readSafe).mockResolvedValue('');
       const pluginSettingsComponent = createPluginSettingsComponent();
@@ -1287,11 +1249,12 @@ describe('IgnorePatternsComponent', () => {
       component.isIgnored({ isFolder: false, normalizedPath: 'test-file.md' });
       expect(component.isIgnored({ isFolder: false, normalizedPath: 'test-file.md' })).toBe(false);
 
-      // Trigger saveSettings with new obsidianignore content, which calls reload()
+      // A save of new patterns calls reload()
       const saveSettingsCall = (vi.mocked(pluginSettingsComponent.on).mock.calls as MockCallEntry[]).find(([name]) => name === 'saveSettings');
       if (saveSettingsCall) {
-        const callback = saveSettingsCall[1] as (newState: SaveSettingsState) => Promise<void>;
-        await callback({ effectiveValues: { obsidianIgnoreContent: 'test-*\n' } });
+        const callback = saveSettingsCall[1] as () => Promise<void>;
+        (pluginSettingsComponent.settings as PluginSettings).obsidianIgnoreContent = 'test-*\n';
+        await callback();
       } else {
         expect.fail('saveSettings event was not registered');
       }

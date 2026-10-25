@@ -40,7 +40,7 @@ Built on `@mnaoumov/obsidian-lib` with tooling from `@mnaoumov/obsidian-dev-tool
 - **`src/`** — plugin source:
   - `main.ts` — Obsidian entry point (default export of `Plugin`)
   - `plugin.ts` — `Plugin` class, wires up child components
-  - `ignore-patterns-component.ts` — owns gitignore matching, IndexedDB cache, `.obsidianignore` / `.gitignore` reads. A `saveSettings` made while the settings tab is open only raises `hadConfigChanges`, for the tab's hide or Apply to apply; one made while it is closed (a command, another plugin, the demo vault's `configureCommunityPlugin` buttons) runs `processConfigChanges` at once. Guard: `src/settings-save-outside-tab.desktop.integration.test.ts`
+  - `ignore-patterns-component.ts` — owns gitignore matching, IndexedDB cache, `.obsidianignore` / `.gitignore` reads. The patterns live in the settings (`obsidianIgnoreContent`, synced in `data.json`); `.obsidianignore` is an opt-in, read-only source behind `shouldIncludeObsidianIgnorePatterns`, like `.gitignore`, because Obsidian Sync skips every dot file. The verdict fingerprint carries `settingsFingerprint` (effective patterns + scalars) always, so a synced `data.json` re-applies through `applySettingsChange`. A `saveSettings` made while the settings tab is open only raises `hadConfigChanges`, for the tab's hide or Apply to apply; one made while it is closed (a command, another plugin, the demo vault's `configureCommunityPlugin` buttons) runs `processConfigChanges` at once. Guard: `src/settings-save-outside-tab.desktop.integration.test.ts`
   - `vault-model.ts` — `VaultModel`: the in-memory shadow tree and its bottom-up visibility (`recomputeAll`, `applyDelta`, `seedHidden`)
   - `index-projection-component.ts` — `IndexProjectionComponent`: projects the model onto Obsidian's index in one event-free pass, drives the explorer, owns fast-enable and apply progress
   - `manual-index-hider.ts` — `ManualIndexHider`: S6 direct index mutation — hides/re-inserts files with no events, keeps the in-memory snapshots a same-session un-ignore restores from
@@ -49,6 +49,7 @@ Built on `@mnaoumov/obsidian-lib` with tooling from `@mnaoumov/obsidian-dev-tool
   - `file-tree-component.ts` — drives Files pane add/delete based on ignore state
   - `data-adapter-safe.ts` — read/write/stat wrappers that survive missing files
   - `indexed-database-utils.ts` — IndexedDB request → promise helper
+  - `obsidian-ignore-migration.ts` — `migrateObsidianIgnoreFile`: once per device (marker in `app.saveLocalStorage`), copies a non-empty `.obsidianignore` into the settings when they differ and shows a notice that stays until closed. Run in `plugin.ts` before `IgnorePatternsComponent` loads. Guard: `src/obsidian-ignore-migration.desktop.integration.test.ts`
   - `constants.ts` — shared constants (`.gitignore` / `.obsidianignore` names, root path)
   - `publish-compatibility-warning-component.ts` — warns when Obsidian Publish is on while `excludeMode === Full`
   - `related-links-batch.ts` — collects Obsidian's per-file `metadataCache.updateRelatedLinks` calls during a bulk re-add and replays them as one `Set`-based pass

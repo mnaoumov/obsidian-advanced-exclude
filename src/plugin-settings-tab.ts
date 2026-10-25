@@ -69,9 +69,7 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginSettings> {
           f.createEl('a', { href: `${README_URL}/blob/main/demo-vault/02%20Whitelist%20with%20negation.md`, text: 'Whitelist with negation' });
           f.appendText(' for how to whitelist only certain files.');
           f.createEl('br');
-          f.appendText('You can also edit ');
-          appendCodeBlock(f, OBSIDIAN_IGNORE_FILE);
-          f.appendText(' file manually.');
+          f.appendText('The patterns are stored in the plugin settings, so Obsidian Sync carries them to your other devices.');
         }),
         name: 'Ignore patterns',
         render: (setting) => {
@@ -92,6 +90,24 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginSettings> {
                   await this.ignorePatternsComponent.processConfigChanges();
                 }));
             });
+        }
+      }),
+      this.settingEx({
+        desc: createFragment((f) => {
+          f.appendText('Whether to include patterns from the ');
+          appendCodeBlock(f, OBSIDIAN_IGNORE_FILE);
+          f.appendText(' file at the vault root, after the patterns above.');
+          f.createEl('br');
+          f.appendText('Obsidian Sync does not sync files whose name starts with a dot, so each device reads its own copy of the file.');
+        }),
+        name: `Include ${OBSIDIAN_IGNORE_FILE} patterns`,
+        render: (setting) => {
+          setting.addToggle((toggle) => {
+            this.bind({
+              propertyName: 'shouldIncludeObsidianIgnorePatterns',
+              valueComponent: toggle
+            });
+          });
         }
       }),
       this.settingEx({

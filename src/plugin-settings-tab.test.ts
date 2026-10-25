@@ -182,7 +182,7 @@ describe('PluginSettingsTab', () => {
       settingsState: {
         effectiveValues: settings,
         inputValues: settings,
-        validationMessages: { excludeMode: '', obsidianIgnoreContent: '', profiles: '', shouldHideEmptyFolders: '', shouldIgnoreExcludedFiles: '', shouldIncludeGitIgnorePatterns: '' }
+        validationMessages: { excludeMode: '', obsidianIgnoreContent: '', profiles: '', shouldHideEmptyFolders: '', shouldIgnoreExcludedFiles: '', shouldIncludeGitIgnorePatterns: '', shouldIncludeObsidianIgnorePatterns: '' }
       }
     });
 
@@ -209,6 +209,7 @@ describe('PluginSettingsTab', () => {
       const names = tab.getSettingDefinitions().map((definition) => 'name' in definition ? definition.name : '');
 
       expect(names).toContain('Hide empty folders');
+      expect(names).toContain('Include .obsidianignore patterns');
     });
   });
 

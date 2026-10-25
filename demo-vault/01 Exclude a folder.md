@@ -49,4 +49,4 @@ The trailing slash in `Archive/` matters: it targets a folder. See [04 Settings]
 
 > [!TIP]
 >
-> You can also edit the ignore list outside Settings: the same patterns live in an `.obsidianignore` file at the vault root, which you can open and edit as plain text.
+> The patterns are stored in the plugin settings, so [Obsidian Sync](https://help.obsidian.md/sync) carries them to your other devices. To keep rules for one device only, write them in a `.obsidianignore` file at the vault root and turn on **Include `.obsidianignore` patterns**, see [03 Exclude mode and sources](<./03 Exclude mode and sources.md>).

@@ -12,9 +12,10 @@ import {
 } from 'vitest';
 
 import type { FileTreeComponent } from './file-tree-component.ts';
-import type { IgnorePatternsComponent } from './ignore-patterns-component.ts';
 import type { ProfileSwitcherComponent } from './profile-switcher-component.ts';
 
+import { IgnorePatternsComponent } from './ignore-patterns-component.ts';
+import { migrateObsidianIgnoreFile } from './obsidian-ignore-migration.ts';
 import { Plugin } from './plugin.ts';
 
 type FileTreeComponentConstructorParams = ConstructorParameters<typeof FileTreeComponent>[0];
@@ -111,6 +112,10 @@ vi.mock('./patches/vault-load-patch-component.ts', () => ({
   })
 }));
 
+vi.mock('./obsidian-ignore-migration.ts', () => ({
+  migrateObsidianIgnoreFile: vi.fn().mockResolvedValue(undefined)
+}));
+
 vi.mock('./plugin-settings-component.ts', () => ({
   // A ComponentEx, not a plain Component: onloadImpl awaits its `loadWithPromises`.
   // eslint-disable-next-line prefer-arrow-callback, func-names -- mock must be constructable with `new` and return a real loadable Component.
@@ -198,6 +203,18 @@ describe('Plugin', () => {
     expect(plugin).toBeInstanceOf(Plugin);
     expect(plugin.app).toBe(appOriginal);
     expect(plugin.manifest).toBe(manifest);
+  });
+
+  it('should move an existing .obsidianignore into the settings before the ignore patterns load', async () => {
+    const appOriginal = app.asOriginalType__();
+    const plugin = new Plugin(appOriginal, manifest);
+    await plugin.onload();
+
+    expect(migrateObsidianIgnoreFile).toHaveBeenCalledOnce();
+    expect(migrateObsidianIgnoreFile).toHaveBeenCalledWith(expect.objectContaining({ app: appOriginal }));
+    const [migrationOrder] = vi.mocked(migrateObsidianIgnoreFile).mock.invocationCallOrder;
+    const [ignorePatternsOrder] = vi.mocked(IgnorePatternsComponent).mock.invocationCallOrder;
+    expect(migrationOrder).toBeLessThan(ignorePatternsOrder ?? 0);
   });
 
   it('should call addChild the expected number of times', async () => {
