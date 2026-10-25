@@ -13,6 +13,10 @@ import {
 
 import type { PluginSettingsComponent } from './plugin-settings-component.ts';
 
+interface PluginWithSettingsComponent {
+  readonly pluginSettingsComponent: PluginSettingsComponent;
+}
+
 interface TraversableComponent {
   readonly _children?: readonly unknown[];
 }
@@ -43,7 +47,13 @@ const ALL_TEST_FOLDERS = [
 
 afterEach(async () => {
   await evalInObsidian({
-    async callback({ ALL_TEST_FILES: files, ALL_TEST_FOLDERS: folders, app }) {
+    async callback({ ALL_TEST_FILES: files, ALL_TEST_FOLDERS: folders, app, PLUGIN_ID: pluginId }) {
+      // The patterns and the file source live in the synced `data.json`, which outlives a test.
+      const plugin = app.plugins.getPlugin(pluginId) as null | PluginWithSettingsComponent;
+      await plugin?.pluginSettingsComponent.editAndSave((settings) => {
+        settings.obsidianIgnoreContent = '';
+        settings.shouldIncludeObsidianIgnorePatterns = false;
+      });
       for (const path of files) {
         try {
           const file = app.vault.getAbstractFileByPath(path);
@@ -69,14 +79,15 @@ afterEach(async () => {
     },
     input: {
       ALL_TEST_FILES,
-      ALL_TEST_FOLDERS
+      ALL_TEST_FOLDERS,
+      PLUGIN_ID
     },
     vaultPath: getTemporaryVault().path
   });
 });
 
 describe('Ignore patterns — Full mode (vault-level exclusion)', () => {
-  it('should exclude files matching .obsidianignore patterns from the vault', async () => {
+  it('should exclude files matching the ignore patterns from the vault', async () => {
     const result = await evalInObsidian({
       async callback({ app, PLUGIN_ID: pluginId, SETTLE_DELAY_IN_MS: settleDelay }) {
         const plugin = app.plugins.getPlugin(pluginId);
@@ -88,8 +99,10 @@ describe('Ignore patterns — Full mode (vault-level exclusion)', () => {
         await app.vault.create('visible-note.md', 'I should be visible');
         await app.vault.create('keep-this.md', 'I should stay visible');
 
-        // Write .obsidianignore to disk and reload plugin to pick up patterns
-        await app.vault.adapter.write('.obsidianignore', 'secret-*\n');
+        // Store the patterns in the settings and reload the plugin to pick them up
+        await (app.plugins.getPlugin(pluginId) as null | PluginWithSettingsComponent)?.pluginSettingsComponent.editAndSave((settings) => {
+          settings.obsidianIgnoreContent = 'secret-*\n';
+        });
         await app.plugins.disablePluginAndSave(pluginId);
         await app.plugins.enablePluginAndSave(pluginId);
         await sleep(settleDelay);
@@ -272,8 +285,10 @@ describe('Ignore patterns — File explorer exclusion', () => {
         // Create visible file
         await app.vault.create('explorer-visible.md', 'Visible in explorer');
 
-        // Write ignore pattern and hidden file
-        await app.vault.adapter.write('.obsidianignore', 'explorer-hidden*\n');
+        // Store the ignore pattern and write the hidden file
+        await (app.plugins.getPlugin(pluginId) as null | PluginWithSettingsComponent)?.pluginSettingsComponent.editAndSave((settings) => {
+          settings.obsidianIgnoreContent = 'explorer-hidden*\n';
+        });
         await app.vault.adapter.write('explorer-hidden.md', 'Hidden in explorer');
 
         // Reload plugin to apply patterns
@@ -323,16 +338,21 @@ describe('Ignore patterns — Settings round-trip', () => {
 
         const filesBefore = app.vault.getFiles().map((f) => f.path).sort();
 
-        // Write .obsidianignore that excludes beta* and reload
-        await app.vault.adapter.write('.obsidianignore', 'beta*\n');
+        // Exclude beta* and reload
+        await (app.plugins.getPlugin(pluginId) as null | PluginWithSettingsComponent)?.pluginSettingsComponent.editAndSave((settings) => {
+          settings.obsidianIgnoreContent = 'beta*\n';
+        });
         await app.plugins.disablePluginAndSave(pluginId);
         await app.plugins.enablePluginAndSave(pluginId);
         await sleep(settleDelay);
 
         const filesAfterExclude = app.vault.getFiles().map((f) => f.path).sort();
 
-        // Update the ignore file to exclude gamma* instead
-        await app.vault.adapter.write('.obsidianignore', 'gamma*\n');
+        // Exclude gamma* instead, on the reloaded plugin
+        const reloadedPlugin = app.plugins.getPlugin(pluginId) as null | PluginWithSettingsComponent;
+        await reloadedPlugin?.pluginSettingsComponent.editAndSave((settings) => {
+          settings.obsidianIgnoreContent = 'gamma*\n';
+        });
         await app.plugins.disablePluginAndSave(pluginId);
         await app.plugins.enablePluginAndSave(pluginId);
         await sleep(settleDelay);
@@ -372,18 +392,39 @@ describe('Ignore patterns — Settings round-trip', () => {
   });
 });
 
-describe('Ignore patterns — Live ignore-file edit', () => {
+describe('Ignore patterns — .obsidianignore file source', () => {
+  it('should not read .obsidianignore while its source is off, which is the default', async () => {
+    const result = await evalInObsidian({
+      async callback({ app, PLUGIN_ID: pluginId, SETTLE_DELAY_IN_MS: settleDelay }) {
+        await app.vault.create('secret-note.md', 'Only the file says to hide me');
+        await app.vault.adapter.write('.obsidianignore', 'secret-*\n');
+        await app.plugins.disablePluginAndSave(pluginId);
+        await app.plugins.enablePluginAndSave(pluginId);
+        await sleep(settleDelay);
+        return app.vault.getFiles().map((f) => f.path).sort();
+      },
+      input: { PLUGIN_ID, SETTLE_DELAY_IN_MS },
+      vaultPath: getTemporaryVault().path
+    });
+
+    expect(result).toContain('secret-note.md');
+  });
+
   it('should apply a .obsidianignore written from outside Obsidian while the plugin runs, without a reload', async () => {
     const vaultPath = getTemporaryVault().path;
 
     const filesBefore = await evalInObsidian({
-      async callback({ app, SETTLE_DELAY_IN_MS: settleDelay }) {
+      async callback({ app, PLUGIN_ID: pluginId, SETTLE_DELAY_IN_MS: settleDelay }) {
+        const plugin = app.plugins.getPlugin(pluginId) as null | PluginWithSettingsComponent;
+        await plugin?.pluginSettingsComponent.editAndSave((settings) => {
+          settings.shouldIncludeObsidianIgnorePatterns = true;
+        });
         await app.vault.create('visible-note.md', 'I should stay visible');
         await app.vault.create('secret-note.md', 'I should be hidden once the rule lands');
         await sleep(settleDelay);
         return app.vault.getFiles().map((f) => f.path).sort();
       },
-      input: { SETTLE_DELAY_IN_MS },
+      input: { PLUGIN_ID, SETTLE_DELAY_IN_MS },
       vaultPath
     });
 

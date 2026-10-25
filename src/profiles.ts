@@ -74,7 +74,7 @@ interface ProfileError {
   readonly profileName: string;
 }
 
-type ProfileScalarSettingName = 'excludeMode' | 'shouldHideEmptyFolders' | 'shouldIgnoreExcludedFiles' | 'shouldIncludeGitIgnorePatterns';
+type ProfileScalarSettingName = 'excludeMode' | 'shouldHideEmptyFolders' | 'shouldIgnoreExcludedFiles' | 'shouldIncludeGitIgnorePatterns' | 'shouldIncludeObsidianIgnorePatterns';
 
 type ProfileScalarSettings = Pick<PluginSettings, ProfileScalarSettingName>;
 
@@ -320,7 +320,8 @@ function expandProfile(state: ExpansionState, profile: Readonly<SettingsProfile>
     excludeMode: profile.excludeMode ?? state.scalars.excludeMode,
     shouldHideEmptyFolders: profile.shouldHideEmptyFolders ?? state.scalars.shouldHideEmptyFolders,
     shouldIgnoreExcludedFiles: profile.shouldIgnoreExcludedFiles ?? state.scalars.shouldIgnoreExcludedFiles,
-    shouldIncludeGitIgnorePatterns: profile.shouldIncludeGitIgnorePatterns ?? state.scalars.shouldIncludeGitIgnorePatterns
+    shouldIncludeGitIgnorePatterns: profile.shouldIncludeGitIgnorePatterns ?? state.scalars.shouldIncludeGitIgnorePatterns,
+    shouldIncludeObsidianIgnorePatterns: profile.shouldIncludeObsidianIgnorePatterns ?? state.scalars.shouldIncludeObsidianIgnorePatterns
   };
 }
 
@@ -333,7 +334,8 @@ function pickScalars(settings: Readonly<ProfileScalarSettings>): ProfileScalarSe
     excludeMode: settings.excludeMode,
     shouldHideEmptyFolders: settings.shouldHideEmptyFolders,
     shouldIgnoreExcludedFiles: settings.shouldIgnoreExcludedFiles,
-    shouldIncludeGitIgnorePatterns: settings.shouldIncludeGitIgnorePatterns
+    shouldIncludeGitIgnorePatterns: settings.shouldIncludeGitIgnorePatterns,
+    shouldIncludeObsidianIgnorePatterns: settings.shouldIncludeObsidianIgnorePatterns
   };
 }
 

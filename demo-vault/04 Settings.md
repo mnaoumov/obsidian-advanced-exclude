@@ -5,10 +5,12 @@ Open **Settings -> Community plugins -> `Advanced Exclude`** to configure the pl
 ## Ignore patterns
 
 - `obsidianIgnoreContent`
-  - the list of [`gitignore`](https://git-scm.com/docs/gitignore) patterns that decide which files and folders are ignored, one per line. This is the text area used in [01 Exclude a folder](<./01 Exclude a folder.md>) and [02 Whitelist with negation](<./02 Whitelist with negation.md>). The same content is mirrored in an `.obsidianignore` file at the vault root, which you can edit by hand.
+  - the list of [`gitignore`](https://git-scm.com/docs/gitignore) patterns that decide which files and folders are ignored, one per line. This is the text area used in [01 Exclude a folder](<./01 Exclude a folder.md>) and [02 Whitelist with negation](<./02 Whitelist with negation.md>). Stored here, it syncs with [Obsidian Sync](https://help.obsidian.md/sync) like every other setting.
 
 ## Sources
 
+- `shouldIncludeObsidianIgnorePatterns`
+  - when on, also honor patterns from a `.obsidianignore` file at the vault root, after the patterns above. Off by default. Sync does not carry the file, since its name starts with a dot, so it suits rules for one device. See [03 Exclude mode and sources](<./03 Exclude mode and sources.md>).
 - `shouldIncludeGitIgnorePatterns`
   - when on, also honor patterns from a `.gitignore` file in the vault. Off by default, so a fresh install never applies your vault's `.gitignore` until you ask it to.
 - `shouldIgnoreExcludedFiles`

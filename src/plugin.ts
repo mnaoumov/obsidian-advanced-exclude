@@ -11,6 +11,7 @@ import { FileTreeComponent } from './file-tree-component.ts';
 import { IgnorePatternsComponent } from './ignore-patterns-component.ts';
 import { IndexProjectionComponent } from './index-projection-component.ts';
 import { ManualIndexHider } from './manual-index-hider.ts';
+import { migrateObsidianIgnoreFile } from './obsidian-ignore-migration.ts';
 import { AdapterPatchComponent } from './patches/adapter-patch-component.ts';
 import { FileExplorerViewOnCreatePatchComponent } from './patches/file-explorer-view-on-create-patch-component.ts';
 import { MetadataCacheInitializePatchComponent } from './patches/metadata-cache-initialize-patch-component.ts';
@@ -39,9 +40,15 @@ export class Plugin extends PluginBase {
     // A child is loaded as it is added, so a component's async load tail runs
     // in parallel with the components added after it instead of before them. IgnorePatternsComponent reads
     // the settings while it loads — `loadFingerprint` fingerprints on `shouldIncludeGitIgnorePatterns` and
-    // `reload` writes `obsidianIgnoreContent` back — so without this wait it would fingerprint against the
-    // defaults and persist a default-derived state over the stored one.
+    // the stored patterns — so without this wait it would fingerprint against the defaults and persist a
+    // default-derived state over the stored one.
     await pluginSettingsComponent.loadWithPromises();
+    // Before the patterns are read: it may copy an existing `.obsidianignore` into the settings.
+    await migrateObsidianIgnoreFile({
+      app: this.app,
+      pluginNoticeComponent: this.pluginNoticeComponent,
+      pluginSettingsComponent
+    });
 
     const ignorePatternsComponent: IgnorePatternsComponent = this.addChild(
       new IgnorePatternsComponent({

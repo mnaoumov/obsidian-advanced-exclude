@@ -140,7 +140,8 @@ describe('resolveProfile', () => {
       profiles: [profile('Work', '')],
       shouldHideEmptyFolders: true,
       shouldIgnoreExcludedFiles: true,
-      shouldIncludeGitIgnorePatterns: true
+      shouldIncludeGitIgnorePatterns: true,
+      shouldIncludeObsidianIgnorePatterns: true
     });
 
     const result = resolveProfile({ activeProfileId: 'work', settings });
@@ -149,13 +150,14 @@ describe('resolveProfile', () => {
     expect(result.shouldHideEmptyFolders).toBe(true);
     expect(result.shouldIgnoreExcludedFiles).toBe(true);
     expect(result.shouldIncludeGitIgnorePatterns).toBe(true);
+    expect(result.shouldIncludeObsidianIgnorePatterns).toBe(true);
   });
 
   it('should let a later import win a scalar, and the profile\'s own override beat every import', () => {
     const settings = createSettings({
       profiles: [
         profile('Alpha', '', { excludeMode: ExcludeMode.FilesPane, shouldHideEmptyFolders: true, shouldIncludeGitIgnorePatterns: true }),
-        profile('Beta', '', { shouldHideEmptyFolders: false, shouldIgnoreExcludedFiles: true }),
+        profile('Beta', '', { shouldHideEmptyFolders: false, shouldIgnoreExcludedFiles: true, shouldIncludeObsidianIgnorePatterns: true }),
         profile('Combined', '@import Alpha\n@import Beta', { excludeMode: ExcludeMode.Full })
       ]
     });
@@ -166,6 +168,7 @@ describe('resolveProfile', () => {
     expect(result.shouldHideEmptyFolders).toBe(false);
     expect(result.shouldIgnoreExcludedFiles).toBe(true);
     expect(result.shouldIncludeGitIgnorePatterns).toBe(true);
+    expect(result.shouldIncludeObsidianIgnorePatterns).toBe(true);
   });
 
   it('should drop the collected lines and scalars at @reset', () => {

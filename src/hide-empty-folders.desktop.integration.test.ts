@@ -9,14 +9,18 @@ import {
   it
 } from 'vitest';
 
+import type { PluginSettingsComponent } from './plugin-settings-component.ts';
 import type { PluginSettingsTab } from './plugin-settings-tab.ts';
+
+interface PluginWithSettingsComponent {
+  readonly pluginSettingsComponent: PluginSettingsComponent;
+}
 
 const PLUGIN_ID = 'advanced-exclude';
 const SETTLE_DELAY_IN_MS = 5000;
 const HIDE_EMPTY_FOLDERS_SETTING_NAME = 'Hide empty folders';
 
 const ALL_TEST_FILES = [
-  '.obsidianignore',
   'alpha/bravo/charlie/hidden.md'
 ];
 
@@ -49,7 +53,10 @@ afterEach(async () => {
         // Ignore
       }
 
-      await app.vault.adapter.write('.obsidianignore', '');
+      const plugin = app.plugins.getPlugin(pluginId) as null | PluginWithSettingsComponent;
+      await plugin?.pluginSettingsComponent.editAndSave((settings) => {
+        settings.obsidianIgnoreContent = '';
+      });
       for (const path of files) {
         try {
           await app.vault.adapter.remove(path);
@@ -120,7 +127,9 @@ describe('Hide empty folders — Full mode', () => {
         // Activate the ignore pattern first, then create the files so the live model
         // records the excluded `hidden.md` as a child of `charlie` (in Full mode it
         // never enters Obsidian's index, so the model is the only place that knows it).
-        await app.vault.adapter.write('.obsidianignore', 'alpha/bravo/charlie/hidden.md\n');
+        await (app.plugins.getPlugin(pluginId) as null | PluginWithSettingsComponent)?.pluginSettingsComponent.editAndSave((settings) => {
+          settings.obsidianIgnoreContent = 'alpha/bravo/charlie/hidden.md\n';
+        });
         await app.plugins.disablePluginAndSave(pluginId);
         await app.plugins.enablePluginAndSave(pluginId);
         await sleep(settleDelay);

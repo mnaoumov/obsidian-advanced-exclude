@@ -13,7 +13,7 @@
  * Two runs give two fresh vaults, so each frame shows exactly one staged state
  * and neither depends on the other having been undone first. The harness enables
  * the plugin before the suite stages its notes, so the `rules` frame also shows
- * a `.obsidianignore` written while the plugin runs taking effect live.
+ * ignore rules saved while the plugin runs taking effect live.
  *
  * Each shot asserts what it claims — the archived notes present, then absent —
  * so a run that staged the wrong rules fails instead of shipping a frame that
@@ -44,6 +44,14 @@ import {
   it
 } from 'vitest';
 
+import type { PluginSettingsComponent } from './plugin-settings-component.ts';
+
+interface PluginWithSettingsComponent {
+  readonly pluginSettingsComponent: PluginSettingsComponent;
+}
+
+const PLUGIN_ID = 'advanced-exclude';
+
 const WIDTH_IN_PIXELS = 1200;
 const HEIGHT_IN_PIXELS = 800;
 
@@ -53,13 +61,11 @@ const HEIGHT_IN_PIXELS = 800;
 const IGNORED_FOLDER = 'archive';
 
 /**
- * Which of the two frames this run takes. `rules` stages the ignore file with
- * the notes; the plugin is already running by then and applies it as a live
- * ignore-file change.
+ * Which of the two frames this run takes. `rules` saves the ignore rules into the
+ * plugin settings after the notes are staged; the plugin is already running by then
+ * and applies the save at once.
  */
 const SHOULD_IGNORE = process.env['SCREENSHOT_IGNORE_RULES'] === 'rules';
-
-const IGNORE_FILE_PATH = '.obsidianignore';
 
 const IMAGES_DIRECTORY = join(process.cwd(), 'images', 'screenshots');
 
@@ -70,7 +76,6 @@ beforeAll(async () => {
     [`${IGNORED_FOLDER}/2019 notes.md`]: '# 2019 notes\n',
     [`${IGNORED_FOLDER}/2020 notes.md`]: '# 2020 notes\n',
     [`${IGNORED_FOLDER}/old drafts/scratch.md`]: '# Scratch\n',
-    [IGNORE_FILE_PATH]: SHOULD_IGNORE ? buildIgnoreRules() : '# Nothing ignored yet\n',
     'Projects/Alpha.md': '# Alpha\n',
     'Projects/Beta.md': '# Beta\n',
     'Reading list.md': '# Reading list\n'
@@ -84,7 +89,7 @@ beforeAll(async () => {
   await applyObsidianTheme({ theme: 'dark', vaultPath: vaultPath() });
 
   await evalInObsidian({
-    async callback({ app, lib: { waitUntil } }) {
+    async callback({ app, ignoreRules, lib: { waitUntil }, pluginId }) {
       /*
        * Under the transport's ~30s per-closure cap, not at it. At 30_000 this ceiling was unreachable: the
        * whole eval is killed at the cap first, and reported as a bare transport timeout naming the harness
@@ -93,6 +98,12 @@ beforeAll(async () => {
        */
       const SETTLE_TIMEOUT_IN_MILLISECONDS = 20_000;
       const SETTLE_DELAY_IN_MILLISECONDS = 1000;
+
+      // Saved with the settings tab closed, so the plugin applies the rules at once.
+      const plugin = app.plugins.getPlugin(pluginId) as null | PluginWithSettingsComponent;
+      await plugin?.pluginSettingsComponent.editAndSave((settings) => {
+        settings.obsidianIgnoreContent = ignoreRules;
+      });
 
       // The file explorer IS the subject here, so it is the one thing that must
       // be open — the opposite of most of these suites, which collapse it.
@@ -110,6 +121,7 @@ beforeAll(async () => {
 
       await sleep(SETTLE_DELAY_IN_MILLISECONDS);
     },
+    input: { ignoreRules: SHOULD_IGNORE ? buildIgnoreRules() : '', pluginId: PLUGIN_ID },
     vaultPath: vaultPath()
   });
 });

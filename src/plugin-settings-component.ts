@@ -133,5 +133,6 @@ function isSameSettings(a: ResolveProfileSettings, b: ResolveProfileSettings): b
     && a.excludeMode === b.excludeMode
     && a.shouldHideEmptyFolders === b.shouldHideEmptyFolders
     && a.shouldIgnoreExcludedFiles === b.shouldIgnoreExcludedFiles
-    && a.shouldIncludeGitIgnorePatterns === b.shouldIncludeGitIgnorePatterns;
+    && a.shouldIncludeGitIgnorePatterns === b.shouldIncludeGitIgnorePatterns
+    && a.shouldIncludeObsidianIgnorePatterns === b.shouldIncludeObsidianIgnorePatterns;
 }

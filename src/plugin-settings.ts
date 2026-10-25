@@ -15,6 +15,7 @@ export interface SettingsProfile {
   shouldHideEmptyFolders?: boolean | undefined;
   shouldIgnoreExcludedFiles?: boolean | undefined;
   shouldIncludeGitIgnorePatterns?: boolean | undefined;
+  shouldIncludeObsidianIgnorePatterns?: boolean | undefined;
 }
 
 export class PluginSettings {
@@ -24,4 +25,5 @@ export class PluginSettings {
   public shouldHideEmptyFolders = false;
   public shouldIgnoreExcludedFiles = false;
   public shouldIncludeGitIgnorePatterns = false;
+  public shouldIncludeObsidianIgnorePatterns = false;
 }
