@@ -20,7 +20,7 @@ await require('/demoSetup.ts').useMarkdownWhitelist(app);
 Manual equivalent:
 
 1. Open **Settings -> Community plugins -> `Advanced Exclude`**.
-2. Replace the **Ignore patterns** with:
+2. Replace the **Global patterns** with:
 
    ```gitignore
    # Ignore everything...
@@ -57,4 +57,4 @@ The same pattern works for whole folders - keep only `Shared/`:
 !Shared/**
 ```
 
-When you are done experimenting, clear the **Ignore patterns** to bring every file back. See [03 Exclude mode and sources](<./03 Exclude mode and sources.md>) for how these patterns combine with `.gitignore` files and Obsidian's own excluded-files list.
+When you are done experimenting, clear the **Global patterns** to bring every file back. See [03 Exclude mode and sources](<./03 Exclude mode and sources.md>) for how these patterns combine with `.gitignore` files and Obsidian's own excluded-files list.

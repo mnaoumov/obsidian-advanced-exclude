@@ -38,7 +38,7 @@ export async function restorePerformanceVaultExclusions(): Promise<void> {
       }
 
       await pluginSettingsComponent.editAndSave((settings) => {
-        settings.obsidianIgnoreContent = '';
+        settings.ignorePatterns = '';
       });
       await ignorePatternsComponent.processConfigChanges();
 

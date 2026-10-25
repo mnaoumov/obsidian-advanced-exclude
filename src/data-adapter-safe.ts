@@ -9,6 +9,12 @@ import {
   FileSystemAdapter
 } from 'obsidian';
 
+interface WriteSafeParams {
+  readonly app: App;
+  readonly content: string;
+  readonly path: string;
+}
+
 /**
  * Reads {@link path}, or returns `null` when it does not exist.
  */
@@ -59,6 +65,24 @@ export async function statSafe(app: App, path: string): Promise<null | Stat> {
       type: fsStats.type
     } as Stat;
   }
+  throw new Error('Unknown adapter');
+}
+
+export async function writeSafe(params: WriteSafeParams): Promise<void> {
+  const { app, content, path } = params;
+  const adapter = getDataAdapterEx(app);
+  const fullPath = adapter.getFullPath(path);
+
+  if (adapter instanceof FileSystemAdapter) {
+    await adapter.fsPromises.writeFile(fullPath, content);
+    return;
+  }
+
+  if (adapter instanceof CapacitorAdapter) {
+    await adapter.fs.write(fullPath, content);
+    return;
+  }
+
   throw new Error('Unknown adapter');
 }
 

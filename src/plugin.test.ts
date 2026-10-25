@@ -1,6 +1,7 @@
 import type { PluginManifest } from 'obsidian';
 
 import { ComponentEx } from '@mnaoumov/obsidian-lib/components/component-ex';
+import { noop } from '@mnaoumov/typescript-lib/function';
 import { Component } from 'obsidian';
 import { App } from 'obsidian-test-mocks/obsidian';
 import {
@@ -15,7 +16,6 @@ import type { FileTreeComponent } from './file-tree-component.ts';
 import type { ProfileSwitcherComponent } from './profile-switcher-component.ts';
 
 import { IgnorePatternsComponent } from './ignore-patterns-component.ts';
-import { migrateObsidianIgnoreFile } from './obsidian-ignore-migration.ts';
 import { Plugin } from './plugin.ts';
 
 type FileTreeComponentConstructorParams = ConstructorParameters<typeof FileTreeComponent>[0];
@@ -74,13 +74,21 @@ vi.mock('./index-projection-component.ts', () => ({
 
 let capturedIsSettingsTabOpen: (() => boolean) | undefined;
 let capturedOnUpdateFileTree: (() => Promise<void>) | undefined;
+let capturedOnLocalPatternsChange: (() => void) | undefined;
 vi.mock('./ignore-patterns-component.ts', () => ({
   // A ComponentEx, not a plain Component: onloadImpl awaits its `loadWithPromises`.
   // eslint-disable-next-line prefer-arrow-callback, func-names -- mock must be constructable with `new` and return a real loadable Component.
   IgnorePatternsComponent: vi.fn(function (params: IgnorePatternsComponentConstructorParams) {
     capturedIsSettingsTabOpen = params.isSettingsTabOpen;
     capturedOnUpdateFileTree = params.onUpdateFileTree;
-    return new ComponentEx();
+    const component = new ComponentEx();
+    Object.assign(component, {
+      onLocalPatternsChange: (listener: () => void): () => void => {
+        capturedOnLocalPatternsChange = listener;
+        return noop;
+      }
+    });
+    return component;
   })
 }));
 
@@ -112,10 +120,6 @@ vi.mock('./patches/vault-load-patch-component.ts', () => ({
   })
 }));
 
-vi.mock('./obsidian-ignore-migration.ts', () => ({
-  migrateObsidianIgnoreFile: vi.fn().mockResolvedValue(undefined)
-}));
-
 vi.mock('./plugin-settings-component.ts', () => ({
   // A ComponentEx, not a plain Component: onloadImpl awaits its `loadWithPromises`.
   // eslint-disable-next-line prefer-arrow-callback, func-names -- mock must be constructable with `new` and return a real loadable Component.
@@ -125,13 +129,15 @@ vi.mock('./plugin-settings-component.ts', () => ({
 }));
 
 let isMockSettingsTabOpen = false;
+const mockSettingsTabRefresh = vi.fn();
 vi.mock('./plugin-settings-tab.ts', () => ({
   // eslint-disable-next-line prefer-arrow-callback, func-names -- mock must be constructable with `new`.
   PluginSettingsTab: vi.fn(function () {
     return {
       get isOpen(): boolean {
         return isMockSettingsTabOpen;
-      }
+      },
+      refresh: mockSettingsTabRefresh
     };
   })
 }));
@@ -203,18 +209,6 @@ describe('Plugin', () => {
     expect(plugin).toBeInstanceOf(Plugin);
     expect(plugin.app).toBe(appOriginal);
     expect(plugin.manifest).toBe(manifest);
-  });
-
-  it('should move an existing .obsidianignore into the settings before the ignore patterns load', async () => {
-    const appOriginal = app.asOriginalType__();
-    const plugin = new Plugin(appOriginal, manifest);
-    await plugin.onload();
-
-    expect(migrateObsidianIgnoreFile).toHaveBeenCalledOnce();
-    expect(migrateObsidianIgnoreFile).toHaveBeenCalledWith(expect.objectContaining({ app: appOriginal }));
-    const [migrationOrder] = vi.mocked(migrateObsidianIgnoreFile).mock.invocationCallOrder;
-    const [ignorePatternsOrder] = vi.mocked(IgnorePatternsComponent).mock.invocationCallOrder;
-    expect(migrationOrder).toBeLessThan(ignorePatternsOrder ?? 0);
   });
 
   it('should call addChild the expected number of times', async () => {
@@ -290,6 +284,21 @@ describe('Plugin', () => {
     expect(capturedIsSettingsTabOpen?.()).toBe(true);
     isMockSettingsTabOpen = false;
     expect(capturedIsSettingsTabOpen?.()).toBe(false);
+  });
+
+  it('should re-render an open settings tab when .obsidianignore changes elsewhere, and leave a closed one alone', async () => {
+    const plugin = new Plugin(app.asOriginalType__(), manifest);
+    await plugin.onload();
+    mockSettingsTabRefresh.mockClear();
+
+    isMockSettingsTabOpen = false;
+    capturedOnLocalPatternsChange?.();
+    expect(mockSettingsTabRefresh).not.toHaveBeenCalled();
+
+    isMockSettingsTabOpen = true;
+    capturedOnLocalPatternsChange?.();
+    expect(mockSettingsTabRefresh).toHaveBeenCalledOnce();
+    isMockSettingsTabOpen = false;
   });
 
   it('should wire onFileExplorerViewBuilt callback to indexProjectionComponent.reapplyToFilesPane', async () => {

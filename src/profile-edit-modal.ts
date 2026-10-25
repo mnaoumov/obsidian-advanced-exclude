@@ -36,7 +36,7 @@ const ON_VALUE = 'on';
 const OFF_VALUE = 'off';
 const EXCLUDE_MODE_BY_VALUE = new Map<string, ExcludeMode>([[ExcludeMode.FilesPane, ExcludeMode.FilesPane], [ExcludeMode.Full, ExcludeMode.Full]]);
 
-type BooleanScalarName = 'shouldHideEmptyFolders' | 'shouldIgnoreExcludedFiles' | 'shouldIncludeGitIgnorePatterns' | 'shouldIncludeObsidianIgnorePatterns';
+type BooleanScalarName = 'shouldHideEmptyFolders' | 'shouldIgnoreExcludedFiles' | 'shouldIncludeGitIgnorePatterns';
 
 interface ProfileEditModalConstructorParams {
   readonly app: App;
@@ -135,7 +135,6 @@ export class ProfileEditModal extends Modal {
             this.renderResolution();
           });
       });
-    this.addBooleanSetting('shouldIncludeObsidianIgnorePatterns', 'Include .obsidianignore patterns');
     this.addBooleanSetting('shouldIncludeGitIgnorePatterns', 'Include .gitignore patterns');
     this.addBooleanSetting('shouldIgnoreExcludedFiles', 'Ignore excluded files');
     this.addBooleanSetting('shouldHideEmptyFolders', 'Hide empty folders');
@@ -224,6 +223,12 @@ export class ProfileEditModal extends Modal {
       lineEl.createSpan({ cls: 'advanced-exclude-profile-source', text: `${line.filePath === undefined ? source : `${source} (${line.filePath})`}: ` });
       lineEl.appendText(line.text);
     }
+    // Not an error: a missing file is a valid import of nothing, but the user may have mistyped its path.
+    for (const path of effectiveSettings.importedFilePaths) {
+      if (this.importedFileContents.get(path) === null) {
+        expansionEl.createDiv({ cls: 'advanced-exclude-profile-source', text: `${path} (file not found, nothing imported)` });
+      }
+    }
     expansionEl.createDiv({ cls: 'advanced-exclude-profile-source', text: describeScalars(effectiveSettings) });
   }
 
@@ -244,7 +249,7 @@ export class ProfileEditModal extends Modal {
 }
 
 function describeScalars(settings: Pick<PluginSettings, 'excludeMode' | BooleanScalarName>): string {
-  return `Exclude mode: ${settings.excludeMode}; .obsidianignore patterns: ${formatOnOff(settings.shouldIncludeObsidianIgnorePatterns)}; `
+  return `Exclude mode: ${settings.excludeMode}; `
     + `.gitignore patterns: ${formatOnOff(settings.shouldIncludeGitIgnorePatterns)}; `
     + `ignore excluded files: ${formatOnOff(settings.shouldIgnoreExcludedFiles)}; hide empty folders: ${formatOnOff(settings.shouldHideEmptyFolders)}.`;
 }

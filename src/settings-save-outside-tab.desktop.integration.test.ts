@@ -62,7 +62,7 @@ describe('a settings save made outside the settings tab', () => {
           return { error: 'Plugin is not loaded', isVisibleAfter: null, isVisibleBefore };
         }
         await plugin.pluginSettingsComponent.editAndSave((settings) => {
-          settings.obsidianIgnoreContent = `${hiddenFolder}/\n`;
+          settings.ignorePatterns = `${hiddenFolder}/\n`;
         });
 
         return {

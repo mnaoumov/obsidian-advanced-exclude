@@ -82,7 +82,7 @@ describe('Files Pane mode — an explorer built after the plugin loaded', () => 
         await app.plugins.disablePluginAndSave(pluginId);
         await app.vault.adapter.write(
           `${app.vault.configDir}/plugins/${pluginId}/data.json`,
-          JSON.stringify({ excludeMode: 'FilesPane', obsidianIgnoreContent: `${hiddenFolder}/\n` })
+          JSON.stringify({ excludeMode: 'FilesPane', ignorePatterns: `${hiddenFolder}/\n` })
         );
         await app.plugins.enablePluginAndSave(pluginId);
         await sleep(settleDelay);

@@ -58,16 +58,16 @@ describe('resolveProfile', () => {
     expect(result.lines).toStrictEqual([]);
   });
 
-  it('should report a missing imported file and a file import with no path', () => {
+  it('should import nothing from a missing file without an error, and report a file import with no path', () => {
     const settings = createSettings({ profiles: [profile('Work', '@import file:gone.txt\n@import file:  ')] });
 
     const result = resolveProfile({ activeProfileId: 'work', importedFileContents: new Map([['gone.txt', null]]), settings });
 
     expect(result.errors).toStrictEqual([
-      { lineNumber: 1, message: 'File `gone.txt` does not exist.', profileName: 'Work' },
       { lineNumber: 2, message: '`@import file:` needs a vault path.', profileName: 'Work' }
     ]);
     expect(result.importedFilePaths).toStrictEqual(['gone.txt']);
+    expect(result.lines).toStrictEqual([]);
   });
 
   it('should list no imported files when no profile is active', () => {
@@ -75,24 +75,24 @@ describe('resolveProfile', () => {
   });
 
   it('should return the base settings unchanged when no profile is active', () => {
-    const settings = createSettings({ excludeMode: ExcludeMode.FilesPane, obsidianIgnoreContent: 'a/\nb/', profiles: [profile('Work', 'w/')] });
+    const settings = createSettings({ excludeMode: ExcludeMode.FilesPane, ignorePatterns: 'a/\nb/', profiles: [profile('Work', 'w/')] });
 
     const result = resolveProfile({ activeProfileId: null, settings });
 
     expect(result.activeProfile).toBeNull();
-    expect(result.obsidianIgnoreContent).toBe('a/\nb/');
+    expect(result.ignorePatterns).toBe('a/\nb/');
     expect(result.excludeMode).toBe(ExcludeMode.FilesPane);
     expect(result.errors).toStrictEqual([]);
     expect(result.lines).toStrictEqual([{ profileName: null, text: 'a/' }, { profileName: null, text: 'b/' }]);
   });
 
   it('should fall back to the base settings when the active profile no longer exists', () => {
-    const settings = createSettings({ obsidianIgnoreContent: 'a/' });
+    const settings = createSettings({ ignorePatterns: 'a/' });
 
     const result = resolveProfile({ activeProfileId: 'gone', settings });
 
     expect(result.activeProfile).toBeNull();
-    expect(result.obsidianIgnoreContent).toBe('a/');
+    expect(result.ignorePatterns).toBe('a/');
   });
 
   it('should produce no lines for empty base patterns', () => {
@@ -100,12 +100,12 @@ describe('resolveProfile', () => {
   });
 
   it('should append the active profile\'s lines after the base lines', () => {
-    const settings = createSettings({ obsidianIgnoreContent: 'base/', profiles: [profile('Work', 'work/\r\n!work/keep.md')] });
+    const settings = createSettings({ ignorePatterns: 'base/', profiles: [profile('Work', 'work/\r\n!work/keep.md')] });
 
     const result = resolveProfile({ activeProfileId: 'work', settings });
 
     expect(result.activeProfile?.name).toBe('Work');
-    expect(result.obsidianIgnoreContent).toBe('base/\nwork/\n!work/keep.md');
+    expect(result.ignorePatterns).toBe('base/\nwork/\n!work/keep.md');
     expect(result.lines).toStrictEqual([
       { profileName: null, text: 'base/' },
       { profileName: 'Work', text: 'work/' },
@@ -140,8 +140,7 @@ describe('resolveProfile', () => {
       profiles: [profile('Work', '')],
       shouldHideEmptyFolders: true,
       shouldIgnoreExcludedFiles: true,
-      shouldIncludeGitIgnorePatterns: true,
-      shouldIncludeObsidianIgnorePatterns: true
+      shouldIncludeGitIgnorePatterns: true
     });
 
     const result = resolveProfile({ activeProfileId: 'work', settings });
@@ -150,14 +149,13 @@ describe('resolveProfile', () => {
     expect(result.shouldHideEmptyFolders).toBe(true);
     expect(result.shouldIgnoreExcludedFiles).toBe(true);
     expect(result.shouldIncludeGitIgnorePatterns).toBe(true);
-    expect(result.shouldIncludeObsidianIgnorePatterns).toBe(true);
   });
 
   it('should let a later import win a scalar, and the profile\'s own override beat every import', () => {
     const settings = createSettings({
       profiles: [
         profile('Alpha', '', { excludeMode: ExcludeMode.FilesPane, shouldHideEmptyFolders: true, shouldIncludeGitIgnorePatterns: true }),
-        profile('Beta', '', { shouldHideEmptyFolders: false, shouldIgnoreExcludedFiles: true, shouldIncludeObsidianIgnorePatterns: true }),
+        profile('Beta', '', { shouldHideEmptyFolders: false, shouldIgnoreExcludedFiles: true }),
         profile('Combined', '@import Alpha\n@import Beta', { excludeMode: ExcludeMode.Full })
       ]
     });
@@ -168,13 +166,12 @@ describe('resolveProfile', () => {
     expect(result.shouldHideEmptyFolders).toBe(false);
     expect(result.shouldIgnoreExcludedFiles).toBe(true);
     expect(result.shouldIncludeGitIgnorePatterns).toBe(true);
-    expect(result.shouldIncludeObsidianIgnorePatterns).toBe(true);
   });
 
   it('should drop the collected lines and scalars at @reset', () => {
     const settings = createSettings({
       excludeMode: ExcludeMode.FilesPane,
-      obsidianIgnoreContent: 'base/',
+      ignorePatterns: 'base/',
       profiles: [profile('Clean', 'before/\n@reset  \nafter/')],
       shouldHideEmptyFolders: true
     });
@@ -203,7 +200,7 @@ describe('resolveProfile', () => {
 
     const result = resolveProfile({ activeProfileId: 'work', settings });
 
-    expect(result.obsidianIgnoreContent).toBe('a/\nb/');
+    expect(result.ignorePatterns).toBe('a/\nb/');
     expect(result.errors).toStrictEqual([
       { lineNumber: 2, message: 'Unknown profile `Nope`.', profileName: 'Work' },
       { lineNumber: 3, message: '`@import` needs a profile name.', profileName: 'Work' },
@@ -221,7 +218,7 @@ describe('resolveProfile', () => {
 
     const result = resolveProfile({ activeProfileId: 'alpha', settings });
 
-    expect(result.obsidianIgnoreContent).toBe('alpha/\nbeta/');
+    expect(result.ignorePatterns).toBe('alpha/\nbeta/');
     expect(result.errors).toStrictEqual([{ lineNumber: 1, message: 'Import cycle: Alpha → Beta → Alpha.', profileName: 'Beta' }]);
   });
 

@@ -88,7 +88,7 @@ beforeAll(async () => {
       // Saved with the settings tab closed, so the plugin applies the rules at once.
       const plugin = app.plugins.getPlugin(pluginId) as null | PluginWithSettingsComponent;
       await plugin?.pluginSettingsComponent.editAndSave((settings) => {
-        settings.obsidianIgnoreContent = ignoreRules;
+        settings.ignorePatterns = ignoreRules;
       });
 
       app.changeTheme('obsidian');

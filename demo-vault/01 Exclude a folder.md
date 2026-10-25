@@ -19,7 +19,7 @@ await require('/demoSetup.ts').excludeArchiveFolder(app);
 Manual equivalent:
 
 1. Open **Settings -> Community plugins -> `Advanced Exclude`**.
-2. In the **Ignore patterns** text area, add a line:
+2. In the **Global patterns** text area, add a line:
 
    ```gitignore
    Archive/
@@ -36,7 +36,7 @@ caption: Clear every ignore pattern
 await require('/demoSetup.ts').clearIgnorePatterns(app);
 ```
 
-Manual equivalent: empty the **Ignore patterns** text area and apply.
+Manual equivalent: empty the **Global patterns** text area and apply.
 
 ## What you should see
 
@@ -49,4 +49,4 @@ The trailing slash in `Archive/` matters: it targets a folder. See [04 Settings]
 
 > [!TIP]
 >
-> The patterns are stored in the plugin settings, so [Obsidian Sync](https://help.obsidian.md/sync) carries them to your other devices. To keep rules for one device only, write them in a `.obsidianignore` file at the vault root and turn on **Include `.obsidianignore` patterns**, see [03 Exclude mode and sources](<./03 Exclude mode and sources.md>).
+> The global patterns are stored in the plugin settings, so [Obsidian Sync](https://help.obsidian.md/sync) carries them to your other devices. To keep rules for one device only, write them in the **Local patterns** text area below, which edits a `.obsidianignore` file at the vault root; see [03 Exclude mode and sources](<./03 Exclude mode and sources.md>).

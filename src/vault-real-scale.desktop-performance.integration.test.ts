@@ -89,7 +89,7 @@ describe('Real-scale vault — FilesPane mode', () => {
 
         await pluginSettingsComponent.editAndSave((settings) => {
           settings.excludeMode = filesPaneMode;
-          settings.obsidianIgnoreContent = `${vaultFolder}/\n`;
+          settings.ignorePatterns = `${vaultFolder}/\n`;
         });
         await ignorePatternsComponent.processConfigChanges();
         await sleep(settleDelay);

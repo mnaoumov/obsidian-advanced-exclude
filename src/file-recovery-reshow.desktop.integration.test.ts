@@ -95,7 +95,7 @@ describe('re-showing notes hidden by an earlier session', () => {
         await sleep(settleDelay);
 
         await plugin.pluginSettingsComponent.editAndSave((settings) => {
-          settings.obsidianIgnoreContent = `${hiddenFolder}/\n`;
+          settings.ignorePatterns = `${hiddenFolder}/\n`;
         });
         await sleep(settleDelay);
         const visibleWhileHidden = notePaths.filter((notePath) => app.vault.getAbstractFileByPath(notePath) !== null);
@@ -111,7 +111,7 @@ describe('re-showing notes hidden by an earlier session', () => {
         fileRecovery.clearData();
 
         await plugin.pluginSettingsComponent.editAndSave((settings) => {
-          settings.obsidianIgnoreContent = '';
+          settings.ignorePatterns = '';
         });
         await sleep(settleDelay);
 
