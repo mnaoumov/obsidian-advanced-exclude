@@ -31,6 +31,10 @@ export interface EffectiveSettings extends ProfileScalarSettings {
   readonly activeProfile: null | Readonly<SettingsProfile>;
   readonly errors: readonly ProfileError[];
   /**
+  The expanded pattern text the matcher uses.
+  */
+  readonly ignorePatterns: string;
+  /**
   The normalized vault paths the expansion imports with `@import file:`, each once, in first-import order. They
   depend on the profiles alone, never on the files' contents, so reading them all once is enough to resolve.
   */
@@ -39,10 +43,6 @@ export interface EffectiveSettings extends ProfileScalarSettings {
   The expanded pattern lines, each labelled with the profile it came from.
   */
   readonly lines: readonly ResolvedPatternLine[];
-  /**
-  The expanded pattern text the matcher uses.
-  */
-  readonly obsidianIgnoreContent: string;
 }
 
 /**
@@ -52,7 +52,7 @@ export interface EffectiveSettings extends ProfileScalarSettings {
 export type ImportedFileContents = ReadonlyMap<string, null | string>;
 
 export interface ResolveProfileSettings extends Readonly<ProfileScalarSettings> {
-  readonly obsidianIgnoreContent: string;
+  readonly ignorePatterns: string;
   readonly profiles: readonly Readonly<SettingsProfile>[];
 }
 
@@ -74,7 +74,7 @@ interface ProfileError {
   readonly profileName: string;
 }
 
-type ProfileScalarSettingName = 'excludeMode' | 'shouldHideEmptyFolders' | 'shouldIgnoreExcludedFiles' | 'shouldIncludeGitIgnorePatterns' | 'shouldIncludeObsidianIgnorePatterns';
+type ProfileScalarSettingName = 'excludeMode' | 'shouldHideEmptyFolders' | 'shouldIgnoreExcludedFiles' | 'shouldIncludeGitIgnorePatterns';
 
 type ProfileScalarSettings = Pick<PluginSettings, ProfileScalarSettingName>;
 
@@ -186,9 +186,9 @@ export function resolveProfile(params: ResolveProfileParams): EffectiveSettings 
       ...baseScalars,
       activeProfile: null,
       errors: [],
+      ignorePatterns: settings.ignorePatterns,
       importedFilePaths: [],
-      lines: splitLines(settings.obsidianIgnoreContent).map((text) => ({ profileName: null, text })),
-      obsidianIgnoreContent: settings.obsidianIgnoreContent
+      lines: splitLines(settings.ignorePatterns).map((text) => ({ profileName: null, text }))
     };
   }
 
@@ -196,7 +196,7 @@ export function resolveProfile(params: ResolveProfileParams): EffectiveSettings 
     errors: [],
     importedFileContents,
     importedFilePaths: new Set(),
-    lines: splitLines(settings.obsidianIgnoreContent).map((text) => ({ profileName: null, text })),
+    lines: splitLines(settings.ignorePatterns).map((text) => ({ profileName: null, text })),
     profiles: settings.profiles,
     scalars: baseScalars
   };
@@ -206,9 +206,9 @@ export function resolveProfile(params: ResolveProfileParams): EffectiveSettings 
     ...state.scalars,
     activeProfile,
     errors: state.errors,
+    ignorePatterns: state.lines.map((line) => line.text).join('\n'),
     importedFilePaths: [...state.importedFilePaths],
-    lines: state.lines,
-    obsidianIgnoreContent: state.lines.map((line) => line.text).join('\n')
+    lines: state.lines
   };
 }
 
@@ -245,12 +245,9 @@ function expandFileImport(state: ExpansionState, profile: Readonly<SettingsProfi
 
   const filePath = normalizePath(trimmedPath);
   state.importedFilePaths.add(filePath);
-  const content = state.importedFileContents.get(filePath);
-  if (content === null) {
-    return `File \`${filePath}\` does not exist.`;
-  }
-
-  for (const text of splitLines(content ?? '')) {
+  // A missing file imports nothing, without an error: an optional per-device file is a normal thing to import.
+  const content = state.importedFileContents.get(filePath) ?? '';
+  for (const text of splitLines(content)) {
     state.lines.push({ filePath, profileName: profile.name, text });
   }
   return null;
@@ -320,8 +317,7 @@ function expandProfile(state: ExpansionState, profile: Readonly<SettingsProfile>
     excludeMode: profile.excludeMode ?? state.scalars.excludeMode,
     shouldHideEmptyFolders: profile.shouldHideEmptyFolders ?? state.scalars.shouldHideEmptyFolders,
     shouldIgnoreExcludedFiles: profile.shouldIgnoreExcludedFiles ?? state.scalars.shouldIgnoreExcludedFiles,
-    shouldIncludeGitIgnorePatterns: profile.shouldIncludeGitIgnorePatterns ?? state.scalars.shouldIncludeGitIgnorePatterns,
-    shouldIncludeObsidianIgnorePatterns: profile.shouldIncludeObsidianIgnorePatterns ?? state.scalars.shouldIncludeObsidianIgnorePatterns
+    shouldIncludeGitIgnorePatterns: profile.shouldIncludeGitIgnorePatterns ?? state.scalars.shouldIncludeGitIgnorePatterns
   };
 }
 
@@ -334,8 +330,7 @@ function pickScalars(settings: Readonly<ProfileScalarSettings>): ProfileScalarSe
     excludeMode: settings.excludeMode,
     shouldHideEmptyFolders: settings.shouldHideEmptyFolders,
     shouldIgnoreExcludedFiles: settings.shouldIgnoreExcludedFiles,
-    shouldIncludeGitIgnorePatterns: settings.shouldIncludeGitIgnorePatterns,
-    shouldIncludeObsidianIgnorePatterns: settings.shouldIncludeObsidianIgnorePatterns
+    shouldIncludeGitIgnorePatterns: settings.shouldIncludeGitIgnorePatterns
   };
 }
 

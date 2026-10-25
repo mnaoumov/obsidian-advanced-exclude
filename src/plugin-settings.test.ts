@@ -23,7 +23,7 @@ describe('PluginSettings', () => {
   it('should have correct default values', () => {
     const settings = new PluginSettings();
     expect(settings.excludeMode).toBe(ExcludeMode.Full);
-    expect(settings.obsidianIgnoreContent).toBe('');
+    expect(settings.ignorePatterns).toBe('');
     expect(settings.shouldHideEmptyFolders).toBe(false);
     expect(settings.shouldIgnoreExcludedFiles).toBe(false);
     expect(settings.shouldIncludeGitIgnorePatterns).toBe(false);

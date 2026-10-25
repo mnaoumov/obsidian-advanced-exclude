@@ -69,7 +69,7 @@ describe('metadataCache.initialize with paths hidden', () => {
         }
 
         await plugin.pluginSettingsComponent.editAndSave((settings) => {
-          settings.obsidianIgnoreContent = `${hiddenFolder}/\n`;
+          settings.ignorePatterns = `${hiddenFolder}/\n`;
         });
         await sleep(settleDelay);
         const visibleWhileHidden = notePaths.filter((notePath) => app.vault.getAbstractFileByPath(notePath) !== null);

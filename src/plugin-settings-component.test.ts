@@ -48,11 +48,11 @@ describe('PluginSettingsComponent', () => {
 
   it('should resolve the effective settings from the active profile', () => {
     const { component, settings } = createComponent('work');
-    settings.obsidianIgnoreContent = 'base/';
+    settings.ignorePatterns = 'base/';
     settings.profiles = [{ excludeMode: ExcludeMode.FilesPane, id: 'work', name: 'Work', patterns: 'work/' }];
 
     expect(component.effectiveSettings.activeProfile?.id).toBe('work');
-    expect(component.effectiveSettings.obsidianIgnoreContent).toBe('base/\nwork/');
+    expect(component.effectiveSettings.ignorePatterns).toBe('base/\nwork/');
     expect(component.effectiveSettings.excludeMode).toBe(ExcludeMode.FilesPane);
   });
 
@@ -62,10 +62,10 @@ describe('PluginSettingsComponent', () => {
 
     expect(component.effectiveSettings).toBe(first);
 
-    settings.obsidianIgnoreContent = 'changed/';
+    settings.ignorePatterns = 'changed/';
     const second = component.effectiveSettings;
     expect(second).not.toBe(first);
-    expect(second.obsidianIgnoreContent).toBe('changed/');
+    expect(second.ignorePatterns).toBe('changed/');
 
     for (
       const edit of [
@@ -96,14 +96,14 @@ describe('PluginSettingsComponent', () => {
     const { component, settings } = createComponent('work');
     settings.profiles = [{ id: 'work', name: 'Work', patterns: '@import file:work.txt' }];
     const before = component.effectiveSettings;
-    expect(before.obsidianIgnoreContent).toBe('');
+    expect(before.ignorePatterns).toBe('');
 
     const importedFileContents = new Map([['work.txt', 'from-file/']]);
     component.setImportedFileContents(importedFileContents);
 
     expect(component.importedFileContents).toBe(importedFileContents);
     expect(component.effectiveSettings).not.toBe(before);
-    expect(component.effectiveSettings.obsidianIgnoreContent).toBe('from-file/');
+    expect(component.effectiveSettings.ignorePatterns).toBe('from-file/');
   });
 
   it('should store a new active profile, notify the listeners, and resolve against it', async () => {

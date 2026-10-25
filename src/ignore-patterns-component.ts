@@ -1,13 +1,18 @@
 import { registerAsyncEvent } from '@mnaoumov/obsidian-lib/components/async-events-component';
 import { LayoutReadyComponent } from '@mnaoumov/obsidian-lib/components/layout-ready-component';
 import { ensureMetadataCacheReady } from '@mnaoumov/obsidian-lib/metadata-cache';
-import { invokeAsyncSafelyAfterDelay } from '@mnaoumov/typescript-lib/async';
+import {
+  invokeAsyncSafely,
+  invokeAsyncSafelyAfterDelay
+} from '@mnaoumov/typescript-lib/async';
+import { noopAsync } from '@mnaoumov/typescript-lib/function';
 import { isDeepEqual } from '@mnaoumov/typescript-lib/object-utils';
 import { escapeRegExp } from '@mnaoumov/typescript-lib/reg-exp';
 import ignore from 'ignore';
 import {
   App,
-  debounce
+  debounce,
+  Platform
 } from 'obsidian';
 
 import type { PluginSettingsComponent } from './plugin-settings-component.ts';
@@ -21,9 +26,15 @@ import {
 import {
   readIfExists,
   readSafe,
-  statSafe
+  statSafe,
+  writeSafe
 } from './data-adapter-safe.ts';
 import { getResult } from './indexed-database-utils.ts';
+import {
+  formatLocalPatternsFile,
+  LOCAL_PATTERNS_HEADER,
+  normalizeLocalPatterns
+} from './local-patterns.ts';
 
 const DB_VERSION = 1;
 // Bumped whenever the ignore-matching logic changes shape (e.g. the folder verdict
@@ -86,13 +97,20 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
   private cachedExcludeRegExps: null | RegExp[] = null;
   private cachedGitIgnoreContent = '';
   private cachedIgnoreTester: ignore.Ignore | null = null;
-  private cachedObsidianIgnoreContent = '';
+  // The patterns of `.obsidianignore`, normalized: no byte order mark, LF line endings, `''` for a missing file.
+  private cachedLocalPatterns = '';
   // Whether the config fingerprint matched the persisted one at load (see
   // `loadFingerprint`/`isConfigUnchanged`) — the gate for the fast-enable path.
   private configFingerprintMatched = false;
   private readonly fileIgnoreMap = new Map<string, boolean>();
   private hadConfigChanges = false;
   private readonly isSettingsTabOpen: () => boolean;
+  private readonly localPatternsChangeListeners = new Set<() => void>();
+  // The raw content of `.obsidianignore` as last read or written, or `null` when it does not exist: a save keeps
+  // its line ending and byte order mark.
+  private localPatternsFileContent: null | string = null;
+  // The last save of `.obsidianignore`. A read waits for it, so it never takes a half-saved file for an outside edit.
+  private localPatternsWrite: Promise<void> = noopAsync();
   private readonly onUpdateFileTree: () => Promise<void>;
   private pendingStoreActions = new Map<string, (store: IDBObjectStore) => void>();
   private readonly pluginSettingsComponent: PluginSettingsComponent;
@@ -154,6 +172,14 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
     }
   }
 
+  /**
+   * The text the settings tab edits for `.obsidianignore`: the whole file, comments included, with LF line endings; or
+   * {@link LOCAL_PATTERNS_HEADER} while the file does not exist, which the first save writes.
+   */
+  public getLocalPatternsText(): string {
+    return this.localPatternsFileContent === null ? LOCAL_PATTERNS_HEADER : this.cachedLocalPatterns;
+  }
+
   public async handleDeletedOrDotFile(normalizedPath: string): Promise<void> {
     if (this.fileIgnoreMap.has(normalizedPath)) {
       this.fileIgnoreMap.delete(normalizedPath);
@@ -162,8 +188,11 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
     }
 
     let shouldRefresh = false;
-    if (normalizedPath === OBSIDIAN_IGNORE_FILE) {
-      shouldRefresh ||= await this.readObsidianIgnore();
+    if (normalizedPath === OBSIDIAN_IGNORE_FILE && await this.readObsidianIgnore()) {
+      shouldRefresh = true;
+      for (const listener of this.localPatternsChangeListeners) {
+        listener();
+      }
     }
 
     if (normalizedPath === GIT_IGNORE_FILE) {
@@ -233,6 +262,16 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
     this.registerDomEvent(window, 'pagehide', () => {
       this.releaseDatabase();
     });
+    // A dot file raises no vault event, and only the desktop watcher reports it at all (as a `reconcileDeletion`), so
+    // an edit made in another app, or by a sync tool, is read when the user comes back to Obsidian.
+    this.registerDomEvent(window, 'focus', () => {
+      invokeAsyncSafely(() => this.refreshLocalPatterns());
+    });
+    this.registerDomEvent(document, 'visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        invokeAsyncSafely(() => this.refreshLocalPatterns());
+      }
+    });
     // Before the fingerprint: the imported files' contents are part of the expanded patterns it covers.
     await this.readImportedFiles();
     await this.loadFingerprint();
@@ -276,6 +315,18 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
   }
 
   /**
+   * Registers a listener for a change of `.obsidianignore` made outside the settings tab.
+   *
+   * @returns A function that removes the listener.
+   */
+  public onLocalPatternsChange(listener: () => void): () => void {
+    this.localPatternsChangeListeners.add(listener);
+    return () => {
+      this.localPatternsChangeListeners.delete(listener);
+    };
+  }
+
+  /**
    * Releases the connection. An open connection blocks every later `deleteDatabase` and version
    * upgrade, and each enable opened a new one, so a disable must let it go.
    *
@@ -295,6 +346,37 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
     this.hadConfigChanges = false;
     await this.resetDatabase();
     await this.onUpdateFileTree();
+  }
+
+  /**
+   * Re-reads `.obsidianignore`, and applies it and tells the listeners when it changed. For a moment no change event
+   * covers: the user coming back to Obsidian, or the settings tab rendering.
+   */
+  public async refreshLocalPatterns(): Promise<void> {
+    await this.handleDeletedOrDotFile(OBSIDIAN_IGNORE_FILE);
+  }
+
+  /**
+   * Writes {@link text} to `.obsidianignore`, keeping the line ending and byte order mark the file already has. Like an
+   * edit of the global patterns, it applies on the settings tab's hide or Apply while the tab is open, and at once
+   * otherwise.
+   */
+  public async saveLocalPatterns(text: string): Promise<void> {
+    const write = this.localPatternsWrite.then(async () => {
+      const content = formatLocalPatternsFile({ existingContent: this.localPatternsFileContent, isWindows: Platform.isWin, text });
+      await writeSafe({ app: this.app, content, path: OBSIDIAN_IGNORE_FILE });
+      this.localPatternsFileContent = content;
+      this.cachedLocalPatterns = normalizeLocalPatterns(content);
+    });
+    // A failed save must not stop the ones after it; its caller still gets the error.
+    this.localPatternsWrite = write.catch(() => undefined);
+    await write;
+    this.cachedIgnoreTester = null;
+    this.fileIgnoreMap.clear();
+    this.hadConfigChanges = true;
+    if (!this.isSettingsTabOpen()) {
+      await this.processConfigChanges();
+    }
   }
 
   protected override async onLayoutReady(): Promise<void> {
@@ -331,9 +413,7 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
 
   private async getCurrentMtimeEntry(): Promise<DatabaseMtimeEntry> {
     const gitIgnoreStat = this.pluginSettingsComponent.effectiveSettings.shouldIncludeGitIgnorePatterns ? await statSafe(this.app, GIT_IGNORE_FILE) : null;
-    const obsidianIgnoreStat = this.pluginSettingsComponent.effectiveSettings.shouldIncludeObsidianIgnorePatterns
-      ? await statSafe(this.app, OBSIDIAN_IGNORE_FILE)
-      : null;
+    const obsidianIgnoreStat = await statSafe(this.app, OBSIDIAN_IGNORE_FILE);
     return {
       gitIgnoreMtime: gitIgnoreStat?.mtime ?? 0,
       matcherVersion: IGNORE_MATCHER_VERSION,
@@ -347,7 +427,7 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
    * The pattern text of the settings: the expanded profile while one is active, else the base patterns.
    */
   private getEffectivePatterns(): string {
-    return this.pluginSettingsComponent.effectiveSettings.obsidianIgnoreContent;
+    return this.pluginSettingsComponent.effectiveSettings.ignorePatterns;
   }
 
   private getExcludeRegExps(): RegExp[] {
@@ -384,7 +464,7 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
       return this.cachedIgnoreTester;
     }
 
-    const ignorePatternsString = `${this.getEffectivePatterns()}\n${this.cachedObsidianIgnoreContent}\n${this.cachedGitIgnoreContent}`;
+    const ignorePatternsString = `${this.getEffectivePatterns()}\n${this.cachedLocalPatterns}\n${this.cachedGitIgnoreContent}`;
 
     this.cachedIgnoreTester = ignore({
       ignoreCase: true
@@ -395,12 +475,11 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
   private getSettingsFingerprint(): string {
     const effectiveSettings = this.pluginSettingsComponent.effectiveSettings;
     return JSON.stringify([
-      effectiveSettings.obsidianIgnoreContent,
+      effectiveSettings.ignorePatterns,
       effectiveSettings.excludeMode,
       effectiveSettings.shouldHideEmptyFolders,
       effectiveSettings.shouldIgnoreExcludedFiles,
-      effectiveSettings.shouldIncludeGitIgnorePatterns,
-      effectiveSettings.shouldIncludeObsidianIgnorePatterns
+      effectiveSettings.shouldIncludeGitIgnorePatterns
     ]);
   }
 
@@ -506,16 +585,23 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
     return true;
   }
 
+  /**
+   * Reads `.obsidianignore` once a save in flight has finished.
+   *
+   * @returns Whether its content changed since it was last read or written.
+   */
   private async readObsidianIgnore(): Promise<boolean> {
-    const obsidianIgnoreContent = this.pluginSettingsComponent.effectiveSettings.shouldIncludeObsidianIgnorePatterns
-      ? await readSafe(this.app, OBSIDIAN_IGNORE_FILE)
-      : '';
-    if (obsidianIgnoreContent === this.cachedObsidianIgnoreContent) {
+    await this.localPatternsWrite;
+    const content = await readIfExists(this.app, OBSIDIAN_IGNORE_FILE);
+    if (content === this.localPatternsFileContent) {
       return false;
     }
 
-    this.cachedObsidianIgnoreContent = obsidianIgnoreContent;
-    return true;
+    this.localPatternsFileContent = content;
+    const localPatterns = normalizeLocalPatterns(content ?? '');
+    const hasPatternChanges = localPatterns !== this.cachedLocalPatterns;
+    this.cachedLocalPatterns = localPatterns;
+    return hasPatternChanges;
   }
 
   private releaseDatabase(): void {

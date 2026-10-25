@@ -43,7 +43,7 @@ describe('ProfileEditModal', () => {
     expect(modal.titleEl.textContent).toBe('Edit profile: Work');
     expect(getInput(modal).value).toBe('Work');
     expect(getTextArea(modal).value).toBe('@import Base\nwork/');
-    expect(getSelects(modal).map((select) => select.value)).toStrictEqual(['inherit', 'inherit', 'inherit', 'off', 'on']);
+    expect(getSelects(modal).map((select) => select.value)).toStrictEqual(['inherit', 'inherit', 'off', 'on']);
     expect(getText(modal, '.advanced-exclude-profile-expansion')).toContain('base: base/');
     expect(getText(modal, '.advanced-exclude-profile-expansion')).toContain('Base: from-base/');
     expect(getText(modal, '.advanced-exclude-profile-expansion')).toContain('Work: work/');
@@ -72,16 +72,15 @@ describe('ProfileEditModal', () => {
 
   it('should save the edited name, patterns and overrides', async () => {
     const { modal, onSave } = openModal({ excludeMode: ExcludeMode.Full, id: 'work', name: 'Work', patterns: 'a/' });
-    const [excludeModeSelect, obsidianIgnoreSelect, gitIgnoreSelect, excludedFilesSelect, emptyFoldersSelect] = getSelects(modal);
+    const [excludeModeSelect, gitIgnoreSelect, excludedFilesSelect, emptyFoldersSelect] = getSelects(modal);
 
     typeInto(getInput(modal), '  Office  ');
     typeInto(getTextArea(modal), 'b/');
     choose(excludeModeSelect, 'inherit');
-    choose(obsidianIgnoreSelect, 'on');
     choose(gitIgnoreSelect, 'on');
     choose(excludedFilesSelect, 'off');
     choose(emptyFoldersSelect, 'inherit');
-    expect(getText(modal, '.advanced-exclude-profile-expansion')).toContain('.obsidianignore patterns: on; .gitignore patterns: on');
+    expect(getText(modal, '.advanced-exclude-profile-expansion')).toContain('.gitignore patterns: on; ignore excluded files: off');
     clickButton(modal, 'Save');
     await waitForAllAsyncOperations();
 
@@ -92,8 +91,7 @@ describe('ProfileEditModal', () => {
       patterns: 'b/',
       shouldHideEmptyFolders: undefined,
       shouldIgnoreExcludedFiles: false,
-      shouldIncludeGitIgnorePatterns: true,
-      shouldIncludeObsidianIgnorePatterns: true
+      shouldIncludeGitIgnorePatterns: true
     });
   });
 
@@ -129,7 +127,7 @@ describe('ProfileEditModal', () => {
     expect(readIfExists).not.toHaveBeenCalled();
   });
 
-  it('should read a file the draft newly imports and show it, or report it missing', async () => {
+  it('should read a file the draft newly imports and show it, or hint that it is missing without an error', async () => {
     vi.mocked(readIfExists).mockImplementation((_app, path) => Promise.resolve(path === 'work.txt' ? 'from-file/' : null));
     const { modal } = openModal({ id: 'work', name: 'Work', patterns: '' });
 
@@ -137,7 +135,8 @@ describe('ProfileEditModal', () => {
     await waitForAllAsyncOperations();
 
     expect(getText(modal, '.advanced-exclude-profile-expansion')).toContain('Work (work.txt): from-file/');
-    expect(modal.contentEl.textContent).toContain('Work, line 2: File `gone.txt` does not exist.');
+    expect(getText(modal, '.advanced-exclude-profile-expansion')).toContain('gone.txt (file not found, nothing imported)');
+    expect(modal.contentEl.textContent).not.toContain('line 2');
   });
 
   it('should refuse a name that would read as a file import', () => {
@@ -200,7 +199,7 @@ function getTextArea(modal: ProfileEditModal): HTMLTextAreaElement {
 
 function openModal(profile: SettingsProfile, importedFileContents: ReadonlyMap<string, null | string> = new Map()): OpenModalResult {
   const settings = Object.assign(new PluginSettings(), {
-    obsidianIgnoreContent: 'base/',
+    ignorePatterns: 'base/',
     profiles: [{ id: 'base', name: 'Base', patterns: 'from-base/' }, profile]
   });
   const onSave = vi.fn<(editedProfile: SettingsProfile) => Promise<void>>().mockResolvedValue(undefined);

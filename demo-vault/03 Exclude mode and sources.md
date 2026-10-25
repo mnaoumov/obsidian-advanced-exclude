@@ -1,6 +1,6 @@
 # Exclude mode and sources
 
-Beyond the ignore patterns from [01 Exclude a folder](<./01 Exclude a folder.md>) and [02 Whitelist with negation](<./02 Whitelist with negation.md>), `Advanced Exclude` has four more settings that change *how far* the exclusion reaches and *which sources* feed the ignore list. All of them live in **Settings -> Community plugins -> `Advanced Exclude`**; each key is documented in [04 Settings](<./04 Settings.md>).
+Beyond the ignore patterns from [01 Exclude a folder](<./01 Exclude a folder.md>) and [02 Whitelist with negation](<./02 Whitelist with negation.md>), `Advanced Exclude` has three more settings that change *how far* the exclusion reaches and *which sources* feed the ignore list, and a second place to keep patterns, for one device only. All of them live in **Settings -> Community plugins -> `Advanced Exclude`**; each key is documented in [04 Settings](<./04 Settings.md>).
 
 ## Exclude mode
 
@@ -59,8 +59,13 @@ await require('/demoSetup.ts').changeSettings(app, { shouldIgnoreExcludedFiles: 
 
 Manual equivalent: toggle **Ignore excluded files** and **Include `.gitignore` patterns** above.
 
-## Read a `.obsidianignore` file
+## Global and local patterns
 
-**Include `.obsidianignore` patterns** (a toggle, off by default) also reads a `.obsidianignore` file at the vault root, after the patterns in the settings. The patterns in the settings are the ones to use: they are stored in the plugin's `data.json`, so [Obsidian Sync](https://help.obsidian.md/sync) carries them to your other devices. Sync never carries a file whose name starts with a dot, so a `.obsidianignore` applies only on the device that has it. Turn this on for rules that belong to one device, or that another tool writes for you.
+The settings tab has two pattern sections, and both always apply, global first:
 
-Earlier versions kept the patterns in `.obsidianignore` itself. On the first start after the update, each device copies its own file's patterns into the settings once and says so in a notice.
+1. **Global patterns** are stored in the plugin's `data.json`, so [Obsidian Sync](https://help.obsidian.md/sync) carries them to your other devices. Put here what every device should hide.
+2. **Local patterns** are the `.obsidianignore` file at the vault root, which the text area edits directly. Obsidian Sync never carries a file whose name starts with a dot, so these apply only on the device that has the file. Other sync tools, such as git or Syncthing, may carry it. A `!negation` here can re-include what a global pattern hid, on this device only.
+
+The file is not created until you first type in the **Local patterns** text area, and then it starts with a few `#` comment lines saying what it is for. You can also edit it in any text editor: the plugin reads it again when you come back to Obsidian, and on desktop as soon as it changes. It keeps the line endings the file already uses.
+
+A `.obsidianignore` from an earlier version keeps working as it is.

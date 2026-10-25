@@ -129,10 +129,9 @@ export class PluginSettingsComponent extends PluginSettingsComponentBase<PluginS
 
 function isSameSettings(a: ResolveProfileSettings, b: ResolveProfileSettings): boolean {
   return a.profiles === b.profiles
-    && a.obsidianIgnoreContent === b.obsidianIgnoreContent
+    && a.ignorePatterns === b.ignorePatterns
     && a.excludeMode === b.excludeMode
     && a.shouldHideEmptyFolders === b.shouldHideEmptyFolders
     && a.shouldIgnoreExcludedFiles === b.shouldIgnoreExcludedFiles
-    && a.shouldIncludeGitIgnorePatterns === b.shouldIncludeGitIgnorePatterns
-    && a.shouldIncludeObsidianIgnorePatterns === b.shouldIncludeObsidianIgnorePatterns;
+    && a.shouldIncludeGitIgnorePatterns === b.shouldIncludeGitIgnorePatterns;
 }

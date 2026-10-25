@@ -96,7 +96,7 @@ describe('Full-mode hide-almost-everything scales with work, not vault size (iss
         await pluginSettingsComponent.editAndSave((settings) => {
           settings.excludeMode = fullMode;
           // The reported idiom: ignore everything, keep only the root control note.
-          settings.obsidianIgnoreContent = '*\n!keep-real.md\n';
+          settings.ignorePatterns = '*\n!keep-real.md\n';
         });
         await ignorePatternsComponent.processConfigChanges();
         const totalMs = performance.now() - totalT0;

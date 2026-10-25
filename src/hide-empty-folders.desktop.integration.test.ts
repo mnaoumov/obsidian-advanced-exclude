@@ -55,7 +55,7 @@ afterEach(async () => {
 
       const plugin = app.plugins.getPlugin(pluginId) as null | PluginWithSettingsComponent;
       await plugin?.pluginSettingsComponent.editAndSave((settings) => {
-        settings.obsidianIgnoreContent = '';
+        settings.ignorePatterns = '';
       });
       for (const path of files) {
         try {
@@ -128,7 +128,7 @@ describe('Hide empty folders — Full mode', () => {
         // records the excluded `hidden.md` as a child of `charlie` (in Full mode it
         // never enters Obsidian's index, so the model is the only place that knows it).
         await (app.plugins.getPlugin(pluginId) as null | PluginWithSettingsComponent)?.pluginSettingsComponent.editAndSave((settings) => {
-          settings.obsidianIgnoreContent = 'alpha/bravo/charlie/hidden.md\n';
+          settings.ignorePatterns = 'alpha/bravo/charlie/hidden.md\n';
         });
         await app.plugins.disablePluginAndSave(pluginId);
         await app.plugins.enablePluginAndSave(pluginId);

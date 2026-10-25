@@ -11,7 +11,6 @@ import { FileTreeComponent } from './file-tree-component.ts';
 import { IgnorePatternsComponent } from './ignore-patterns-component.ts';
 import { IndexProjectionComponent } from './index-projection-component.ts';
 import { ManualIndexHider } from './manual-index-hider.ts';
-import { migrateObsidianIgnoreFile } from './obsidian-ignore-migration.ts';
 import { AdapterPatchComponent } from './patches/adapter-patch-component.ts';
 import { FileExplorerViewOnCreatePatchComponent } from './patches/file-explorer-view-on-create-patch-component.ts';
 import { MetadataCacheInitializePatchComponent } from './patches/metadata-cache-initialize-patch-component.ts';
@@ -43,12 +42,6 @@ export class Plugin extends PluginBase {
     // the stored patterns — so without this wait it would fingerprint against the defaults and persist a
     // default-derived state over the stored one.
     await pluginSettingsComponent.loadWithPromises();
-    // Before the patterns are read: it may copy an existing `.obsidianignore` into the settings.
-    await migrateObsidianIgnoreFile({
-      app: this.app,
-      pluginNoticeComponent: this.pluginNoticeComponent,
-      pluginSettingsComponent
-    });
 
     const ignorePatternsComponent: IgnorePatternsComponent = this.addChild(
       new IgnorePatternsComponent({
@@ -100,6 +93,12 @@ export class Plugin extends PluginBase {
       plugin: this,
       pluginSettingsComponent
     });
+    // An open tab shows `.obsidianignore` as it was when the tab rendered, so an edit made elsewhere re-renders it.
+    this.register(ignorePatternsComponent.onLocalPatternsChange(() => {
+      if (pluginSettingsTab.isOpen) {
+        pluginSettingsTab.refresh();
+      }
+    }));
 
     this.addChild(
       new PluginSettingsTabComponent({

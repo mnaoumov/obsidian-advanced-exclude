@@ -131,7 +131,7 @@ describe('Fast enable — re-hides the persisted set directly on unchanged confi
         // 1. Full-mode hide of one folder → persists the hidden set + universe signature.
         await pluginSettingsComponent.editAndSave((settings) => {
           settings.excludeMode = fullMode;
-          settings.obsidianIgnoreContent = `${hiddenPrefix}\n`;
+          settings.ignorePatterns = `${hiddenPrefix}\n`;
         });
         await ignorePatternsComponent.processConfigChanges();
         const hiddenAfterApply = countHidden();

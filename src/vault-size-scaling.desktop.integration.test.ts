@@ -367,7 +367,7 @@ async function runIgnoreScenario(spec: ScenarioSpec): Promise<VaultSizeScenarioR
            * path that used to freeze.
            */
           await pluginSettingsComponent.editAndSave((settings) => {
-            settings.obsidianIgnoreContent = pattern;
+            settings.ignorePatterns = pattern;
           });
           await ignorePatternsComponent.processConfigChanges();
           // Wait for the ignored scope to actually vanish rather than sleeping a fixed interval.
@@ -383,7 +383,7 @@ async function runIgnoreScenario(spec: ScenarioSpec): Promise<VaultSizeScenarioR
 
           // Remove the pattern the same way and confirm the scope returns live with no reload — the model must have retained the hidden subtree.
           await pluginSettingsComponent.editAndSave((settings) => {
-            settings.obsidianIgnoreContent = '';
+            settings.ignorePatterns = '';
           });
           await ignorePatternsComponent.processConfigChanges();
           // Wait for the whole scope to return rather than sleeping a fixed interval.

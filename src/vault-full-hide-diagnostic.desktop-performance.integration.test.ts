@@ -92,7 +92,7 @@ describe('Full-mode hide fires no updateRelatedLinks cascade', () => {
         try {
           await pluginSettingsComponent.editAndSave((settings) => {
             settings.excludeMode = fullMode;
-            settings.obsidianIgnoreContent = `${vaultFolder}/\n`;
+            settings.ignorePatterns = `${vaultFolder}/\n`;
           });
           await ignorePatternsComponent.processConfigChanges();
         } finally {

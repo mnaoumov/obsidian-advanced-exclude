@@ -320,7 +320,7 @@ async function runStep(vaultPath: string, step: Step, excludeMode: ExcludeMode):
           case 'switchMode': {
             await settingsComponent.editAndSave((settings) => {
               settings.excludeMode = mode;
-              settings.obsidianIgnoreContent = '';
+              settings.ignorePatterns = '';
             });
             await ignoreComponent.processConfigChanges();
             break;
@@ -356,9 +356,9 @@ async function runStep(vaultPath: string, step: Step, excludeMode: ExcludeMode):
           wallMs: Math.round(wallMs)
         };
 
-        async function setIgnoreContent(obsidianIgnoreContent: string): Promise<void> {
+        async function setIgnoreContent(ignorePatterns: string): Promise<void> {
           await settingsComponent?.editAndSave((settings) => {
-            settings.obsidianIgnoreContent = obsidianIgnoreContent;
+            settings.ignorePatterns = ignorePatterns;
           });
           await ignoreComponent?.processConfigChanges();
         }

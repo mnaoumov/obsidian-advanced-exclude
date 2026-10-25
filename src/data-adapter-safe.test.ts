@@ -17,7 +17,8 @@ import {
 
 import {
   readSafe,
-  statSafe
+  statSafe,
+  writeSafe
 } from './data-adapter-safe.ts';
 
 vi.mock('@obsidian-typings/obsidian-public-latest/implementations', () => ({
@@ -120,6 +121,14 @@ describe('data-adapter-safe', () => {
         });
       });
     });
+
+    describe('writeSafe', () => {
+      it('should write content to file', async () => {
+        mockFsPromises.writeFile.mockResolvedValue(undefined);
+        await writeSafe({ app: mockApp, content: 'content', path: 'test.md' });
+        expect(mockFsPromises.writeFile).toHaveBeenCalledWith('/vault/test.md', 'content');
+      });
+    });
   });
 
   describe('CapacitorAdapter', () => {
@@ -199,6 +208,14 @@ describe('data-adapter-safe', () => {
         });
       });
     });
+
+    describe('writeSafe', () => {
+      it('should write content via capacitor fs', async () => {
+        mockFs.write.mockResolvedValue(undefined);
+        await writeSafe({ app: mockApp, content: 'content', path: 'test.md' });
+        expect(mockFs.write).toHaveBeenCalledWith('/vault/test.md', 'content');
+      });
+    });
   });
 
   describe('Unknown adapter', () => {
@@ -244,6 +261,10 @@ describe('data-adapter-safe', () => {
         .mockReturnValueOnce(fsAdapter.asOriginalType__())
         .mockReturnValueOnce(unknownAdapter);
       await expect(statSafe(mockApp, 'test.md')).rejects.toThrow('Unknown adapter');
+    });
+
+    it('writeSafe should throw for unknown adapter', async () => {
+      await expect(writeSafe({ app: mockApp, content: 'content', path: 'test.md' })).rejects.toThrow('Unknown adapter');
     });
   });
 });

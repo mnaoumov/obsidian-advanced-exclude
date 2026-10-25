@@ -2,6 +2,7 @@ import type { PluginSettingsComponentBase } from '@mnaoumov/obsidian-lib/compone
 import type { GenericVoidFunction } from '@mnaoumov/typescript-lib/function';
 import type {
   Plugin,
+  SettingDefinitionItem,
   SettingGroup
 } from 'obsidian';
 
@@ -13,7 +14,8 @@ import { strictProxy } from '@mnaoumov/typescript-test-toolkit/strict-proxy';
 import {
   App,
   ButtonComponent,
-  DropdownComponent
+  DropdownComponent,
+  TextAreaComponent
 } from 'obsidian-test-mocks/obsidian';
 import {
   beforeEach,
@@ -107,13 +109,23 @@ function captureButtonHandlers(tab: PluginSettingsTab): Map<string, (($event: Mo
 }
 
 /**
+ * Returns the declared rows, the ones inside a heading group included.
+ *
+ * @param tab - The settings tab.
+ * @returns The rows in render order.
+ */
+function getRowDefinitions(tab: PluginSettingsTab): SettingDefinitionItem[] {
+  return tab.getSettingDefinitions().flatMap((definition) => 'items' in definition ? definition.items : [definition]);
+}
+
+/**
  * Invokes every declared row's `render` callback the way Obsidian does when the tab is opened, so the
  * bindings are still exercised now that the rows are declarative.
  *
  * @param tab - The settings tab.
  */
 function renderRows(tab: PluginSettingsTab): void {
-  for (const definition of tab.getSettingDefinitions()) {
+  for (const definition of getRowDefinitions(tab)) {
     if ('render' in definition) {
       definition.render(new SettingEx(tab.containerEl), castTo<SettingGroup>(null));
     }
@@ -130,6 +142,8 @@ describe('PluginSettingsTab', () => {
   let settings: PluginSettings;
   let saveToFile: ReturnType<typeof vi.fn<typeof noopAsync>>;
   let processConfigChanges: ReturnType<typeof vi.fn<() => Promise<void>>>;
+  let refreshLocalPatterns: ReturnType<typeof vi.fn<() => Promise<void>>>;
+  let saveLocalPatterns: ReturnType<typeof vi.fn<(text: string) => Promise<void>>>;
   let tab: PluginSettingsTab;
 
   beforeEach(() => {
@@ -137,8 +151,13 @@ describe('PluginSettingsTab', () => {
     saveToFile = vi.fn<typeof noopAsync>(() => noopAsync());
     processConfigChanges = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
 
+    refreshLocalPatterns = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
+    saveLocalPatterns = vi.fn<(text: string) => Promise<void>>().mockResolvedValue(undefined);
     ignorePatternsComponent = strictProxy<IgnorePatternsComponent>({
-      processConfigChanges
+      getLocalPatternsText: () => '# header\nlocal/',
+      processConfigChanges,
+      refreshLocalPatterns,
+      saveLocalPatterns
     });
 
     mocks.openedEditors.length = 0;
@@ -182,7 +201,7 @@ describe('PluginSettingsTab', () => {
       settingsState: {
         effectiveValues: settings,
         inputValues: settings,
-        validationMessages: { excludeMode: '', obsidianIgnoreContent: '', profiles: '', shouldHideEmptyFolders: '', shouldIgnoreExcludedFiles: '', shouldIncludeGitIgnorePatterns: '', shouldIncludeObsidianIgnorePatterns: '' }
+        validationMessages: { excludeMode: '', ignorePatterns: '', profiles: '', shouldHideEmptyFolders: '', shouldIgnoreExcludedFiles: '', shouldIncludeGitIgnorePatterns: '' }
       }
     });
 
@@ -205,11 +224,20 @@ describe('PluginSettingsTab', () => {
       expect(tab.containerEl.children.length).toBeGreaterThan(0);
     });
 
-    it('should declare a Hide empty folders setting', () => {
-      const names = tab.getSettingDefinitions().map((definition) => 'name' in definition ? definition.name : '');
+    it('should declare the global and local pattern rows, each in its own section, and the options', () => {
+      const headings = tab.getSettingDefinitions().map((definition) => 'heading' in definition ? definition.heading : '');
+      const names = getRowDefinitions(tab).map((definition) => 'name' in definition ? definition.name : '');
 
+      expect(headings).toStrictEqual([
+        'Every device: plugin settings, carried by Obsidian Sync',
+        'This device: .obsidianignore, not carried by Obsidian Sync',
+        'Options',
+        'Profiles'
+      ]);
+      expect(names).toContain('Global patterns');
+      expect(names).toContain('Local patterns');
       expect(names).toContain('Hide empty folders');
-      expect(names).toContain('Include .obsidianignore patterns');
+      expect(names).not.toContain('Include .obsidianignore patterns');
     });
   });
 
@@ -319,6 +347,31 @@ describe('PluginSettingsTab', () => {
 
       expect(editAndSave).not.toHaveBeenCalled();
       expect(settings.profiles).toHaveLength(2);
+    });
+  });
+
+  describe('Local patterns', () => {
+    it('should show .obsidianignore as the component reads it, and save every edit to it', async () => {
+      const onChangeHandlers: ((value: string) => unknown)[] = [];
+      const onChangeSpy = vi.spyOn(TextAreaComponent.prototype, 'onChange')
+        .mockImplementation(function captureOnChange(this: TextAreaComponent, callback): TextAreaComponent {
+          onChangeHandlers.push(callback);
+          return this;
+        });
+      renderRows(tab);
+      onChangeSpy.mockRestore();
+
+      const textAreas = [...tab.containerEl.querySelectorAll('textarea')];
+      expect(textAreas.map((textArea) => textArea.value)).toContain('# header\nlocal/');
+      // Rendering re-reads the file, which may have changed with no event for it.
+      await waitForAllAsyncOperations();
+      expect(refreshLocalPatterns).toHaveBeenCalled();
+
+      // The global row binds its text area through the base; the local row's is the only one with its own handler.
+      onChangeHandlers.at(-1)?.('# header\nlocal/\nmore/');
+      await waitForAllAsyncOperations();
+
+      expect(saveLocalPatterns).toHaveBeenCalledWith('# header\nlocal/\nmore/');
     });
   });
 

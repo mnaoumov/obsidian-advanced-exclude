@@ -7,7 +7,7 @@ const PLUGIN_ID = 'advanced-exclude';
 
 interface DemoSettingsPatch {
   excludeMode?: string;
-  obsidianIgnoreContent?: string;
+  ignorePatterns?: string;
   shouldHideEmptyFolders?: boolean;
   shouldIgnoreExcludedFiles?: boolean;
   shouldIncludeGitIgnorePatterns?: boolean;
@@ -23,8 +23,8 @@ interface DemoSettingsPatch {
  * Manual equivalent: paste the same lines into **Ignore patterns** in **Settings -> Community plugins
  * -> `Advanced Exclude`** and click **Apply**.
  */
-export async function setIgnorePatterns(app: App, obsidianIgnoreContent: string): Promise<void> {
-  await configureCommunityPlugin({ app, pluginId: PLUGIN_ID, settings: { obsidianIgnoreContent } });
+export async function setIgnorePatterns(app: App, ignorePatterns: string): Promise<void> {
+  await configureCommunityPlugin({ app, pluginId: PLUGIN_ID, settings: { ignorePatterns } });
   new Notice('Patterns applied. Look at the Files pane.');
 }
 

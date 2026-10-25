@@ -15,15 +15,13 @@ export interface SettingsProfile {
   shouldHideEmptyFolders?: boolean | undefined;
   shouldIgnoreExcludedFiles?: boolean | undefined;
   shouldIncludeGitIgnorePatterns?: boolean | undefined;
-  shouldIncludeObsidianIgnorePatterns?: boolean | undefined;
 }
 
 export class PluginSettings {
   public excludeMode: ExcludeMode = ExcludeMode.Full;
-  public obsidianIgnoreContent = '';
+  public ignorePatterns = '';
   public profiles: SettingsProfile[] = [];
   public shouldHideEmptyFolders = false;
   public shouldIgnoreExcludedFiles = false;
   public shouldIncludeGitIgnorePatterns = false;
-  public shouldIncludeObsidianIgnorePatterns = false;
 }

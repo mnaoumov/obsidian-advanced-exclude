@@ -4,7 +4,7 @@
 
 [Obsidian](https://obsidian.md/)'s `Files and links > Excluded files` setting does less than its name suggests: excluded files still sit in the Files pane, still turn up in Backlinks, still appear in search. They are de-emphasized, not excluded.
 
-This plugin makes them behave as though they are not there, and lets you say which ones with [`gitignore`](https://git-scm.com/docs/gitignore) syntax — the pattern language you already know — kept in the plugin settings so [`Obsidian Sync`](https://help.obsidian.md/sync) carries them, plus, if you like, a `.obsidianignore` file, your existing `.gitignore`, or Obsidian's own setting.
+This plugin makes them behave as though they are not there, and lets you say which ones with [`gitignore`](https://git-scm.com/docs/gitignore) syntax — the pattern language you already know — kept in two places: global patterns in the plugin settings, which [`Obsidian Sync`](https://help.obsidian.md/sync) carries to every device, and local patterns in a `.obsidianignore` file for this device only. Your existing `.gitignore` and Obsidian's own setting can feed it too.
 
 > [!WARNING]
 >
@@ -43,9 +43,9 @@ A copy of the vault ships with every release. You can access it via any of the f
 
 ## What it does
 
-- **Exclude with `gitignore` syntax** — a folder, an extension, a path, in a settings text area whose patterns sync with your vault. A line starting with `#` is a comment, as in `.gitignore`; write `\#` for a pattern that really starts with `#`. [01 Exclude a folder](<./demo-vault/01 Exclude a folder.md>)
+- **Exclude with `gitignore` syntax** — a folder, an extension, a path, in two settings text areas: global patterns that sync with your vault, and local patterns kept in `.obsidianignore` for one device. A line starting with `#` is a comment, as in `.gitignore`; write `\#` for a pattern that really starts with `#`. [01 Exclude a folder](<./demo-vault/01 Exclude a folder.md>)
 - **Whitelist instead of blacklist**, including the negation trap that catches most people: once `*` ignores everything, folders must be re-included with `!*/` before any `!file` rule can reach inside them. [02 Whitelist with negation](<./demo-vault/02 Whitelist with negation.md>)
-- **Choose where patterns come from and how hard they hide** — a per-device `.obsidianignore`, your `.gitignore`, Obsidian's own `Excluded files` setting, and how completely an ignored file disappears. The extra sources are off by default, so a fresh install changes nothing until you turn one on. [03 Exclude mode and sources](<./demo-vault/03 Exclude mode and sources.md>)
+- **Choose where patterns come from and how hard they hide** — your `.gitignore`, Obsidian's own `Excluded files` setting, and how completely an ignored file disappears. The extra sources are off by default, so a fresh install changes nothing until you turn one on. [03 Exclude mode and sources](<./demo-vault/03 Exclude mode and sources.md>)
 - **Hide folders left empty by exclusion**, cascading up through parents whose whole subtree went away. Genuinely empty folders stay visible. [04 Settings](<./demo-vault/04 Settings.md>)
 - **Switch between profiles** — named sets of patterns and settings that compose with `@import`, so `Focus` can import `Work` and add its own lines, with `!negation` working across them as in one `.gitignore`. `@import file:<vault path>` pastes a vault file's patterns the same way, so `@import file:.gitignore` places the vault's `.gitignore` anywhere in a profile. The profiles sync with the vault; each device picks its own active one from the status bar. [05 Profiles](<./demo-vault/05 Profiles.md>)
 
