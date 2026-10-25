@@ -124,9 +124,13 @@ export class PublishCompatibilityWarningComponent extends LayoutReadyComponent {
       addButton({
         containerEl: buttonsEl,
         listener: convertAsyncToSync(() => this.disableThisPlugin()),
+        // One inline `span`: a `button` is a flex container, so loose text runs would each become a flex item and
+        // lose the space before the `code`.
         text: createFragment((buttonText) => {
-          buttonText.appendText('Disable ');
-          appendCodeBlock(buttonText, 'Advanced Exclude');
+          buttonText.createSpan({}, (span) => {
+            span.appendText('Disable ');
+            appendCodeBlock(span, 'Advanced Exclude');
+          });
         })
       });
       addButton({ containerEl: buttonsEl, listener: convertAsyncToSync(() => this.switchToFilesPaneMode()), text: 'Switch to Files Pane mode' });

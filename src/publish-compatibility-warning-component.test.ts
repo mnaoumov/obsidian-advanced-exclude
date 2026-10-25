@@ -113,6 +113,18 @@ describe('PublishCompatibilityWarningComponent', () => {
     expect(getButton(fragment, 'Disable Advanced Exclude').querySelector('code')?.textContent).toBe('Advanced Exclude');
   });
 
+  it('should keep the Disable Advanced Exclude label in one inline span so the flex button keeps its space', () => {
+    const harness = createHarness({ excludeMode: ExcludeMode.Full, publishEnabled: true });
+    harness.component.load();
+    harness.fireSaveSettings();
+
+    const button = getButton(getFragment(showNoticeMock.mock.calls[0]?.[0]), 'Disable Advanced Exclude');
+    expect(button.childNodes).toHaveLength(1);
+    const label = button.firstElementChild;
+    expect(label?.tagName).toBe('SPAN');
+    expect(label?.textContent).toBe('Disable Advanced Exclude');
+  });
+
   it('should validate on layout ready', async () => {
     vi.useFakeTimers();
     const harness = createHarness({ excludeMode: ExcludeMode.Full, publishEnabled: true });
