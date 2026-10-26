@@ -118,9 +118,10 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginSettings> {
                   textArea.inputEl.addClass('ignore-patterns-control');
                   textArea
                     .setValue(this.ignorePatternsComponent.getLocalPatternsText())
-                    .onChange(convertAsyncToSync(async (value: string) => {
-                      await this.ignorePatternsComponent.saveLocalPatterns(value);
-                    }));
+                    .onChange((value: string) => {
+                      // Written once the typing pauses; the tab's hide and Apply write a waiting text first.
+                      this.ignorePatternsComponent.scheduleLocalPatternsSave(value);
+                    });
                   addPatternFindings(setting, textArea.inputEl);
                 });
               this.addApplyButton(setting);

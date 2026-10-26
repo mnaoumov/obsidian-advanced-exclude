@@ -143,7 +143,7 @@ describe('PluginSettingsTab', () => {
   let saveToFile: ReturnType<typeof vi.fn<typeof noopAsync>>;
   let processConfigChanges: ReturnType<typeof vi.fn<() => Promise<void>>>;
   let refreshLocalPatterns: ReturnType<typeof vi.fn<() => Promise<void>>>;
-  let saveLocalPatterns: ReturnType<typeof vi.fn<(text: string) => Promise<void>>>;
+  let scheduleLocalPatternsSave: ReturnType<typeof vi.fn<(text: string) => void>>;
   let tab: PluginSettingsTab;
 
   beforeEach(() => {
@@ -152,12 +152,12 @@ describe('PluginSettingsTab', () => {
     processConfigChanges = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
 
     refreshLocalPatterns = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
-    saveLocalPatterns = vi.fn<(text: string) => Promise<void>>().mockResolvedValue(undefined);
+    scheduleLocalPatternsSave = vi.fn<(text: string) => void>();
     ignorePatternsComponent = strictProxy<IgnorePatternsComponent>({
       getLocalPatternsText: () => '# header\nlocal/',
       processConfigChanges,
       refreshLocalPatterns,
-      saveLocalPatterns
+      scheduleLocalPatternsSave
     });
 
     mocks.openedEditors.length = 0;
@@ -246,7 +246,7 @@ describe('PluginSettingsTab', () => {
         getLocalPatternsText: () => '# header\nbroken[',
         processConfigChanges,
         refreshLocalPatterns,
-        saveLocalPatterns
+        scheduleLocalPatternsSave
       });
       tab = new PluginSettingsTab({ ignorePatternsComponent, plugin: strictProxy<Plugin>({ app: app.asOriginalType__() }), pluginSettingsComponent });
 
@@ -371,7 +371,7 @@ describe('PluginSettingsTab', () => {
   });
 
   describe('Local patterns', () => {
-    it('should show .obsidianignore as the component reads it, and save every edit to it', async () => {
+    it('should show .obsidianignore as the component reads it, and hand every edit to it to save', async () => {
       const onChangeHandlers: ((value: string) => unknown)[] = [];
       const onChangeSpy = vi.spyOn(TextAreaComponent.prototype, 'onChange')
         .mockImplementation(function captureOnChange(this: TextAreaComponent, callback): TextAreaComponent {
@@ -391,7 +391,7 @@ describe('PluginSettingsTab', () => {
       onChangeHandlers.at(-1)?.('# header\nlocal/\nmore/');
       await waitForAllAsyncOperations();
 
-      expect(saveLocalPatterns).toHaveBeenCalledWith('# header\nlocal/\nmore/');
+      expect(scheduleLocalPatternsSave).toHaveBeenCalledWith('# header\nlocal/\nmore/');
     });
   });
 

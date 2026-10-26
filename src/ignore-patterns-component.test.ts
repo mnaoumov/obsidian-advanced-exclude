@@ -888,7 +888,7 @@ describe('IgnorePatternsComponent', () => {
       }
     });
 
-    it('should handle saveSettings event', async () => {
+    it('should judge files by the applied patterns until the tab applies a save made while it is open', async () => {
       setupIndexedDatabase();
       const pluginSettingsComponent = createPluginSettingsComponent();
       const component = createComponent({ pluginSettingsComponent });
@@ -900,6 +900,9 @@ describe('IgnorePatternsComponent', () => {
         (pluginSettingsComponent.settings as PluginSettings).ignorePatterns = 'new-pattern';
         await callback();
 
+        // A file created while the patterns are being typed is judged by the applied ones.
+        expect(component.isIgnored({ isFolder: false, normalizedPath: 'new-pattern' })).toBe(false);
+        await component.processConfigChanges();
         expect(component.isIgnored({ isFolder: false, normalizedPath: 'new-pattern' })).toBe(true);
       } else {
         expect.fail('saveSettings event was not registered');
@@ -1301,7 +1304,7 @@ describe('IgnorePatternsComponent', () => {
       expect(component.getLocalPatternsText()).toBe('# mine\nlocal/\n');
     });
 
-    it('should save to the file keeping its line ending, match at once, and apply on the tab\'s hide while it is open', async () => {
+    it('should save to the file keeping its line ending, and judge by the applied patterns until the tab\'s hide while it is open', async () => {
       setupIndexedDatabase();
       vi.mocked(readIfExists).mockResolvedValueOnce('old/\r\n');
       const onUpdateFileTree = vi.fn().mockResolvedValue(undefined);
@@ -1312,12 +1315,72 @@ describe('IgnorePatternsComponent', () => {
       await component.saveLocalPatterns('new/\n');
 
       expect(writeSafe).toHaveBeenCalledWith({ app: expect.anything() as unknown, content: 'new/\r\n', path: '.obsidianignore' });
-      expect(component.isIgnored({ isFolder: true, normalizedPath: 'old' })).toBe(false);
-      expect(component.isIgnored({ isFolder: true, normalizedPath: 'new' })).toBe(true);
+      // `new` is a folder created mid-edit: no verdict was cached for it.
+      expect(component.isIgnored({ isFolder: true, normalizedPath: 'old' })).toBe(true);
+      expect(component.isIgnored({ isFolder: true, normalizedPath: 'new' })).toBe(false);
       expect(onUpdateFileTree).not.toHaveBeenCalled();
 
       await component.processConfigChanges();
       expect(onUpdateFileTree).toHaveBeenCalledOnce();
+      expect(component.isIgnored({ isFolder: true, normalizedPath: 'old' })).toBe(false);
+      expect(component.isIgnored({ isFolder: true, normalizedPath: 'new' })).toBe(true);
+    });
+
+    it('should write a burst of edits once the typing pauses, and show the waiting text meanwhile', async () => {
+      setupIndexedDatabase();
+      const onUpdateFileTree = vi.fn().mockResolvedValue(undefined);
+      const component = createComponent({ onUpdateFileTree });
+      await component.loadWithPromises();
+      vi.mocked(writeSafe).mockClear();
+
+      component.scheduleLocalPatternsSave('a');
+      await vi.advanceTimersByTimeAsync(300);
+      component.scheduleLocalPatternsSave('ab');
+      await vi.advanceTimersByTimeAsync(300);
+      component.scheduleLocalPatternsSave('ab/');
+      expect(writeSafe).not.toHaveBeenCalled();
+      expect(component.getLocalPatternsText()).toBe('ab/');
+
+      await vi.advanceTimersByTimeAsync(500);
+
+      expect(writeSafe).toHaveBeenCalledExactlyOnceWith({ app: expect.anything() as unknown, content: expect.stringMatching(/^ab\/\r?\n?$/u) as unknown, path: '.obsidianignore' });
+      expect(component.getLocalPatternsText()).toBe('ab/');
+      // Saved, not applied: the tab is open.
+      expect(onUpdateFileTree).not.toHaveBeenCalled();
+      expect(component.isIgnored({ isFolder: true, normalizedPath: 'ab' })).toBe(false);
+    });
+
+    it('should write and apply the waiting text on the tab\'s hide or Apply, before the pause ends', async () => {
+      setupIndexedDatabase();
+      const onUpdateFileTree = vi.fn().mockResolvedValue(undefined);
+      const component = createComponent({ onUpdateFileTree });
+      await component.loadWithPromises();
+      vi.mocked(writeSafe).mockClear();
+
+      component.scheduleLocalPatternsSave('latest/');
+      await component.processConfigChanges();
+
+      expect(writeSafe).toHaveBeenCalledOnce();
+      expect(onUpdateFileTree).toHaveBeenCalledOnce();
+      expect(component.isIgnored({ isFolder: true, normalizedPath: 'latest' })).toBe(true);
+      // The pause ending later finds nothing left to write.
+      await vi.runAllTimersAsync();
+      expect(writeSafe).toHaveBeenCalledOnce();
+    });
+
+    it('should write the waiting text on unload without applying it', async () => {
+      setupIndexedDatabase();
+      const onUpdateFileTree = vi.fn().mockResolvedValue(undefined);
+      const component = createComponent({ onUpdateFileTree });
+      await component.loadWithPromises();
+      vi.mocked(writeSafe).mockClear();
+
+      component.scheduleLocalPatternsSave('typed/');
+      component.unload();
+      await vi.runAllTimersAsync();
+
+      expect(writeSafe).toHaveBeenCalledOnce();
+      expect(onUpdateFileTree).not.toHaveBeenCalled();
     });
 
     it('should tell its listeners when an empty file is deleted, though no pattern changed', async () => {
@@ -1486,7 +1549,8 @@ describe('IgnorePatternsComponent', () => {
       setupIndexedDatabase();
       vi.mocked(readSafe).mockResolvedValue('');
       const pluginSettingsComponent = createPluginSettingsComponent();
-      const component = createComponent({ pluginSettingsComponent });
+      // Closed: a save made while the tab is open waits for its hide.
+      const component = createComponent({ isSettingsTabOpen: () => false, pluginSettingsComponent });
       await component.loadWithPromises();
 
       // Populate fileIgnoreMap by calling isIgnored — no patterns loaded, so not ignored
