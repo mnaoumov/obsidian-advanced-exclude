@@ -51,6 +51,21 @@ A copy of the vault ships with every release. You can access it via any of the f
 - **Hide folders left empty by exclusion**, cascading up through parents whose whole subtree went away. Genuinely empty folders stay visible. [04 Settings](<./demo-vault/04 Settings.md>)
 - **Switch between profiles** — named sets of patterns and settings that compose with `@import`, so `Focus` can import `Work` and add its own lines, with `!negation` working across them as in one `.gitignore`. `@import file:<vault path>` pastes a vault file's patterns the same way, so `@import file:.gitignore` places the vault's `.gitignore` anywhere in a profile. The profiles sync with the vault; each device picks its own active one from the status bar. [05 Profiles](<./demo-vault/05 Profiles.md>)
 
+## Similar plugins
+
+- [`Ignore`](https://community.obsidian.md/plugins/ignore) — reads a `.obsidianignore` file in `gitignore` syntax and writes it into Obsidian's own `Excluded files` list, so the files stay in Obsidian's index; it has no synced patterns, profiles or pattern checks, and this plugin can take files out of the index altogether.
+- [`Sieve`](https://community.obsidian.md/plugins/sieve) — skips files and folders while Obsidian scans the vault, with Syncthing-style rules where the first matching rule wins, and can give a vault a display name; its rules are not `gitignore` syntax.
+- [`File Ignore`](https://community.obsidian.md/plugins/file-ignore) — hides a file by renaming it on disk with a leading dot, which Obsidian never indexes, so the exclusion travels with the file itself; this plugin leaves file names untouched.
+- [`Shadow Tree`](https://community.obsidian.md/plugins/shadow-tree) — hides folders from the file explorer when nothing below them counts as content or a `.gitignore`-style pattern matches them, with per-folder pins and an optional Sync exclusion; it filters the explorer view rather than Obsidian's index.
+- [`File Explorer++`](https://community.obsidian.md/plugins/file-explorer-plus) — hides and pins files and folders in the file explorer by wildcard or regular-expression filters on names, paths and tags; it adds pinning, which this plugin does not, and hides from the explorer only.
+- [`Hide Folders`](https://community.obsidian.md/plugins/hide-folders) — toggles the visibility of folders with configured names, such as attachment folders, in the file explorer; it matches folder names rather than patterns.
+- [`Explorer Hider`](https://community.obsidian.md/plugins/explorer-hider) — hides files and folders picked from the context menu in the file explorer and bookmarks, through auto-managed CSS; the files stay in Obsidian's index.
+- [`File Hider`](https://community.obsidian.md/plugins/OA-file-hider) — hides files and folders picked from the context menu in the file explorer, with a command to toggle them back into view.
+- [`Toggle Excluded Folders`](https://community.obsidian.md/plugins/toggle-excluded-folders) — switches Obsidian's own `Excluded files` list off and back on with one click; it keeps no patterns of its own.
+- [`Ignore Filters Boost`](https://community.obsidian.md/plugins/ignore-filters-boost) — adds and removes folders in Obsidian's own `Excluded files` list from the file explorer, including excluding everything except one folder; it edits the native setting rather than extending it.
+
+Last searched for similar plugins on 2026-10-26.
+
 ## Installation
 
 The plugin is available in [the official Community Plugins repository](https://community.obsidian.md/plugins/advanced-exclude).
