@@ -239,6 +239,26 @@ describe('PluginSettingsTab', () => {
       expect(names).toContain('Hide empty folders');
       expect(names).not.toContain('Include .obsidianignore patterns');
     });
+
+    it('should show the findings of the global and local patterns under their boxes, taking directives literally', () => {
+      settings.ignorePatterns = 'ok/\n@import Work';
+      ignorePatternsComponent = strictProxy<IgnorePatternsComponent>({
+        getLocalPatternsText: () => '# header\nbroken[',
+        processConfigChanges,
+        refreshLocalPatterns,
+        saveLocalPatterns
+      });
+      tab = new PluginSettingsTab({ ignorePatternsComponent, plugin: strictProxy<Plugin>({ app: app.asOriginalType__() }), pluginSettingsComponent });
+
+      renderRows(tab);
+
+      const findingsEls = [...tab.containerEl.querySelectorAll('.advanced-exclude-pattern-findings')].filter((el) => el.parentElement?.classList.contains('advanced-exclude-pattern-control') ?? false);
+      expect(findingsEls.map((el) => el.textContent))
+        .toStrictEqual([
+          'Line 2: @import and @reset work only in a profile. Here this line is a pattern for a name that starts with @.',
+          String.raw`Line 2: The [ at column 7 is never closed, so this line matches nothing. Write \[ for a bracket.`
+        ]);
+    });
   });
 
   describe('Apply button', () => {

@@ -40,6 +40,10 @@ export interface EffectiveSettings extends ProfileScalarSettings {
   */
   readonly importedFilePaths: readonly string[];
   /**
+  The profile whose `@import file:` line first imports each of {@link importedFilePaths}.
+  */
+  readonly importingProfileNames: ReadonlyMap<string, string>;
+  /**
   The expanded pattern lines, each labelled with the profile it came from.
   */
   readonly lines: readonly ResolvedPatternLine[];
@@ -59,7 +63,8 @@ export interface ResolveProfileSettings extends Readonly<ProfileScalarSettings> 
 interface ExpansionState {
   readonly errors: ProfileError[];
   readonly importedFileContents: ImportedFileContents;
-  readonly importedFilePaths: Set<string>;
+  // Its keys, in insertion order, are the imported paths.
+  readonly importingProfileNames: Map<string, string>;
   lines: ResolvedPatternLine[];
   readonly profiles: readonly Readonly<SettingsProfile>[];
   scalars: ProfileScalarSettings;
@@ -188,6 +193,7 @@ export function resolveProfile(params: ResolveProfileParams): EffectiveSettings 
       errors: [],
       ignorePatterns: settings.ignorePatterns,
       importedFilePaths: [],
+      importingProfileNames: new Map(),
       lines: splitLines(settings.ignorePatterns).map((text) => ({ profileName: null, text }))
     };
   }
@@ -195,7 +201,7 @@ export function resolveProfile(params: ResolveProfileParams): EffectiveSettings 
   const state: ExpansionState = {
     errors: [],
     importedFileContents,
-    importedFilePaths: new Set(),
+    importingProfileNames: new Map(),
     lines: splitLines(settings.ignorePatterns).map((text) => ({ profileName: null, text })),
     profiles: settings.profiles,
     scalars: baseScalars
@@ -207,7 +213,8 @@ export function resolveProfile(params: ResolveProfileParams): EffectiveSettings 
     activeProfile,
     errors: state.errors,
     ignorePatterns: state.lines.map((line) => line.text).join('\n'),
-    importedFilePaths: [...state.importedFilePaths],
+    importedFilePaths: [...state.importingProfileNames.keys()],
+    importingProfileNames: state.importingProfileNames,
     lines: state.lines
   };
 }
@@ -244,7 +251,9 @@ function expandFileImport(state: ExpansionState, profile: Readonly<SettingsProfi
   }
 
   const filePath = normalizePath(trimmedPath);
-  state.importedFilePaths.add(filePath);
+  if (!state.importingProfileNames.has(filePath)) {
+    state.importingProfileNames.set(filePath, profile.name);
+  }
   // A missing file imports nothing, without an error: an optional per-device file is a normal thing to import.
   const content = state.importedFileContents.get(filePath) ?? '';
   for (const text of splitLines(content)) {

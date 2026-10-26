@@ -65,9 +65,16 @@ describe('ProfileEditModal', () => {
   it('should show the errors of the edited patterns as they are typed', () => {
     const { modal } = openModal({ id: 'work', name: 'Work', patterns: '' });
 
-    typeInto(getTextArea(modal), 'a/\n@import Missing');
+    typeInto(getTextArea(modal), 'a/\n@import Missing\n\\@x[');
 
-    expect(modal.contentEl.textContent).toContain('Work, line 2: Unknown profile `Missing`.');
+    expect([...modal.contentEl.querySelectorAll('.advanced-exclude-pattern-finding')].map((el) => [el.className, el.textContent])).toStrictEqual([
+      ['advanced-exclude-pattern-finding advanced-exclude-pattern-finding-error', 'Work, line 2: Unknown profile Missing.'],
+      [
+        'advanced-exclude-pattern-finding advanced-exclude-pattern-finding-error',
+        String.raw`Work, line 3: The [ at column 4 is never closed, so this line matches nothing. Write \[ for a bracket.`
+      ]
+    ]);
+    expect(modal.contentEl.textContent).not.toContain('None.');
   });
 
   it('should save the edited name, patterns and overrides', async () => {

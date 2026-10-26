@@ -13,6 +13,7 @@ import {
   Setting
 } from 'obsidian';
 
+import type { SourcedPatternFinding } from './pattern-findings-view.ts';
 import type {
   PluginSettings,
   SettingsProfile
@@ -23,6 +24,11 @@ import type {
 } from './profiles.ts';
 
 import { readIfExists } from './data-adapter-safe.ts';
+import { renderPatternFindings } from './pattern-findings-view.ts';
+import {
+  PatternFindingSeverity,
+  validatePatterns
+} from './pattern-validation.ts';
 import { ExcludeMode } from './plugin-settings.ts';
 import {
   FILE_IMPORT_PREFIX,
@@ -62,12 +68,13 @@ interface ProfileEditModalConstructorParams {
 export class ProfileEditModal extends Modal {
   private readonly draft: SettingsProfile;
   // Created detached, so an input handler can always reach them; onOpen puts them in place.
-  private readonly errorsEl = createDiv();
   private readonly expansionEl = createEl('pre', { cls: 'advanced-exclude-profile-expansion' });
   private readonly importedFileContents: Map<string, null | string>;
   private readonly nameErrorEl = createDiv({ cls: 'advanced-exclude-profile-error' });
   private readonly onSave: (profile: SettingsProfile) => Promise<void>;
   private readonly originalName: string;
+  // The expansion's errors and the findings of the draft's own lines.
+  private readonly problemsEl = createDiv({ cls: 'advanced-exclude-pattern-findings' });
   private readonly settings: ResolveProfileSettings;
 
   public constructor(params: ProfileEditModalConstructorParams) {
@@ -139,8 +146,8 @@ export class ProfileEditModal extends Modal {
     this.addBooleanSetting('shouldIgnoreExcludedFiles', 'Ignore excluded files');
     this.addBooleanSetting('shouldHideEmptyFolders', 'Hide empty folders');
 
-    contentEl.createEl('h4', { text: 'Errors' });
-    contentEl.append(this.errorsEl);
+    contentEl.createEl('h4', { text: 'Problems' });
+    contentEl.append(this.problemsEl);
     contentEl.createEl('h4', { text: 'Effective patterns when this profile is active' });
     contentEl.append(this.expansionEl);
 
@@ -193,7 +200,7 @@ export class ProfileEditModal extends Modal {
   }
 
   private renderResolution(): void {
-    const { errorsEl, expansionEl } = this;
+    const { expansionEl, problemsEl } = this;
     const otherProfiles = this.settings.profiles.filter((profile) => profile.id !== this.draft.id);
     const effectiveSettings = resolveProfile({
       activeProfileId: this.draft.id,
@@ -205,15 +212,18 @@ export class ProfileEditModal extends Modal {
       invokeAsyncSafely(() => this.readFiles(unreadPaths));
     }
 
-    errorsEl.empty();
-    if (effectiveSettings.errors.length === 0) {
-      errorsEl.createDiv({ text: 'None.' });
-    }
-    for (const error of effectiveSettings.errors) {
-      errorsEl.createDiv({
-        cls: 'advanced-exclude-profile-error',
-        text: `${error.profileName}, line ${String(error.lineNumber)}: ${error.message}`
-      });
+    const problems: SourcedPatternFinding[] = [
+      ...effectiveSettings.errors.map((error) => ({
+        lineNumber: error.lineNumber,
+        message: error.message,
+        severity: PatternFindingSeverity.Error,
+        source: error.profileName
+      })),
+      ...validatePatterns({ areDirectivesAllowed: true, text: this.draft.patterns }).map((finding) => ({ ...finding, source: this.draft.name }))
+    ];
+    renderPatternFindings({ findings: problems, findingsEl: problemsEl });
+    if (problems.length === 0) {
+      problemsEl.createDiv({ text: 'None.' });
     }
 
     expansionEl.empty();

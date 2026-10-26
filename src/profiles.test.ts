@@ -70,6 +70,16 @@ describe('resolveProfile', () => {
     expect(result.lines).toStrictEqual([]);
   });
 
+  it('should name the profile that first imports each file', () => {
+    const settings = createSettings({
+      profiles: [profile('Work', '@import file:shared.txt\n@import Base'), profile('Base', '@import file:base.txt\n@import file:shared.txt')]
+    });
+
+    const result = resolveProfile({ activeProfileId: 'work', settings });
+
+    expect([...result.importingProfileNames]).toStrictEqual([['shared.txt', 'Work'], ['base.txt', 'Base']]);
+  });
+
   it('should list no imported files when no profile is active', () => {
     expect(resolveProfile({ activeProfileId: null, settings: createSettings({}) }).importedFilePaths).toStrictEqual([]);
   });

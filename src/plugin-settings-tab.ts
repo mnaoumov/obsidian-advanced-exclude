@@ -21,6 +21,7 @@ import {
   GIT_IGNORE_FILE,
   OBSIDIAN_IGNORE_FILE
 } from './constants.ts';
+import { attachPatternValidation } from './pattern-findings-view.ts';
 import { ExcludeMode } from './plugin-settings.ts';
 import { ProfileEditModal } from './profile-edit-modal.ts';
 import { getProfileChoices } from './profile-suggest-modal.ts';
@@ -88,6 +89,7 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginSettings> {
                     propertyName: 'ignorePatterns',
                     valueComponent: textArea
                   });
+                  addPatternFindings(setting, textArea.inputEl);
                 });
               this.addApplyButton(setting);
             }
@@ -119,6 +121,7 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginSettings> {
                     .onChange(convertAsyncToSync(async (value: string) => {
                       await this.ignorePatternsComponent.saveLocalPatterns(value);
                     }));
+                  addPatternFindings(setting, textArea.inputEl);
                 });
               this.addApplyButton(setting);
             }
@@ -333,4 +336,17 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginSettings> {
     });
     this.refresh();
   }
+}
+
+/**
+ * Shows the findings of the setting's pattern box under it, live. The global and local patterns are taken literally,
+ * so no directive is allowed in them.
+ */
+function addPatternFindings(setting: Setting, textAreaEl: HTMLTextAreaElement): void {
+  setting.controlEl.addClass('advanced-exclude-pattern-control');
+  attachPatternValidation({
+    areDirectivesAllowed: false,
+    findingsEl: setting.controlEl.createDiv({ cls: 'advanced-exclude-pattern-findings' }),
+    textAreaEl
+  });
 }

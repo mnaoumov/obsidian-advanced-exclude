@@ -3,6 +3,31 @@
     height: 200px;
     width: 300px;
   }
+
+  // The findings take a row of their own under the pattern box and its Apply button.
+  .advanced-exclude-pattern-control {
+    flex-wrap: wrap;
+
+    .advanced-exclude-pattern-findings {
+      flex-basis: 100%;
+      order: 1;
+    }
+  }
+}
+
+// Also inside the profile editor, a modal outside `.advanced-exclude`.
+.advanced-exclude-pattern-findings {
+  font-size: var(--font-ui-small);
+  text-align: start;
+  user-select: text;
+}
+
+.advanced-exclude-pattern-finding-error {
+  color: var(--text-error);
+}
+
+.advanced-exclude-pattern-finding-warning {
+  color: var(--text-warning);
 }
 
 // Rendered inside a Notice (attached to document body), so it lives outside `.advanced-exclude`.

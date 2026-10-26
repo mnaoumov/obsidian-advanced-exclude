@@ -9,8 +9,10 @@
   "dictionaryDefinitions": [],
   "dictionaries": [],
   "words": [
+    "alnum",
     "backlink",
     "Backlinks",
+    "cntrl",
     "czrc",
     "dblclick",
     "FEFF",
@@ -29,6 +31,7 @@
     "pagehide",
     "pmpm",
     "Promisable",
+    "punct",
     "reimplementation",
     "reprojection",
     "smol",
@@ -39,6 +42,8 @@
     "unvalidated",
     "visibilitychange",
     "wdio",
+    "wildmatch",
+    "xdigit",
     "yieldable"
   ],
   "ignoreWords": [],
