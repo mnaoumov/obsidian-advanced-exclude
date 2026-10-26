@@ -1,9 +1,11 @@
+import type { PluginNoticeComponent } from '@mnaoumov/obsidian-lib/components/plugin-notice-component';
 import type {
   App as AppOriginal,
   EventRef
 } from 'obsidian';
 
 import { registerAsyncEvent } from '@mnaoumov/obsidian-lib/components/async-events-component';
+import { PluginNoticeMode } from '@mnaoumov/obsidian-lib/components/plugin-notice-component';
 import { ensureMetadataCacheReady } from '@mnaoumov/obsidian-lib/metadata-cache';
 import { invokeAsyncSafelyAfterDelay } from '@mnaoumov/typescript-lib/async';
 import { noop } from '@mnaoumov/typescript-lib/function';
@@ -34,7 +36,10 @@ import {
   statSafe,
   writeSafe
 } from './data-adapter-safe.ts';
-import { IgnorePatternsComponent } from './ignore-patterns-component.ts';
+import {
+  IgnorePatternsComponent,
+  REPORTED_MISSING_IMPORTS_LOCAL_STORAGE_KEY
+} from './ignore-patterns-component.ts';
 import { LOCAL_PATTERNS_HEADER } from './local-patterns.ts';
 import { PluginSettings } from './plugin-settings.ts';
 import { resolveProfile } from './profiles.ts';
@@ -74,6 +79,7 @@ interface CreateComponentOverrides {
   app?: AppOriginal;
   isSettingsTabOpen?: () => boolean;
   onUpdateFileTree?: () => Promise<void>;
+  pluginNoticeComponent?: PluginNoticeComponent;
   pluginSettingsComponent?: PluginSettingsComponent;
 }
 
@@ -169,6 +175,7 @@ function createComponent(overrides?: CreateComponentOverrides): TestIgnorePatter
     // Open by default, so a save only raises the pending change, as it did before saves outside the tab applied.
     isSettingsTabOpen: overrides?.isSettingsTabOpen ?? ((): boolean => true),
     onUpdateFileTree: overrides?.onUpdateFileTree ?? vi.fn().mockResolvedValue(undefined),
+    pluginNoticeComponent: overrides?.pluginNoticeComponent ?? createPluginNoticeComponent(),
     pluginSettingsComponent: overrides?.pluginSettingsComponent ?? createPluginSettingsComponent()
   });
 }
@@ -199,6 +206,12 @@ function createMockTransaction(stores: Record<string, MockIDBObjectStore>): Mock
   };
 }
 
+function createPluginNoticeComponent(): PluginNoticeComponent {
+  return strictProxy<PluginNoticeComponent>({
+    showNotice: vi.fn()
+  });
+}
+
 function createPluginSettingsComponent(settings?: Partial<PluginSettings>, profileState?: ProfileState): PluginSettingsComponent {
   const effectiveSettings = new PluginSettings();
   if (settings) {
@@ -226,6 +239,10 @@ function createPluginSettingsComponent(settings?: Partial<PluginSettings>, profi
     setProperty: vi.fn().mockResolvedValue(''),
     settings: effectiveSettings
   });
+}
+
+function getFragmentText(message: DocumentFragment | string | undefined): string {
+  return typeof message === 'string' ? message : message?.textContent ?? '';
 }
 
 function getMtimeEntries(mtimeStore: MockIDBObjectStore): unknown[] {
@@ -1058,6 +1075,54 @@ describe('IgnorePatternsComponent', () => {
 
       expect(onUpdateFileTree).toHaveBeenCalledOnce();
     });
+
+    it('should report a missing imported file once per device, and again only after it existed in between', async () => {
+      const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(noop);
+      const expectedMessage = 'The profile `Work` imports `ignores/work.txt` with `@import file:`, but the file does not exist, so it imports nothing.';
+      mockImportedFileContent(null);
+      setupIndexedDatabase();
+      const app = createApp();
+      app.saveLocalStorage(REPORTED_MISSING_IMPORTS_LOCAL_STORAGE_KEY, null);
+      const vaultOnSpy = vi.spyOn(app.vault, 'on');
+      const pluginNoticeComponent = createPluginNoticeComponent();
+      const component = createComponent({ app, pluginNoticeComponent, pluginSettingsComponent: createPluginSettingsComponent(IMPORT_SETTINGS, { activeProfileId: 'work' }) });
+      await component.loadWithPromises();
+
+      expect(consoleWarnSpy).toHaveBeenCalledExactlyOnceWith(expectedMessage);
+      expect(pluginNoticeComponent.showNotice).toHaveBeenCalledOnce();
+      expect(getFragmentText(vi.mocked(pluginNoticeComponent.showNotice).mock.calls[0]?.[0])).toBe(expectedMessage.replaceAll('`', ''));
+      expect(app.loadLocalStorage(REPORTED_MISSING_IMPORTS_LOCAL_STORAGE_KEY)).toStrictEqual(['ignores/work.txt']);
+
+      // A new load on the same device, as after an app restart: already reported.
+      await createComponent({ app, pluginNoticeComponent, pluginSettingsComponent: createPluginSettingsComponent(IMPORT_SETTINGS, { activeProfileId: 'work' }) }).loadWithPromises();
+      expect(consoleWarnSpy).toHaveBeenCalledOnce();
+
+      const rawListener = getRawListener(vaultOnSpy.mock.calls);
+      mockImportedFileContent('');
+      rawListener('ignores/work.txt');
+      await vi.runAllTimersAsync();
+      expect(app.loadLocalStorage(REPORTED_MISSING_IMPORTS_LOCAL_STORAGE_KEY)).toStrictEqual([]);
+
+      mockImportedFileContent(null);
+      rawListener('ignores/work.txt');
+      await vi.runAllTimersAsync();
+      expect(consoleWarnSpy).toHaveBeenCalledTimes(2);
+    });
+
+    it('should ignore a stored value that is not a list of paths', async () => {
+      vi.spyOn(console, 'warn').mockImplementation(noop);
+      mockImportedFileContent(null);
+      setupIndexedDatabase();
+      const app = createApp();
+      app.saveLocalStorage(REPORTED_MISSING_IMPORTS_LOCAL_STORAGE_KEY, ['ignores/work.txt', 1]);
+      const pluginNoticeComponent = createPluginNoticeComponent();
+      await createComponent({ app, pluginNoticeComponent, pluginSettingsComponent: createPluginSettingsComponent(IMPORT_SETTINGS, { activeProfileId: 'work' }) }).loadWithPromises();
+      expect(pluginNoticeComponent.showNotice).not.toHaveBeenCalled();
+
+      app.saveLocalStorage(REPORTED_MISSING_IMPORTS_LOCAL_STORAGE_KEY, 'ignores/work.txt');
+      await createComponent({ app, pluginNoticeComponent, pluginSettingsComponent: createPluginSettingsComponent(IMPORT_SETTINGS, { activeProfileId: 'work' }) }).loadWithPromises();
+      expect(pluginNoticeComponent.showNotice).toHaveBeenCalledOnce();
+    });
   });
 
   describe('config fingerprint and lazy verdict loading', () => {
@@ -1371,6 +1436,38 @@ describe('IgnorePatternsComponent', () => {
       await vi.runAllTimersAsync();
       expect(listener).toHaveBeenCalledTimes(2);
       expect(component.isIgnored({ isFolder: true, normalizedPath: 'visible' })).toBe(true);
+    });
+
+    it('should report the errors an outside edit brings, once per change, and stay quiet at load and on its own saves', async () => {
+      const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(noop);
+      setupIndexedDatabase();
+      vi.mocked(readIfExists).mockResolvedValueOnce('broken[\n');
+      const pluginNoticeComponent = createPluginNoticeComponent();
+      const component = createComponent({ pluginNoticeComponent });
+      await component.loadWithPromises();
+      expect(consoleWarnSpy).not.toHaveBeenCalled();
+
+      await component.saveLocalPatterns('ok/\n[x\n');
+      expect(consoleWarnSpy).not.toHaveBeenCalled();
+
+      vi.mocked(readIfExists).mockResolvedValueOnce('ok/\ndrive\\\n[a\n./b\n');
+      await component.refreshLocalPatterns();
+      const expectedMessage = '`.obsidianignore`, line 2: A line cannot end with a single `\\`, so this line matches nothing. Write `\\\\` for a backslash. (and 2 more)';
+      expect(consoleWarnSpy).toHaveBeenCalledExactlyOnceWith(expectedMessage);
+      expect(getFragmentText(vi.mocked(pluginNoticeComponent.showNotice).mock.calls[0]?.[0])).toBe(expectedMessage.replaceAll('`', ''));
+      expect(vi.mocked(pluginNoticeComponent.showNotice).mock.calls[0]?.[1]).toStrictEqual({ mode: PluginNoticeMode.Separate });
+
+      // The same errors under another line ending, then a fix that leaves only warnings: nothing new to report.
+      vi.mocked(readIfExists).mockResolvedValueOnce('ok/\r\ndrive\\\r\n[a\r\n./b\r\n');
+      await component.refreshLocalPatterns();
+      vi.mocked(readIfExists).mockResolvedValueOnce('ok/ \n');
+      await component.refreshLocalPatterns();
+      expect(consoleWarnSpy).toHaveBeenCalledOnce();
+
+      vi.mocked(readIfExists).mockResolvedValueOnce('!\n');
+      await component.refreshLocalPatterns();
+      expect(consoleWarnSpy).toHaveBeenLastCalledWith('`.obsidianignore`, line 1: `!` needs a pattern after it.');
+      expect(pluginNoticeComponent.showNotice).toHaveBeenCalledTimes(2);
     });
   });
 

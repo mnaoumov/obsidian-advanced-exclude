@@ -1,5 +1,8 @@
+import type { PluginNoticeComponent } from '@mnaoumov/obsidian-lib/components/plugin-notice-component';
+
 import { registerAsyncEvent } from '@mnaoumov/obsidian-lib/components/async-events-component';
 import { LayoutReadyComponent } from '@mnaoumov/obsidian-lib/components/layout-ready-component';
+import { PluginNoticeMode } from '@mnaoumov/obsidian-lib/components/plugin-notice-component';
 import { ensureMetadataCacheReady } from '@mnaoumov/obsidian-lib/metadata-cache';
 import {
   invokeAsyncSafely,
@@ -35,6 +38,11 @@ import {
   LOCAL_PATTERNS_HEADER,
   normalizeLocalPatterns
 } from './local-patterns.ts';
+import { appendFindingMessage } from './pattern-findings-view.ts';
+import {
+  PatternFindingSeverity,
+  validatePatterns
+} from './pattern-validation.ts';
 
 const DB_VERSION = 1;
 // Bumped whenever the ignore-matching logic changes shape (e.g. the folder verdict
@@ -76,10 +84,17 @@ const DEFAULT_MTIME_ENTRY: DatabaseMtimeEntry = {
   userIgnoreFiltersString: ''
 };
 
+/**
+ * The `app.loadLocalStorage` key of the `@import file:` paths already reported missing on this device, so a missing
+ * file is reported once, not on every app start, until it exists again or is no longer imported.
+ */
+export const REPORTED_MISSING_IMPORTS_LOCAL_STORAGE_KEY = 'advanced-exclude:reported-missing-imports';
+
 interface IgnorePatternsComponentConstructorParams {
   readonly app: App;
   readonly isSettingsTabOpen: (this: void) => boolean;
   readonly onUpdateFileTree: (this: void) => Promise<void>;
+  readonly pluginNoticeComponent: PluginNoticeComponent;
   readonly pluginSettingsComponent: PluginSettingsComponent;
 }
 
@@ -112,7 +127,11 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
   private configFingerprintMatched = false;
   private readonly fileIgnoreMap = new Map<string, boolean>();
   private hadConfigChanges = false;
+  // Whether `.obsidianignore` has been read once: the first read is the plugin loading, not an edit to report.
+  private isLocalPatternsFileRead = false;
   private readonly isSettingsTabOpen: () => boolean;
+  // The errors of `.obsidianignore` last reported (or seen at load), so each change is reported once.
+  private localPatternErrorsKey = '[]';
   private readonly localPatternsChangeListeners = new Set<() => void>();
   // The raw content of `.obsidianignore` as last read or written, or `null` when it does not exist: a save keeps
   // its line ending and byte order mark.
@@ -121,6 +140,7 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
   private localPatternsWrite: Promise<void> = noopAsync();
   private readonly onUpdateFileTree: () => Promise<void>;
   private pendingStoreActions = new Map<string, (store: IDBObjectStore) => void>();
+  private readonly pluginNoticeComponent: PluginNoticeComponent;
   private readonly pluginSettingsComponent: PluginSettingsComponent;
   private readonly processStoreActionsDebounced = debounce(() => {
     this.processStoreActions();
@@ -146,6 +166,7 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
     super(params.app);
     this.isSettingsTabOpen = params.isSettingsTabOpen;
     this.onUpdateFileTree = params.onUpdateFileTree;
+    this.pluginNoticeComponent = params.pluginNoticeComponent;
     this.pluginSettingsComponent = params.pluginSettingsComponent;
   }
 
@@ -379,6 +400,8 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
       await writeSafe({ app: this.app, content, path: OBSIDIAN_IGNORE_FILE });
       this.localPatternsFileContent = content;
       this.cachedLocalPatterns = normalizeLocalPatterns(content);
+      // The tab shows the findings of its own edit; only a later edit made elsewhere is reported.
+      this.checkLocalPatternErrors(false);
     });
     // A failed save must not stop the ones after it; its caller still gets the error.
     this.localPatternsWrite = write.catch(() => undefined);
@@ -409,6 +432,35 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
     // whole vault on every `processConfigChanges`.
     this.pendingStoreActions.set(normalizedPath, storeAction);
     this.processStoreActionsDebounced();
+  }
+
+  /**
+   * Notes the errors of `.obsidianignore` and, when {@link shouldReport} and they changed to some, reports the first
+   * one. Warnings are left to the settings tab.
+   */
+  private checkLocalPatternErrors(shouldReport: boolean): void {
+    const errors = validatePatterns({ areDirectivesAllowed: false, text: this.cachedLocalPatterns })
+      .filter((finding) => finding.severity === PatternFindingSeverity.Error);
+    const errorsKey = JSON.stringify(errors);
+    if (errorsKey === this.localPatternErrorsKey) {
+      return;
+    }
+    this.localPatternErrorsKey = errorsKey;
+    const [firstError] = errors;
+    if (!shouldReport || !firstError) {
+      return;
+    }
+
+    const moreErrors = errors.length > 1 ? ` (and ${String(errors.length - 1)} more)` : '';
+    const message = `\`${OBSIDIAN_IGNORE_FILE}\`, line ${String(firstError.lineNumber)}: ${firstError.message}${moreErrors}`;
+    console.warn(message);
+    // Separate: the edit is applied at once, and the apply's progress notice would otherwise take this one's place.
+    this.pluginNoticeComponent.showNotice(
+      createFragment((f) => {
+        appendFindingMessage(f, message);
+      }),
+      { mode: PluginNoticeMode.Separate }
+    );
   }
 
   private clearCachedExcludeRegExps(): void {
@@ -590,6 +642,7 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
     for (const path of this.pluginSettingsComponent.effectiveSettings.importedFilePaths) {
       contents.set(path, await readIfExists(this.app, path));
     }
+    this.reportMissingImports(contents);
     if (isSameImportedFileContents(this.pluginSettingsComponent.importedFileContents, contents)) {
       return false;
     }
@@ -605,6 +658,8 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
   private async readObsidianIgnore(): Promise<ObsidianIgnoreReadResult> {
     await this.localPatternsWrite;
     const content = await readIfExists(this.app, OBSIDIAN_IGNORE_FILE);
+    const isEdit = this.isLocalPatternsFileRead;
+    this.isLocalPatternsFileRead = true;
     if (content === this.localPatternsFileContent) {
       return { hasPatternChanges: false, isFileChanged: false };
     }
@@ -613,6 +668,7 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
     const localPatterns = normalizeLocalPatterns(content ?? '');
     const hasPatternChanges = localPatterns !== this.cachedLocalPatterns;
     this.cachedLocalPatterns = localPatterns;
+    this.checkLocalPatternErrors(isEdit);
     return { hasPatternChanges, isFileChanged: true };
   }
 
@@ -636,6 +692,40 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
     if (hasPatternChanges || hasImportChanges || hasObsidianIgnoreChanges || hasGitIgnoreChanges) {
       this.fileIgnoreMap.clear();
     }
+  }
+
+  /**
+   * Reports the paths the active profile imports with `@import file:` that do not exist and were not reported on this
+   * device yet. A missing file imports nothing, which is valid, but the path may be mistyped.
+   */
+  private reportMissingImports(contents: ImportedFileContents): void {
+    const storedPaths: unknown = this.app.loadLocalStorage(REPORTED_MISSING_IMPORTS_LOCAL_STORAGE_KEY);
+    const reportedPaths = new Set(Array.isArray(storedPaths) ? storedPaths.filter((path) => typeof path === 'string') : []);
+    const missingPaths = [...contents].filter(([, content]) => content === null).map(([path]) => path);
+    const newPaths = missingPaths.filter((path) => !reportedPaths.has(path));
+    if (missingPaths.length !== reportedPaths.size || newPaths.length > 0) {
+      // Keeping only the paths missing now forgets one that exists again or is no longer imported.
+      this.app.saveLocalStorage(REPORTED_MISSING_IMPORTS_LOCAL_STORAGE_KEY, missingPaths);
+    }
+    if (newPaths.length === 0) {
+      return;
+    }
+
+    const messages = [...this.pluginSettingsComponent.effectiveSettings.importingProfileNames]
+      .filter(([path]) => newPaths.includes(path))
+      .map(([path, profileName]) => `The profile \`${profileName}\` imports \`${path}\` with \`@import file:\`, but the file does not exist, so it imports nothing.`);
+    for (const message of messages) {
+      console.warn(message);
+    }
+    // Separate, for the same reason as `checkLocalPatternErrors`: an apply may follow the read.
+    this.pluginNoticeComponent.showNotice(
+      createFragment((f) => {
+        for (const message of messages) {
+          appendFindingMessage(f.createDiv(), message);
+        }
+      }),
+      { mode: PluginNoticeMode.Separate }
+    );
   }
 
   private async resetDatabase(): Promise<void> {

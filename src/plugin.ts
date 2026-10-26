@@ -50,6 +50,7 @@ export class Plugin extends PluginBase {
         // and nothing saves the settings before the tab exists.
         isSettingsTabOpen: (): boolean => pluginSettingsTab.isOpen,
         onUpdateFileTree: (): Promise<void> => indexProjectionComponent.update(),
+        pluginNoticeComponent: this.pluginNoticeComponent,
         pluginSettingsComponent
       })
     );
