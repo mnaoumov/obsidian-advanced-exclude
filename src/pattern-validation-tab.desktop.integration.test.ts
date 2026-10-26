@@ -14,14 +14,18 @@ const SETTLE_DELAY_IN_MS = 5000;
 
 afterEach(async () => {
   await evalInObsidian({
-    async callback({ app }) {
+    async callback({ app, PLUGIN_ID: pluginId }) {
       app.setting.close();
+      // `close` does not wait for the tab's hide, which writes the text still waiting to be saved: it would land after
+      // the removal below and leave the file for the next test.
+      await (app.setting.pluginTabs.find((tab) => tab.id === pluginId) as PluginSettingsTab | undefined)?.hideAsync();
       try {
         await app.vault.adapter.remove('.obsidianignore');
       } catch {
         // Ignore
       }
     },
+    input: { PLUGIN_ID },
     vaultPath: getTemporaryVault().path
   });
 });

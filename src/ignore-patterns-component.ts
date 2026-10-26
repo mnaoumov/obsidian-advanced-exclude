@@ -53,6 +53,7 @@ const IGNORE_MATCHER_VERSION = 2;
 const MTIME_STORE_NAME = 'mtime';
 const FILES_STORE_NAME = 'files';
 const PROCESS_STORE_ACTIONS_DEBOUNCE_INTERVAL_IN_MILLISECONDS = 5000;
+const SAVE_LOCAL_PATTERNS_DEBOUNCE_INTERVAL_IN_MILLISECONDS = 500;
 /**
  * How many queued verdict writes one flush transaction takes before yielding. A pattern change
  * re-verdicts the whole vault, and writing ~91k verdicts in one task froze the window for ~1 s at
@@ -129,6 +130,8 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
   private hadConfigChanges = false;
   // Whether `.obsidianignore` has been read once: the first read is the plugin loading, not an edit to report.
   private isLocalPatternsFileRead = false;
+  // A `saveSettings` made while the settings tab was open left its reload to `processConfigChanges`.
+  private isReloadPending = false;
   private readonly isSettingsTabOpen: () => boolean;
   // The errors of `.obsidianignore` last reported (or seen at load), so each change is reported once.
   private localPatternErrorsKey = '[]';
@@ -139,12 +142,22 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
   // The last save of `.obsidianignore`. A read waits for it, so it never takes a half-saved file for an outside edit.
   private localPatternsWrite: Promise<void> = noopAsync();
   private readonly onUpdateFileTree: () => Promise<void>;
+  // The text of `.obsidianignore` the settings tab is waiting to save, or `null` when nothing waits.
+  private pendingLocalPatternsText: null | string = null;
   private pendingStoreActions = new Map<string, (store: IDBObjectStore) => void>();
   private readonly pluginNoticeComponent: PluginNoticeComponent;
   private readonly pluginSettingsComponent: PluginSettingsComponent;
   private readonly processStoreActionsDebounced = debounce(() => {
     this.processStoreActions();
   }, PROCESS_STORE_ACTIONS_DEBOUNCE_INTERVAL_IN_MILLISECONDS);
+
+  private readonly saveLocalPatternsDebounced = debounce(
+    () => {
+      invokeAsyncSafely(() => this.flushLocalPatterns());
+    },
+    SAVE_LOCAL_PATTERNS_DEBOUNCE_INTERVAL_IN_MILLISECONDS,
+    true
+  );
 
   // Bumped whenever queued verdicts stop being valid (a store reset, an unload), so a chunked
   // flush still running from before stops instead of writing stale verdicts into the fresh store.
@@ -202,10 +215,27 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
   }
 
   /**
+   * Saves the text {@link scheduleLocalPatternsSave} is waiting to save, now.
+   */
+  public async flushLocalPatterns(): Promise<void> {
+    this.saveLocalPatternsDebounced.cancel();
+    const text = this.pendingLocalPatternsText;
+    if (text === null) {
+      return;
+    }
+    this.pendingLocalPatternsText = null;
+    await this.saveLocalPatterns(text);
+  }
+
+  /**
    * The text the settings tab edits for `.obsidianignore`: the whole file, comments included, with LF line endings; or
-   * {@link LOCAL_PATTERNS_HEADER} while the file does not exist, which the first save writes.
+   * {@link LOCAL_PATTERNS_HEADER} while the file does not exist, which the first save writes. A text still waiting to be
+   * saved wins, so a re-render of the tab keeps what was typed.
    */
   public getLocalPatternsText(): string {
+    if (this.pendingLocalPatternsText !== null) {
+      return this.pendingLocalPatternsText;
+    }
     return this.localPatternsFileContent === null ? LOCAL_PATTERNS_HEADER : this.cachedLocalPatterns;
   }
 
@@ -335,14 +365,17 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
     registerAsyncEvent(
       this,
       this.pluginSettingsComponent.on('saveSettings', async () => {
-        await this.reload();
         this.hadConfigChanges = true;
         // While the settings tab is open it applies on its hide or Apply, so typing a pattern never re-applies per
-        // keystroke. A save made anywhere else (a command, another plugin, the demo vault's buttons) has nothing
-        // that would apply it later, so it applies now.
-        if (!this.isSettingsTabOpen()) {
-          await this.processConfigChanges();
+        // keystroke, and the reload waits too: it would rebuild the tester, and a file created meanwhile would be
+        // judged by half-typed patterns. A save made anywhere else (a command, another plugin, the demo vault's
+        // buttons) has nothing that would apply it later, so it applies now.
+        if (this.isSettingsTabOpen()) {
+          this.isReloadPending = true;
+          return;
         }
+        await this.reload();
+        await this.processConfigChanges();
       })
     );
   }
@@ -368,15 +401,30 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
    * vault) blocked the disable for a second.
    */
   public override onunload(): void {
+    // The settings tab's hide saves a waiting text; an unload while it still waits only writes it, as nothing is left
+    // to apply it.
+    this.saveLocalPatternsDebounced.cancel();
+    const pendingText = this.pendingLocalPatternsText;
+    if (pendingText !== null) {
+      this.pendingLocalPatternsText = null;
+      invokeAsyncSafely(() => this.writeLocalPatterns(pendingText));
+    }
     this.releaseDatabase();
     super.onunload();
   }
 
   public async processConfigChanges(): Promise<void> {
+    await this.flushLocalPatterns();
     if (!this.hadConfigChanges) {
       return;
     }
     this.hadConfigChanges = false;
+    if (this.isReloadPending) {
+      this.isReloadPending = false;
+      await this.reload();
+    }
+    // An edit made while the settings tab was open left the tester on the patterns applied before it.
+    this.rebuildIgnoreTester();
     await this.resetDatabase();
     await this.onUpdateFileTree();
   }
@@ -392,26 +440,23 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
   /**
    * Writes {@link text} to `.obsidianignore`, keeping the line ending and byte order mark the file already has. Like an
    * edit of the global patterns, it applies on the settings tab's hide or Apply while the tab is open, and at once
-   * otherwise.
+   * otherwise. Until it applies, files are still judged by the patterns applied before it.
    */
   public async saveLocalPatterns(text: string): Promise<void> {
-    const write = this.localPatternsWrite.then(async () => {
-      const content = formatLocalPatternsFile({ existingContent: this.localPatternsFileContent, isWindows: Platform.isWin, text });
-      await writeSafe({ app: this.app, content, path: OBSIDIAN_IGNORE_FILE });
-      this.localPatternsFileContent = content;
-      this.cachedLocalPatterns = normalizeLocalPatterns(content);
-      // The tab shows the findings of its own edit; only a later edit made elsewhere is reported.
-      this.checkLocalPatternErrors(false);
-    });
-    // A failed save must not stop the ones after it; its caller still gets the error.
-    this.localPatternsWrite = write.catch(() => undefined);
-    await write;
-    this.cachedIgnoreTester = null;
-    this.fileIgnoreMap.clear();
+    await this.writeLocalPatterns(text);
     this.hadConfigChanges = true;
     if (!this.isSettingsTabOpen()) {
       await this.processConfigChanges();
     }
+  }
+
+  /**
+   * Saves {@link text} with {@link saveLocalPatterns} once the typing pauses, so a burst of keystrokes writes the file
+   * once. {@link processConfigChanges}, which the settings tab's hide and Apply call, saves a waiting text first.
+   */
+  public scheduleLocalPatternsSave(text: string): void {
+    this.pendingLocalPatternsText = text;
+    this.saveLocalPatternsDebounced();
   }
 
   protected override async onLayoutReady(): Promise<void> {
@@ -524,16 +569,7 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
   }
 
   private getIgnoreTester(): ignore.Ignore {
-    if (this.cachedIgnoreTester) {
-      return this.cachedIgnoreTester;
-    }
-
-    const ignorePatternsString = `${this.getEffectivePatterns()}\n${this.cachedLocalPatterns}\n${this.cachedGitIgnoreContent}`;
-
-    this.cachedIgnoreTester = ignore({
-      ignoreCase: true
-    }).add(ignorePatternsString.split('\n'));
-    return this.cachedIgnoreTester;
+    return this.cachedIgnoreTester ?? this.rebuildIgnoreTester();
   }
 
   private getSettingsFingerprint(): string {
@@ -672,6 +708,19 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
     return { hasPatternChanges, isFileChanged: true };
   }
 
+  /**
+   * Builds the tester from the patterns as they are now. Built eagerly wherever patterns apply, so an edit in the
+   * settings tab, which changes the patterns without applying them, never reaches it.
+   */
+  private rebuildIgnoreTester(): ignore.Ignore {
+    const ignorePatternsString = `${this.getEffectivePatterns()}\n${this.cachedLocalPatterns}\n${this.cachedGitIgnoreContent}`;
+
+    this.cachedIgnoreTester = ignore({
+      ignoreCase: true
+    }).add(ignorePatternsString.split('\n'));
+    return this.cachedIgnoreTester;
+  }
+
   private releaseDatabase(): void {
     this.processStoreActionsDebounced.cancel();
     this.pendingStoreActions.clear();
@@ -692,6 +741,7 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
     if (hasPatternChanges || hasImportChanges || hasObsidianIgnoreChanges || hasGitIgnoreChanges) {
       this.fileIgnoreMap.clear();
     }
+    this.rebuildIgnoreTester();
   }
 
   /**
@@ -745,6 +795,24 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
     // to hydrate — `fileIgnoreMap` (empty) is authoritative and repopulates on miss.
     this.verdictsLoaded = true;
     mtimeStore.put(currentMtimeEntry, 0);
+  }
+
+  /**
+   * Writes {@link text} to `.obsidianignore` after the save in flight, keeping the file's line ending and byte order
+   * mark, and applies nothing.
+   */
+  private async writeLocalPatterns(text: string): Promise<void> {
+    const write = this.localPatternsWrite.then(async () => {
+      const content = formatLocalPatternsFile({ existingContent: this.localPatternsFileContent, isWindows: Platform.isWin, text });
+      await writeSafe({ app: this.app, content, path: OBSIDIAN_IGNORE_FILE });
+      this.localPatternsFileContent = content;
+      this.cachedLocalPatterns = normalizeLocalPatterns(content);
+      // The tab shows the findings of its own edit; only a later edit made elsewhere is reported.
+      this.checkLocalPatternErrors(false);
+    });
+    // A failed save must not stop the ones after it; its caller still gets the error.
+    this.localPatternsWrite = write.catch(() => undefined);
+    await write;
   }
 
   /**

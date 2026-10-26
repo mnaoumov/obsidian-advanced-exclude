@@ -1,3 +1,5 @@
+import type { FileSystemAdapter } from 'obsidian';
+
 import { evalInObsidian } from 'obsidian-integration-testing';
 import { getTemporaryVault } from 'obsidian-integration-testing/vitest-global-setup-plugin';
 import {
@@ -13,12 +15,16 @@ const PLUGIN_ID = 'advanced-exclude';
 const SETTLE_DELAY_IN_MS = 5000;
 const NOTE_PATH = 'local-note.md';
 const LOCAL_PATTERN = 'local-note.md';
+const SECOND_NOTE_PATH = 'second-note.md';
 
 afterEach(async () => {
   await evalInObsidian({
-    async callback({ app, NOTE_PATH: notePath }) {
+    async callback({ app, NOTE_PATH: notePath, PLUGIN_ID: pluginId, SECOND_NOTE_PATH: secondNotePath }) {
       app.setting.close();
-      for (const path of ['.obsidianignore', notePath]) {
+      // `close` does not wait for the tab's hide, which writes the text still waiting to be saved: it would land after
+      // the removal below and leave the file for the next test.
+      await (app.setting.pluginTabs.find((tab) => tab.id === pluginId) as PluginSettingsTab | undefined)?.hideAsync();
+      for (const path of ['.obsidianignore', notePath, secondNotePath]) {
         try {
           await app.vault.adapter.remove(path);
         } catch {
@@ -26,7 +32,7 @@ afterEach(async () => {
         }
       }
     },
-    input: { NOTE_PATH },
+    input: { NOTE_PATH, PLUGIN_ID, SECOND_NOTE_PATH },
     vaultPath: getTemporaryVault().path
   });
 });
@@ -108,5 +114,118 @@ describe('Settings tab — local patterns', () => {
     expect(result.doesFileExistBeforeEdit).toBe(false);
     expect(result.fileContent).toMatch(/^# \.obsidianignore: /);
     expect(result.fileContent?.replaceAll('\r\n', '\n').endsWith(`\n${LOCAL_PATTERN}`)).toBe(true);
+  });
+
+  it('writes a burst of edits once, judges a note created mid-edit by the applied patterns, and applies the latest text on hide', async () => {
+    const result = await evalInObsidian({
+      async callback({
+        app,
+        lib: { waitUntil },
+        LOCAL_PATTERN: localPattern,
+        NOTE_PATH: notePath,
+        PLUGIN_ID: pluginId,
+        SECOND_NOTE_PATH: secondNotePath,
+        SETTLE_DELAY_IN_MS: settleDelay
+      }) {
+        const settingTab = app.setting.pluginTabs.find((tab) => tab.id === pluginId) as PluginSettingsTab | undefined;
+        if (!settingTab) {
+          return { error: 'Settings tab not found' };
+        }
+        app.setting.open();
+        app.setting.openTabById(pluginId);
+
+        function getTextArea(): HTMLTextAreaElement | null {
+          const items = [...(settingTab?.containerEl.querySelectorAll('.setting-item') ?? [])];
+          const item = items.find((el) => el.querySelector('.setting-item-name')?.textContent === 'Local patterns');
+          return item?.querySelector('textarea') ?? null;
+        }
+
+        await waitUntil({
+          message: 'the Local patterns text area to show the header',
+          predicate: () => getTextArea()?.value.startsWith('# ') ?? false,
+          timeoutInMilliseconds: settleDelay
+        });
+        const textArea = getTextArea();
+        if (!textArea) {
+          return { error: 'Local patterns text area not found' };
+        }
+        const header = textArea.value;
+
+        function typeText(text: string): void {
+          if (!textArea) {
+            return;
+          }
+          textArea.value = text;
+          textArea.dispatchEvent(new Event('input'));
+        }
+
+        // The plugin writes the dot file straight through `fsPromises`, which raises no vault event to count.
+        const { fsPromises } = app.vault.adapter as FileSystemAdapter;
+        const originalWriteFile = fsPromises.writeFile;
+        let writeCount = 0;
+        function restoreWriteFile(): void {
+          fsPromises.writeFile = originalWriteFile;
+        }
+        function countWrites(): void {
+          fsPromises.writeFile = async (...writeFileArguments: Parameters<typeof originalWriteFile>): Promise<void> => {
+            const [file] = writeFileArguments;
+            if (typeof file === 'string' && file.endsWith('.obsidianignore')) {
+              writeCount++;
+            }
+            await originalWriteFile.apply(fsPromises, writeFileArguments);
+          };
+        }
+        countWrites();
+
+        try {
+          // One edit per keystroke, with no pause between them.
+          for (let length = 1; length <= localPattern.length; length++) {
+            typeText(`${header}${localPattern.slice(0, length)}`);
+          }
+          await waitUntil({
+            message: '.obsidianignore to carry the typed pattern',
+            predicate: async () => {
+              if (!await app.vault.adapter.exists('.obsidianignore')) {
+                return false;
+              }
+              const content = await app.vault.adapter.read('.obsidianignore');
+              return content.includes(localPattern);
+            },
+            timeoutInMilliseconds: settleDelay
+          });
+          // Long enough for any further write the burst would cause.
+          await sleep(1000);
+          const writeCountAfterBurst = writeCount;
+
+          // Matches the saved but unapplied pattern: it must stay until the tab applies.
+          await app.vault.create(notePath, 'Created while the tab is open');
+          await sleep(1000);
+          const isNoteKeptMidEdit = !!app.vault.getAbstractFileByPath(notePath);
+
+          await app.vault.create(secondNotePath, 'Matched only by the last edit');
+          // Hidden at once, before the typing pause ends: the hide must save the latest text first.
+          typeText(`${header}${localPattern}\n${secondNotePath}`);
+          app.setting.close();
+          await settingTab.hideAsync();
+          await waitUntil({
+            message: 'both notes to leave the vault',
+            predicate: () => !app.vault.getAbstractFileByPath(notePath) && !app.vault.getAbstractFileByPath(secondNotePath),
+            timeoutInMilliseconds: settleDelay * 3
+          });
+          const fileContent = await app.vault.adapter.read('.obsidianignore');
+
+          return { error: null, fileContent, isNoteKeptMidEdit, writeCountAfterBurst };
+        } finally {
+          restoreWriteFile();
+        }
+      },
+      input: { LOCAL_PATTERN, NOTE_PATH, PLUGIN_ID, SECOND_NOTE_PATH, SETTLE_DELAY_IN_MS },
+      vaultPath: getTemporaryVault().path
+    });
+
+    expect(result.error).toBeNull();
+    expect(result.writeCountAfterBurst).toBe(1);
+    expect(result.isNoteKeptMidEdit).toBe(true);
+    expect(result.fileContent?.replaceAll('\r\n', '\n').endsWith(`\n${LOCAL_PATTERN}\n${SECOND_NOTE_PATH}`)).toBe(true);
   });
 });
