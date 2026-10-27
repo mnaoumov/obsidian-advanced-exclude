@@ -60,6 +60,7 @@ const APPLY_YIELD_INTERVAL_IN_MILLISECONDS = 50;
 const SHOW_CHUNK_SIZE = 200;
 
 interface ApplyProgress {
+  // eslint-disable-next-line typescript-dev-toolkit/readonly-interface-members -- Projection progress advances as entries are processed.
   processed: number;
   readonly total: number;
 }

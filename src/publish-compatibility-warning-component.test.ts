@@ -49,24 +49,26 @@ const showNoticeMock = vi.fn(
 );
 
 interface Harness {
-  component: PublishCompatibilityWarningComponent;
-  disablePluginAndSave: ReturnType<typeof vi.fn>;
-  editAndSave: ReturnType<typeof vi.fn>;
-  effectiveSettings: PluginSettings;
-  fireActiveProfileChange: () => Promise<void>;
-  fireInternalPluginsChange: () => void;
-  fireSaveSettings: () => void;
-  processConfigChanges: ReturnType<typeof vi.fn>;
-  publishDisable: ReturnType<typeof vi.fn>;
-  state: HarnessState;
-  triggerLayoutReady: () => Promise<void>;
+  readonly component: PublishCompatibilityWarningComponent;
+  readonly disablePluginAndSave: ReturnType<typeof vi.fn>;
+  readonly editAndSave: ReturnType<typeof vi.fn>;
+  readonly effectiveSettings: PluginSettings;
+  readonly fireActiveProfileChange: () => Promise<void>;
+  readonly fireInternalPluginsChange: () => void;
+  readonly fireSaveSettings: () => void;
+  readonly processConfigChanges: ReturnType<typeof vi.fn>;
+  readonly publishDisable: ReturnType<typeof vi.fn>;
+  readonly state: HarnessState;
+  readonly triggerLayoutReady: () => Promise<void>;
 }
 
 interface HarnessState {
+  // eslint-disable-next-line typescript-dev-toolkit/readonly-interface-members -- The test replaces this mock member while exercising state changes.
   activeProfileId: null | string;
-  excludeMode: ExcludeMode;
+  readonly excludeMode: ExcludeMode;
+  // eslint-disable-next-line typescript-dev-toolkit/readonly-interface-members -- The test replaces this mock member while exercising state changes.
   publishEnabled: boolean;
-  publishPluginExists: boolean;
+  readonly publishPluginExists: boolean;
 }
 
 describe('PublishCompatibilityWarningComponent', () => {

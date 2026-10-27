@@ -20,11 +20,11 @@ import {
 import { ManualIndexHider } from './manual-index-hider.ts';
 
 interface Fixture {
-  app: App;
-  fileCache: MetadataCache['fileCache'];
-  fileMap: Vault['fileMap'];
-  resolvedLinks: MetadataCache['resolvedLinks'];
-  unresolvedLinks: MetadataCache['unresolvedLinks'];
+  readonly app: App;
+  readonly fileCache: MetadataCache['fileCache'];
+  readonly fileMap: Vault['fileMap'];
+  readonly resolvedLinks: MetadataCache['resolvedLinks'];
+  readonly unresolvedLinks: MetadataCache['unresolvedLinks'];
 }
 
 interface FolderLike {

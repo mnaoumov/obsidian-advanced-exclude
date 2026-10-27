@@ -24,9 +24,9 @@ export interface StoredVaultPaths {
  * plus a {@link StoredVaultPaths.universeSignature} guarding the fast-enable path.
  */
 export interface VaultPathStore {
-  close: () => void;
-  load: () => Promise<StoredVaultPaths>;
-  save: (entries: readonly VaultModelEntry[], universeSignature: string) => void;
+  readonly close: () => void;
+  readonly load: () => Promise<StoredVaultPaths>;
+  readonly save: (entries: readonly VaultModelEntry[], universeSignature: string) => void;
 }
 
 /**

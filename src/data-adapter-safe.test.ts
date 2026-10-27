@@ -28,16 +28,16 @@ vi.mock('@obsidian-typings/obsidian-public-latest/implementations', () => ({
 const mockGetDataAdapterEx = vi.mocked(getDataAdapterEx);
 
 interface MockCapacitorFs {
-  read: ReturnType<typeof vi.fn>;
-  stat: ReturnType<typeof vi.fn>;
-  write: ReturnType<typeof vi.fn>;
+  readonly read: ReturnType<typeof vi.fn>;
+  readonly stat: ReturnType<typeof vi.fn>;
+  readonly write: ReturnType<typeof vi.fn>;
 }
 
 interface MockFsPromises {
-  access: ReturnType<typeof vi.fn>;
-  readFile: ReturnType<typeof vi.fn>;
-  stat: ReturnType<typeof vi.fn>;
-  writeFile: ReturnType<typeof vi.fn>;
+  readonly access: ReturnType<typeof vi.fn>;
+  readonly readFile: ReturnType<typeof vi.fn>;
+  readonly stat: ReturnType<typeof vi.fn>;
+  readonly writeFile: ReturnType<typeof vi.fn>;
 }
 
 describe('data-adapter-safe', () => {

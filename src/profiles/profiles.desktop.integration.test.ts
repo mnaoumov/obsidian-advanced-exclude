@@ -21,12 +21,12 @@ const ACTIVE_PROFILE_LOCAL_STORAGE_KEY = 'advanced-exclude:active-profile';
 const IMPORTED_FILE = '.profile-ignore';
 
 interface FilesSnapshot {
-  explorer: string[];
-  loaded: string[];
+  readonly explorer: string[];
+  readonly loaded: string[];
 }
 
 interface ProfilesTestPlugin extends Plugin {
-  pluginSettingsComponent: PluginSettingsComponent;
+  readonly pluginSettingsComponent: PluginSettingsComponent;
 }
 
 const TEST_FILES = [

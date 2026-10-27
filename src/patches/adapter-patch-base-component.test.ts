@@ -20,7 +20,7 @@ import {
 import { AdapterPatchBaseComponent } from './adapter-patch-base-component.ts';
 
 interface CreateComponentOverrides {
-  settings?: PluginSettings;
+  readonly settings?: PluginSettings;
 }
 
 class TestAdapterPatchBaseComponent extends AdapterPatchBaseComponent {

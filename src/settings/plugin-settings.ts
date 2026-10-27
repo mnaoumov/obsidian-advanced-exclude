@@ -8,12 +8,18 @@ export enum ExcludeMode {
  * `@import <name>` and start over with `@reset` (see `profiles.ts`). A scalar left `undefined` is inherited.
  */
 export interface SettingsProfile {
+  // eslint-disable-next-line typescript-dev-toolkit/readonly-interface-members -- The profile editor updates this setting in place before saving.
   excludeMode?: ExcludeMode | undefined;
-  id: string;
+  readonly id: string;
+  // eslint-disable-next-line typescript-dev-toolkit/readonly-interface-members -- The profile editor updates this setting in place before saving.
   name: string;
+  // eslint-disable-next-line typescript-dev-toolkit/readonly-interface-members -- The profile editor updates this setting in place before saving.
   patterns: string;
+  // eslint-disable-next-line typescript-dev-toolkit/readonly-interface-members -- The profile editor updates this setting in place before saving.
   shouldHideEmptyFolders?: boolean | undefined;
+  // eslint-disable-next-line typescript-dev-toolkit/readonly-interface-members -- The profile editor updates this setting in place before saving.
   shouldIgnoreExcludedFiles?: boolean | undefined;
+  // eslint-disable-next-line typescript-dev-toolkit/readonly-interface-members -- The profile editor updates this setting in place before saving.
   shouldIncludeGitIgnorePatterns?: boolean | undefined;
 }
 

@@ -17,6 +17,7 @@ const NOTE_PATHS = ['folder-reshow-listing/one.md', 'folder-reshow-listing/inner
 
 interface AdapterInternals {
   readonly files: Record<string, unknown>;
+  // eslint-disable-next-line typescript-dev-toolkit/readonly-interface-members -- The test wraps the adapter trigger to count events and restores it afterward.
   trigger: (name: string, path: string, ...rest: unknown[]) => void;
 }
 
