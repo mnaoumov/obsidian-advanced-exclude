@@ -125,6 +125,6 @@ export const config = defineObsidianPluginVitestConfig({
      * The Reload-button test fakes `location.reload` by redefining `window.location`, which the
      * `vmThreads` pool makes non-configurable, so this file runs on the default pool instead.
      */
-    context.globalStubTestFiles.push('src/restore-notice-component.test.ts');
+    context.globalStubTestFiles.push('src/index-projection/restore-notice-component.test.ts');
   }
 });

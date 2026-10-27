@@ -44,7 +44,7 @@ import {
   it
 } from 'vitest';
 
-import type { PluginSettingsComponent } from './plugin-settings-component.ts';
+import type { PluginSettingsComponent } from './settings/plugin-settings-component.ts';
 
 interface PluginWithSettingsComponent {
   readonly pluginSettingsComponent: PluginSettingsComponent;

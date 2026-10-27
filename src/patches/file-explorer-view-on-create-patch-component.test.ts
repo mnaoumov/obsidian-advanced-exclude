@@ -19,13 +19,13 @@ import {
   vi
 } from 'vitest';
 
-import type { IgnorePatternsComponent } from '../ignore-patterns-component.ts';
-import type { PluginSettingsComponent } from '../plugin-settings-component.ts';
+import type { IgnorePatternsComponent } from '../patterns/ignore-patterns-component.ts';
+import type { PluginSettingsComponent } from '../settings/plugin-settings-component.ts';
 
 import {
   ExcludeMode,
   PluginSettings
-} from '../plugin-settings.ts';
+} from '../settings/plugin-settings.ts';
 import { FileExplorerViewOnCreatePatchComponent } from './file-explorer-view-on-create-patch-component.ts';
 
 class MockFileExplorerView extends View {

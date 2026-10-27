@@ -8,11 +8,11 @@ import {
 import { strictProxy } from '@mnaoumov/typescript-test-toolkit/strict-proxy';
 import { vi } from 'vitest';
 
-import type { PluginSettingsComponent } from '../plugin-settings-component.ts';
-import type { EffectiveSettings } from '../profiles.ts';
+import type { EffectiveSettings } from '../profiles/profiles.ts';
+import type { PluginSettingsComponent } from '../settings/plugin-settings-component.ts';
 
-import { PluginSettings } from '../plugin-settings.ts';
-import { resolveProfile } from '../profiles.ts';
+import { resolveProfile } from '../profiles/profiles.ts';
+import { PluginSettings } from '../settings/plugin-settings.ts';
 
 interface FakeSettings {
   readonly fireActiveProfileChange: () => Promise<void>;

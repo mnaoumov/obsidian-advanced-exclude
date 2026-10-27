@@ -17,7 +17,7 @@ import { MetadataCacheInitializePatchComponent } from './metadata-cache-initiali
 const mockResume = vi.fn();
 const mockSuspend = vi.fn((_app: App): () => void => mockResume);
 
-vi.mock('../related-links-batch.ts', () => ({
+vi.mock('../bulk-index-update/related-links-batch.ts', () => ({
   suspendRelatedLinksUpdates: (app: App): () => void => mockSuspend(app)
 }));
 

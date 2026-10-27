@@ -10,10 +10,10 @@ import { appendCodeBlock } from '@mnaoumov/obsidian-lib/html-element';
 import { convertAsyncToSync } from '@mnaoumov/typescript-lib/async';
 import { InternalPluginName } from '@obsidian-typings/obsidian-public-latest/implementations';
 
-import type { IgnorePatternsComponent } from './ignore-patterns-component.ts';
-import type { PluginSettingsComponent } from './plugin-settings-component.ts';
+import type { IgnorePatternsComponent } from './patterns/ignore-patterns-component.ts';
+import type { PluginSettingsComponent } from './settings/plugin-settings-component.ts';
 
-import { ExcludeMode } from './plugin-settings.ts';
+import { ExcludeMode } from './settings/plugin-settings.ts';
 
 interface AddButtonParams {
   readonly containerEl: HTMLElement;
