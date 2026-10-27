@@ -5,23 +5,23 @@ import { PluginDataHandler } from '@mnaoumov/obsidian-lib/data-handler';
 import { PluginBase } from '@mnaoumov/obsidian-lib/plugin/plugin';
 import { PluginEventSourceImpl } from '@mnaoumov/obsidian-lib/plugin/plugin-event-source';
 
-import { SwitchProfileCommandHandler } from './command-handlers/switch-profile-command-handler.ts';
-import { UseBaseSettingsCommandHandler } from './command-handlers/use-base-settings-command-handler.ts';
-import { FileTreeComponent } from './file-tree-component.ts';
-import { IgnorePatternsComponent } from './ignore-patterns-component.ts';
-import { IndexProjectionComponent } from './index-projection-component.ts';
-import { ManualIndexHider } from './manual-index-hider.ts';
+import { FileTreeComponent } from './files-pane/file-tree-component.ts';
+import { IndexProjectionComponent } from './index-projection/index-projection-component.ts';
+import { ManualIndexHider } from './index-projection/manual-index-hider.ts';
+import { RestoreNoticeComponent } from './index-projection/restore-notice-component.ts';
+import { UpdateProgressNoticeComponent } from './index-projection/update-progress-notice-component.ts';
+import { IndexedDatabaseVaultPathStore } from './index-projection/vault-path-store.ts';
 import { AdapterPatchComponent } from './patches/adapter-patch-component.ts';
 import { FileExplorerViewOnCreatePatchComponent } from './patches/file-explorer-view-on-create-patch-component.ts';
 import { MetadataCacheInitializePatchComponent } from './patches/metadata-cache-initialize-patch-component.ts';
 import { VaultLoadPatchComponent } from './patches/vault-load-patch-component.ts';
-import { PluginSettingsComponent } from './plugin-settings-component.ts';
-import { PluginSettingsTab } from './plugin-settings-tab.ts';
-import { ProfileSwitcherComponent } from './profile-switcher-component.ts';
+import { IgnorePatternsComponent } from './patterns/ignore-patterns-component.ts';
+import { ProfileSwitcherComponent } from './profiles/profile-switcher-component.ts';
+import { SwitchProfileCommandHandler } from './profiles/switch-profile-command-handler.ts';
+import { UseBaseSettingsCommandHandler } from './profiles/use-base-settings-command-handler.ts';
 import { PublishCompatibilityWarningComponent } from './publish-compatibility-warning-component.ts';
-import { RestoreNoticeComponent } from './restore-notice-component.ts';
-import { UpdateProgressNoticeComponent } from './update-progress-notice-component.ts';
-import { IndexedDatabaseVaultPathStore } from './vault-path-store.ts';
+import { PluginSettingsComponent } from './settings/plugin-settings-component.ts';
+import { PluginSettingsTab } from './settings/plugin-settings-tab.ts';
 
 export class Plugin extends PluginBase {
   protected override async onloadImpl(): Promise<void> {

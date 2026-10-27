@@ -13,15 +13,15 @@ import {
   vi
 } from 'vitest';
 
-import type { FileTreeComponent } from '../file-tree-component.ts';
-import type { IgnorePatternsComponent } from '../ignore-patterns-component.ts';
-import type { IndexProjectionComponent } from '../index-projection-component.ts';
-import type { PluginSettingsComponent } from '../plugin-settings-component.ts';
+import type { FileTreeComponent } from '../files-pane/file-tree-component.ts';
+import type { IndexProjectionComponent } from '../index-projection/index-projection-component.ts';
+import type { IgnorePatternsComponent } from '../patterns/ignore-patterns-component.ts';
+import type { PluginSettingsComponent } from '../settings/plugin-settings-component.ts';
 
 import {
   ExcludeMode,
   PluginSettings
-} from '../plugin-settings.ts';
+} from '../settings/plugin-settings.ts';
 import { CapacitorAdapterPatchComponent } from './capacitor-adapter-patch-component.ts';
 
 interface OnloadAccessor {

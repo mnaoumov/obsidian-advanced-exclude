@@ -12,10 +12,10 @@ import {
   vi
 } from 'vitest';
 
-import type { FileTreeComponent } from './file-tree-component.ts';
-import type { ProfileSwitcherComponent } from './profile-switcher-component.ts';
+import type { FileTreeComponent } from './files-pane/file-tree-component.ts';
+import type { ProfileSwitcherComponent } from './profiles/profile-switcher-component.ts';
 
-import { IgnorePatternsComponent } from './ignore-patterns-component.ts';
+import { IgnorePatternsComponent } from './patterns/ignore-patterns-component.ts';
 import { Plugin } from './plugin.ts';
 
 type FileTreeComponentConstructorParams = ConstructorParameters<typeof FileTreeComponent>[0];
@@ -49,7 +49,7 @@ class MockFileTreeComponent extends Component {
 }
 
 let capturedOnFileExplorerViewBuilt: (() => void) | undefined;
-vi.mock('./file-tree-component.ts', () => ({
+vi.mock('./files-pane/file-tree-component.ts', () => ({
   // eslint-disable-next-line prefer-arrow-callback, func-names -- mock must be constructable with `new` and return a real loadable Component.
   FileTreeComponent: vi.fn(function (params: FileTreeComponentConstructorParams) {
     capturedOnFileExplorerViewBuilt = params.onFileExplorerViewBuilt;
@@ -65,7 +65,7 @@ class MockIndexProjectionComponent extends Component {
   public update = mockUpdate;
 }
 
-vi.mock('./index-projection-component.ts', () => ({
+vi.mock('./index-projection/index-projection-component.ts', () => ({
   // eslint-disable-next-line prefer-arrow-callback, func-names -- mock must be constructable with `new` and return a real loadable Component.
   IndexProjectionComponent: vi.fn(function () {
     return new MockIndexProjectionComponent();
@@ -75,7 +75,7 @@ vi.mock('./index-projection-component.ts', () => ({
 let capturedIsSettingsTabOpen: (() => boolean) | undefined;
 let capturedOnUpdateFileTree: (() => Promise<void>) | undefined;
 let capturedOnLocalPatternsChange: (() => void) | undefined;
-vi.mock('./ignore-patterns-component.ts', () => ({
+vi.mock('./patterns/ignore-patterns-component.ts', () => ({
   // A ComponentEx, not a plain Component: onloadImpl awaits its `loadWithPromises`.
   // eslint-disable-next-line prefer-arrow-callback, func-names -- mock must be constructable with `new` and return a real loadable Component.
   IgnorePatternsComponent: vi.fn(function (params: IgnorePatternsComponentConstructorParams) {
@@ -120,7 +120,7 @@ vi.mock('./patches/vault-load-patch-component.ts', () => ({
   })
 }));
 
-vi.mock('./plugin-settings-component.ts', () => ({
+vi.mock('./settings/plugin-settings-component.ts', () => ({
   // A ComponentEx, not a plain Component: onloadImpl awaits its `loadWithPromises`.
   // eslint-disable-next-line prefer-arrow-callback, func-names -- mock must be constructable with `new` and return a real loadable Component.
   PluginSettingsComponent: vi.fn(function () {
@@ -130,7 +130,7 @@ vi.mock('./plugin-settings-component.ts', () => ({
 
 let isMockSettingsTabOpen = false;
 const mockSettingsTabRefresh = vi.fn();
-vi.mock('./plugin-settings-tab.ts', () => ({
+vi.mock('./settings/plugin-settings-tab.ts', () => ({
   // eslint-disable-next-line prefer-arrow-callback, func-names -- mock must be constructable with `new`.
   PluginSettingsTab: vi.fn(function () {
     return {
@@ -143,7 +143,7 @@ vi.mock('./plugin-settings-tab.ts', () => ({
 }));
 
 let capturedAddStatusBarItem: (() => HTMLElement) | undefined;
-vi.mock('./profile-switcher-component.ts', () => ({
+vi.mock('./profiles/profile-switcher-component.ts', () => ({
   // eslint-disable-next-line prefer-arrow-callback, func-names -- mock must be constructable with `new` and return a real loadable Component.
   ProfileSwitcherComponent: vi.fn(function (params: ProfileSwitcherComponentConstructorParams) {
     capturedAddStatusBarItem = params.addStatusBarItem;
@@ -151,7 +151,7 @@ vi.mock('./profile-switcher-component.ts', () => ({
   })
 }));
 
-vi.mock('./restore-notice-component.ts', () => ({
+vi.mock('./index-projection/restore-notice-component.ts', () => ({
   // eslint-disable-next-line prefer-arrow-callback, func-names -- mock must be constructable with `new` and return a real loadable Component.
   RestoreNoticeComponent: vi.fn(function () {
     return new Component();
@@ -165,7 +165,7 @@ vi.mock('./publish-compatibility-warning-component.ts', () => ({
   })
 }));
 
-vi.mock('./vault-path-store.ts', () => ({
+vi.mock('./index-projection/vault-path-store.ts', () => ({
   IndexedDatabaseVaultPathStore: vi.fn()
 }));
 

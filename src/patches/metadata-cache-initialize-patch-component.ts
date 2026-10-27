@@ -1,7 +1,7 @@
 import { MonkeyAroundComponent } from '@mnaoumov/obsidian-lib/components/monkey-around-component';
 import { App } from 'obsidian';
 
-import { suspendRelatedLinksUpdates } from '../related-links-batch.ts';
+import { suspendRelatedLinksUpdates } from '../bulk-index-update/related-links-batch.ts';
 
 /**
  * Batches the related-links passes Obsidian runs while `metadataCache.initialize` reconciles its

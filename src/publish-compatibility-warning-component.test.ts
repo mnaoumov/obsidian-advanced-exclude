@@ -25,16 +25,16 @@ import {
   vi
 } from 'vitest';
 
-import type { IgnorePatternsComponent } from './ignore-patterns-component.ts';
-import type { PluginSettingsComponent } from './plugin-settings-component.ts';
-import type { EffectiveSettings } from './profiles.ts';
+import type { IgnorePatternsComponent } from './patterns/ignore-patterns-component.ts';
+import type { EffectiveSettings } from './profiles/profiles.ts';
+import type { PluginSettingsComponent } from './settings/plugin-settings-component.ts';
 
+import { resolveProfile } from './profiles/profiles.ts';
+import { PublishCompatibilityWarningComponent } from './publish-compatibility-warning-component.ts';
 import {
   ExcludeMode,
   PluginSettings
-} from './plugin-settings.ts';
-import { resolveProfile } from './profiles.ts';
-import { PublishCompatibilityWarningComponent } from './publish-compatibility-warning-component.ts';
+} from './settings/plugin-settings.ts';
 
 const PLUGIN_ID = 'advanced-exclude';
 

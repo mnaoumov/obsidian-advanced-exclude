@@ -10,10 +10,10 @@ import {
   TAbstractFile
 } from 'obsidian';
 
-import type { IgnorePatternsComponent } from '../ignore-patterns-component.ts';
-import type { PluginSettingsComponent } from '../plugin-settings-component.ts';
+import type { IgnorePatternsComponent } from '../patterns/ignore-patterns-component.ts';
+import type { PluginSettingsComponent } from '../settings/plugin-settings-component.ts';
 
-import { ExcludeMode } from '../plugin-settings.ts';
+import { ExcludeMode } from '../settings/plugin-settings.ts';
 
 interface FileExplorerViewOnCreatePatchComponentConstructorParams {
   readonly app: App;

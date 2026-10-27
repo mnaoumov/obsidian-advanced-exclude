@@ -2,12 +2,12 @@ import type { App } from 'obsidian';
 
 import { MonkeyAroundComponent } from '@mnaoumov/obsidian-lib/components/monkey-around-component';
 
-import type { FileTreeComponent } from '../file-tree-component.ts';
-import type { IgnorePatternsComponent } from '../ignore-patterns-component.ts';
-import type { IndexProjectionComponent } from '../index-projection-component.ts';
-import type { PluginSettingsComponent } from '../plugin-settings-component.ts';
+import type { FileTreeComponent } from '../files-pane/file-tree-component.ts';
+import type { IndexProjectionComponent } from '../index-projection/index-projection-component.ts';
+import type { IgnorePatternsComponent } from '../patterns/ignore-patterns-component.ts';
+import type { PluginSettingsComponent } from '../settings/plugin-settings-component.ts';
 
-import { ExcludeMode } from '../plugin-settings.ts';
+import { ExcludeMode } from '../settings/plugin-settings.ts';
 
 export interface AdapterPatchBaseComponentConstructorParams {
   readonly app: App;

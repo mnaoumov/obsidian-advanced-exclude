@@ -1,8 +1,8 @@
 import { evalInObsidian } from 'obsidian-integration-testing';
 import { getTemporaryVault } from 'obsidian-integration-testing/vitest-global-setup-plugin';
 
-import type { IgnorePatternsComponent } from '../../src/ignore-patterns-component.ts';
-import type { PluginSettingsComponent } from '../../src/plugin-settings-component.ts';
+import type { IgnorePatternsComponent } from '../../src/patterns/ignore-patterns-component.ts';
+import type { PluginSettingsComponent } from '../../src/settings/plugin-settings-component.ts';
 
 interface TraversableComponent {
   readonly _children?: readonly unknown[];
