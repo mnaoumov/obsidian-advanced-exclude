@@ -1,0 +1,13 @@
+# Device-local storage
+
+`Advanced Exclude` keeps ignore verdicts and hidden paths on this device, using `obsidian-lib`'s `LocalDataStore`. Records are isolated by Obsidian's vault identity, plugin id, and schema version. Nothing is written into a synchronized vault folder.
+
+The `verdicts-v1` store has a configuration fingerprint and individual path verdicts. A matching fingerprint permits reuse; individual verdicts load only when a full projection needs them. Changes to patterns, effective profile settings, imported patterns, local ignore files, or Obsidian exclusions follow the existing invalidation flow. Writes coalesce by path, commit in batches of 2,000, and yield between batches. Resetting the configuration cancels older queued verdicts. Each batch checks the full fingerprint while holding the store lock, so an old instance cannot refill a store reset by a new one.
+
+The `hidden-paths-v1` store has individual hidden-path records and the file-universe signature. These paths reconstruct files missing from Obsidian's index. Fast enable still requires both an unchanged configuration and an unchanged file universe. Hidden paths and signatures are never shared between devices.
+
+On first use, each store imports its previous IndexedDB database. The import marker commits in the same transaction as the imported records. Failed imports can be retried after reopening; they do not mark a partial import complete. The old databases are retained for recovery. Invalid verdict rows are discarded as cache misses; malformed hidden-path data fails the import rather than silently losing restoration paths. Older hidden-path arrays retain their paths but have no signature, so they require a full projection.
+
+Disabling the plugin drains accepted writes in the background before closing connections, including connections still opening. A Web Lock serializes operations across plugin instances so a subsequent enable reads after already accepted writes. A window reload requests the same cleanup; persistence during abrupt process termination remains subject to the browser's IndexedDB guarantees.
+
+There is no cache-seed sharing setting or seed folder. Ignore verdicts are cheap to recompute and depend on the complete device configuration and directory ancestry; hashing note contents alone cannot validate them. Sharing hidden paths would transfer another device's index state. Local records preserve the existing fast-enable optimization without introducing a synchronized cache.

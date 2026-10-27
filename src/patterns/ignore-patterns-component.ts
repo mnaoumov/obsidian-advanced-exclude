@@ -18,6 +18,7 @@ import {
   Platform
 } from 'obsidian';
 
+import type { LocalRecordStore } from '../local-record-store.ts';
 import type { ImportedFileContents } from '../profiles/profiles.ts';
 import type { PluginSettingsComponent } from '../settings/plugin-settings-component.ts';
 
@@ -32,7 +33,6 @@ import {
   statSafe,
   writeSafe
 } from '../data-adapter-safe.ts';
-import { getResult } from '../indexed-database-utils.ts';
 import {
   formatLocalPatternsFile,
   LOCAL_PATTERNS_HEADER,
@@ -43,15 +43,17 @@ import {
   PatternFindingSeverity,
   validatePatterns
 } from './pattern-validation.ts';
+import {
+  checkDatabaseFileEntry,
+  createVerdictRecordStore
+} from './verdict-record-store.ts';
 
-const DB_VERSION = 1;
 // Bumped whenever the ignore-matching logic changes shape (e.g. the folder verdict
 // now tests the trailing-slash form only). It rides in the mtime entry so an upgrade
 // whose ignore-file modification times are unchanged still fails the `isDeepEqual` check in `loadDb`
 // and resets the persisted per-path verdicts instead of serving stale ones.
 const IGNORE_MATCHER_VERSION = 2;
-const MTIME_STORE_NAME = 'mtime';
-const FILES_STORE_NAME = 'files';
+
 const PROCESS_STORE_ACTIONS_DEBOUNCE_INTERVAL_IN_MILLISECONDS = 5000;
 const SAVE_LOCAL_PATTERNS_DEBOUNCE_INTERVAL_IN_MILLISECONDS = 500;
 /**
@@ -60,11 +62,6 @@ const SAVE_LOCAL_PATTERNS_DEBOUNCE_INTERVAL_IN_MILLISECONDS = 500;
  * a 91k-node real vault's scale.
  */
 const STORE_ACTIONS_CHUNK_SIZE = 2000;
-
-interface DatabaseFileEntry {
-  readonly isIgnored: boolean;
-  readonly path: string;
-}
 
 interface DatabaseMtimeEntry {
   readonly gitIgnoreMtime: number;
@@ -114,7 +111,8 @@ interface ObsidianIgnoreReadResult {
 
 export class IgnorePatternsComponent extends LayoutReadyComponent {
   // Initialized so onunload can test it before a load ever opened it.
-  private _database: IDBDatabase | undefined = undefined;
+  private _database: LocalRecordStore | undefined = undefined;
+  private appliedFingerprint: DatabaseMtimeEntry = DEFAULT_MTIME_ENTRY;
   // The settings fingerprint the verdict store was last reset under; see the `loadSettings` handler.
   private appliedSettingsFingerprint: null | string = null;
   private cachedEffectivePatterns = '';
@@ -127,12 +125,14 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
   // `loadFingerprint`/`isConfigUnchanged`) — the gate for the fast-enable path.
   private configFingerprintMatched = false;
   private readonly fileIgnoreMap = new Map<string, boolean>();
+  private flushPromise: null | Promise<void> = null;
   private hadConfigChanges = false;
   // Whether `.obsidianignore` has been read once: the first read is the plugin loading, not an edit to report.
   private isLocalPatternsFileRead = false;
   // A `saveSettings` made while the settings tab was open left its reload to `processConfigChanges`.
   private isReloadPending = false;
   private readonly isSettingsTabOpen: () => boolean;
+  private isStoreReleased = false;
   // The errors of `.obsidianignore` last reported (or seen at load), so each change is reported once.
   private localPatternErrorsKey = '[]';
   private readonly localPatternsChangeListeners = new Set<() => void>();
@@ -144,11 +144,12 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
   private readonly onUpdateFileTree: () => Promise<void>;
   // The text of `.obsidianignore` the settings tab is waiting to save, or `null` when nothing waits.
   private pendingLocalPatternsText: null | string = null;
-  private pendingStoreActions = new Map<string, (store: IDBObjectStore) => void>();
+  private readonly pendingStoreActions = new Map<string, boolean | undefined>();
   private readonly pluginNoticeComponent: PluginNoticeComponent;
   private readonly pluginSettingsComponent: PluginSettingsComponent;
+
   private readonly processStoreActionsDebounced = debounce(() => {
-    this.processStoreActions();
+    invokeAsyncSafely(() => this.processStoreActions());
   }, PROCESS_STORE_ACTIONS_DEBOUNCE_INTERVAL_IN_MILLISECONDS);
 
   private readonly saveLocalPatternsDebounced = debounce(
@@ -168,7 +169,7 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
   // path; see `ensureVerdictsLoaded`.
   private verdictsLoaded = false;
 
-  private get database(): IDBDatabase {
+  private get database(): LocalRecordStore {
     if (!this._database) {
       throw new Error('database is not set');
     }
@@ -208,7 +209,12 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
       return;
     }
     this.verdictsLoaded = true;
-    const databaseFileEntries = await getResult(this.getFileStore().getAll()) as DatabaseFileEntry[];
+    const generation = this.storeGeneration;
+    const records = await this.database.entries();
+    if (generation !== this.storeGeneration) {
+      return;
+    }
+    const databaseFileEntries = records.filter(([key]) => key.startsWith('path:')).map(([, value]) => value).filter(checkDatabaseFileEntry);
     for (const entry of databaseFileEntries) {
       this.fileIgnoreMap.set(entry.path, entry.isIgnored);
     }
@@ -243,7 +249,7 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
     if (this.fileIgnoreMap.has(normalizedPath)) {
       this.fileIgnoreMap.delete(normalizedPath);
 
-      this.addStoreAction(normalizedPath, (store) => store.delete(normalizedPath));
+      this.addStoreAction(normalizedPath, undefined);
     }
 
     let shouldRefresh = false;
@@ -310,11 +316,7 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
     isIgnoredResult = ignoreTester.ignores(gitignorePath)
       || excludePaths.some((path) => excludeRegExps.some((regExp) => regExp.test(path)));
     this.fileIgnoreMap.set(normalizedPath, isIgnoredResult);
-    this.addStoreAction(normalizedPath, (store) =>
-      store.put({
-        isIgnored: isIgnoredResult,
-        path: normalizedPath
-      }));
+    this.addStoreAction(normalizedPath, isIgnoredResult);
 
     return isIgnoredResult;
   }
@@ -396,9 +398,7 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
    * Releases the connection. An open connection blocks every later `deleteDatabase` and version
    * upgrade, and each enable opened a new one, so a disable must let it go.
    *
-   * Verdict writes still queued are dropped, not flushed: the store is only a cache that the next
-   * full build refills on a miss, and flushing a whole vault's worth (~91k puts on a 91k-node real
-   * vault) blocked the disable for a second.
+   * Accepted verdict writes drain in bounded asynchronous transactions before close.
    */
   public override onunload(): void {
     // The settings tab's hide saves a waiting text; an unload while it still waits only writes it, as nothing is left
@@ -471,7 +471,10 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
     // alone: a second trigger here raced it on every mid-session enable (see `rebuildModel`).
   }
 
-  private addStoreAction(normalizedPath: string, storeAction: (store: IDBObjectStore) => void): void {
+  private addStoreAction(normalizedPath: string, storeAction: boolean | undefined): void {
+    if (this.isStoreReleased) {
+      return;
+    }
     // Keyed by path so repeated config changes overwrite rather than append: the
     // queue is bounded to the number of distinct paths instead of growing by the
     // whole vault on every `processConfigChanges`.
@@ -520,6 +523,32 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
     });
   }
 
+  private async flushStoreActions(): Promise<void> {
+    const generation = this.storeGeneration;
+    const expectedFingerprint = JSON.stringify(this.appliedFingerprint);
+    while (this._database && this.pendingStoreActions.size > 0 && generation === this.storeGeneration) {
+      const chunk = [...this.pendingStoreActions].slice(0, STORE_ACTIONS_CHUNK_SIZE);
+      await this._database.commit({
+        entries: chunk.filter(([, value]) => value !== undefined).map(([path, isIgnored]) => [`path:${path}`, { isIgnored, path }]),
+        expectedFingerprint,
+        removedKeys: chunk.filter(([, value]) => value === undefined).map(([path]) => `path:${path}`)
+      });
+      if (generation !== this.storeGeneration) {
+        return;
+      }
+      for (const [path, value] of chunk) {
+        if (this.pendingStoreActions.get(path) === value) {
+          this.pendingStoreActions.delete(path);
+        }
+      }
+      if (this.pendingStoreActions.size > 0) {
+        await new Promise<void>((resolve) => {
+          window.setTimeout(resolve, 0);
+        });
+      }
+    }
+  }
+
   private async getCurrentMtimeEntry(): Promise<DatabaseMtimeEntry> {
     const gitIgnoreStat = this.pluginSettingsComponent.effectiveSettings.shouldIncludeGitIgnorePatterns ? await statSafe(this.app, GIT_IGNORE_FILE) : null;
     const obsidianIgnoreStat = await statSafe(this.app, OBSIDIAN_IGNORE_FILE);
@@ -564,10 +593,6 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
     return excludeRegExps;
   }
 
-  private getFileStore(): IDBObjectStore {
-    return this.database.transaction([FILES_STORE_NAME], 'readwrite').objectStore(FILES_STORE_NAME);
-  }
-
   private getIgnoreTester(): ignore.Ignore {
     return this.cachedIgnoreTester ?? this.rebuildIgnoreTester();
   }
@@ -607,32 +632,15 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
    * stale cache is reset here (nothing then remains to load).
    */
   private async loadFingerprint(): Promise<void> {
-    const request = window.indexedDB.open(`${this.app.appId}/advanced-exclude`, DB_VERSION);
-    request.addEventListener('upgradeneeded', ($event) => {
-      if ($event.newVersion !== 1) {
-        return;
-      }
-      const database = request.result;
-      database.createObjectStore(FILES_STORE_NAME, {
-        keyPath: 'path'
-      });
-      database.createObjectStore(MTIME_STORE_NAME);
-    });
-
-    const database = await getResult(request);
-    // Unloaded while the open was pending: `onunload` had no connection to close, and nothing would
-    // ever close this one, which would block every later `deleteDatabase`.
+    const store = createVerdictRecordStore(this.app.appId);
+    this._database = store;
+    const mtimeEntry = await store.get('fingerprint') ?? DEFAULT_MTIME_ENTRY;
     if (this.isUnloaded()) {
-      database.close();
+      await store.close();
       return;
     }
-
-    this._database = database;
-    const transaction = database.transaction([MTIME_STORE_NAME], 'readonly');
-    const mtimeStore = transaction.objectStore(MTIME_STORE_NAME);
-
-    const mtimeEntry = await getResult(mtimeStore.get(0)) as DatabaseMtimeEntry | undefined ?? DEFAULT_MTIME_ENTRY;
     const currentMtimeEntry = await this.getCurrentMtimeEntry();
+    this.appliedFingerprint = currentMtimeEntry;
     this.appliedSettingsFingerprint = currentMtimeEntry.settingsFingerprint;
 
     if (!isDeepEqual(currentMtimeEntry, mtimeEntry)) {
@@ -646,10 +654,17 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
     this.configFingerprintMatched = true;
   }
 
-  private processStoreActions(): void {
-    const storeActions = [...this.pendingStoreActions.values()];
-    this.pendingStoreActions = new Map();
-    this.writeStoreActionChunk(storeActions, 0, this.storeGeneration);
+  private async processStoreActions(): Promise<void> {
+    if (this.flushPromise) {
+      await this.flushPromise;
+      return;
+    }
+    this.flushPromise = this.flushStoreActions();
+    try {
+      await this.flushPromise;
+    } finally {
+      this.flushPromise = null;
+    }
   }
 
   private async readGitIgnore(): Promise<boolean> {
@@ -722,11 +737,19 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
   }
 
   private releaseDatabase(): void {
+    if (this.isStoreReleased) {
+      return;
+    }
+    this.isStoreReleased = true;
     this.processStoreActionsDebounced.cancel();
-    this.pendingStoreActions.clear();
-    this.storeGeneration++;
-    this._database?.close();
-    this._database = undefined;
+    invokeAsyncSafely(async () => {
+      try {
+        await this.processStoreActions();
+      } finally {
+        await this._database?.close();
+        this._database = undefined;
+      }
+    });
   }
 
   private async reload(): Promise<void> {
@@ -780,21 +803,14 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
 
   private async resetDatabase(): Promise<void> {
     const currentMtimeEntry = await this.getCurrentMtimeEntry();
+    this.appliedFingerprint = currentMtimeEntry;
     this.appliedSettingsFingerprint = currentMtimeEntry.settingsFingerprint;
 
-    const transaction = this.database.transaction([FILES_STORE_NAME, MTIME_STORE_NAME], 'readwrite');
-    const mtimeStore = transaction.objectStore(MTIME_STORE_NAME);
-    const filesStore = transaction.objectStore(FILES_STORE_NAME);
-    filesStore.clear();
     this.fileIgnoreMap.clear();
-    // Drop any queued writes: they target the store we just cleared and would
-    // otherwise repopulate it with stale entries.
     this.pendingStoreActions.clear();
     this.storeGeneration++;
-    // The store is now empty, so there is nothing left for `ensureVerdictsLoaded`
-    // to hydrate — `fileIgnoreMap` (empty) is authoritative and repopulates on miss.
     this.verdictsLoaded = true;
-    mtimeStore.put(currentMtimeEntry, 0);
+    await this.database.replace({ entries: [['fingerprint', currentMtimeEntry]], keyPrefix: 'path:' });
   }
 
   /**
@@ -813,29 +829,6 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
     // A failed save must not stop the ones after it; its caller still gets the error.
     this.localPatternsWrite = write.catch(() => undefined);
     await write;
-  }
-
-  /**
-   * Writes `storeActions` from `start` in transactions of {@link STORE_ACTIONS_CHUNK_SIZE},
-   * yielding between them. Stops once `generation` is stale or the connection is gone (a debounced
-   * flush can fire after `onunload` released it).
-   */
-  private writeStoreActionChunk(storeActions: readonly ((store: IDBObjectStore) => void)[], start: number, generation: number): void {
-    if (!this._database || generation !== this.storeGeneration) {
-      return;
-    }
-    const end = Math.min(start + STORE_ACTIONS_CHUNK_SIZE, storeActions.length);
-    const transaction = this._database.transaction(FILES_STORE_NAME, 'readwrite');
-    const store = transaction.objectStore(FILES_STORE_NAME);
-    for (const storeAction of storeActions.slice(start, end)) {
-      storeAction(store);
-    }
-    transaction.commit();
-    if (end < storeActions.length) {
-      window.setTimeout(() => {
-        this.writeStoreActionChunk(storeActions, end, generation);
-      }, 0);
-    }
   }
 }
 
