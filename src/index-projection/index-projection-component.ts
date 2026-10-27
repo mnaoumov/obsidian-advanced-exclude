@@ -637,16 +637,27 @@ export class IndexProjectionComponent extends ComponentEx {
   }
 
   /**
-   * Nudges the open link side-panes (Backlinks, Outgoing Links) to recompute after a
+   * Redraws open global/local graphs and recomputes link side-panes after a
    * `Full`-mode projection. The projection mutates the link index without firing events, so
    * these views would otherwise render stale links (a hidden file lingering as a backlink)
    * until the next interaction: their components recompute only on an active-file change or
    * a `metadataCache` event, neither of which the projection fires. Each component caches
    * the file it last rendered in its `*File` fields and its `update()` short-circuits while
    * they still match the active file, so clearing those trackers (but not `file`, the current
-   * target) makes `update()` recompute. A deferred leaf has no component yet, so it is skipped.
+   * target) makes `update()` recompute. Graph views redraw from the current index directly.
+   * Refresh each open view once, without vault or metadata events. Deferred leaves are skipped.
    */
   private refreshLinkViews(): void {
+    for (const leaf of this.app.workspace.getLeavesOfType(ViewType.Graph)) {
+      if ('dataEngine' in leaf.view) {
+        leaf.view.update();
+      }
+    }
+    for (const leaf of this.app.workspace.getLeavesOfType(ViewType.LocalGraph)) {
+      if ('engine' in leaf.view) {
+        leaf.view.update();
+      }
+    }
     for (const leaf of this.app.workspace.getLeavesOfType(ViewType.Backlink)) {
       if (!('backlink' in leaf.view)) {
         continue;

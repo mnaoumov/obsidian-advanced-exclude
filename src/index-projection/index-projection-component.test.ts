@@ -1,6 +1,8 @@
 import type {
   BacklinkView,
   DataAdapterEx,
+  GraphView,
+  LocalGraphView,
   OutgoingLinkView
 } from '@obsidian-typings/obsidian-public-latest';
 import type {
@@ -15,7 +17,10 @@ import type { Mock } from 'vitest';
 import { isFolder } from '@mnaoumov/obsidian-lib/file-system';
 import { castTo } from '@mnaoumov/typescript-lib/object-utils';
 import { strictProxy } from '@mnaoumov/typescript-test-toolkit/strict-proxy';
-import { getDataAdapterEx } from '@obsidian-typings/obsidian-public-latest/implementations';
+import {
+  getDataAdapterEx,
+  ViewType
+} from '@obsidian-typings/obsidian-public-latest/implementations';
 import {
   afterEach,
   beforeEach,
@@ -583,6 +588,26 @@ describe('IndexProjectionComponent', () => {
   });
 
   describe('link view refresh (Full mode)', () => {
+    it('redraws each open graph once for a projection hiding 5000 files', async () => {
+      const { app, component } = setup({
+        entries: Array.from({ length: 5000 }, (_, index) => ({ isFolderFlag: false, path: `hidden-${String(index)}.md` })),
+        isIgnored: () => true
+      });
+      const graph = strictProxy<GraphView>({ dataEngine: strictProxy<GraphView['dataEngine']>({}), update: vi.fn() });
+      const localGraph = strictProxy<LocalGraphView>({ engine: strictProxy<LocalGraphView['engine']>({}), update: vi.fn() });
+      vi.mocked(app.workspace.getLeavesOfType).mockImplementation((viewType) => {
+        if (viewType === 'graph') {
+          return [strictProxy<WorkspaceLeaf>({ view: graph })];
+        }
+        return viewType === ViewType.LocalGraph ? [strictProxy<WorkspaceLeaf>({ view: localGraph })] : [];
+      });
+
+      await component.update();
+
+      expect(graph.update).toHaveBeenCalledExactlyOnceWith();
+      expect(localGraph.update).toHaveBeenCalledExactlyOnceWith();
+    });
+
     function backlinkLeaf(backlink: BacklinkView['backlink']): WorkspaceLeaf {
       return strictProxy<WorkspaceLeaf>({ view: strictProxy<BacklinkView>({ backlink }) });
     }
