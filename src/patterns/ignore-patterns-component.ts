@@ -608,8 +608,8 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
    */
   private async loadFingerprint(): Promise<void> {
     const request = window.indexedDB.open(`${this.app.appId}/advanced-exclude`, DB_VERSION);
-    request.addEventListener('upgradeneeded', (event) => {
-      if (event.newVersion !== 1) {
+    request.addEventListener('upgradeneeded', ($event) => {
+      if ($event.newVersion !== 1) {
         return;
       }
       const database = request.result;
