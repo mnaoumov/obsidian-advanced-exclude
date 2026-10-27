@@ -14,8 +14,8 @@ const PLUGIN_ID = 'advanced-exclude';
  * Clears the plugin's ignore patterns and re-applies them, so the whole performance vault is visible
  * again.
  *
- * Every `integration-tests:desktop-performance` suite shares ONE populated vault and ONE Obsidian
- * instance, and most of them end by hiding part or all of it. Without this, whichever suite runs next
+ * Suites within each performance project share one populated vault and one Obsidian instance;
+ * the real-restart project owns a separate fixture. Most suites end by hiding part or all of it. Without this, whichever suite runs next
  * opens a vault that is already hidden and fails on its "the vault really was populated" assertion,
  * reporting `0` or `2` indexed files where ~90k were written.
  *

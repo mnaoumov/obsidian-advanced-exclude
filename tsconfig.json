@@ -22,7 +22,8 @@
     "types": [
       "@obsidian-typings/obsidian-public-latest",
       "@total-typescript/ts-reset",
-      "node"
+      "node",
+      "obsidian-integration-testing/vitest/typings"
     ],
     "verbatimModuleSyntax": true
   },
