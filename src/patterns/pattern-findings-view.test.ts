@@ -21,7 +21,7 @@ describe('appendFindingMessage', () => {
 
     appendFindingMessage(el, 'Write `\\[` for a `[`.');
 
-    expect(el.innerHTML).toBe(String.raw`Write <code>\[</code> for a <code>[</code>.`);
+    expect(el.innerHTML).toBe(String.raw`Write <strong class="markdown-rendered code"><code>\[</code></strong> for a <strong class="markdown-rendered code"><code>[</code></strong>.`);
   });
 });
 

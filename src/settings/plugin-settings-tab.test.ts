@@ -65,23 +65,6 @@ vi.mock('@mnaoumov/typescript-lib/html-element', () => ({
   appendCodeBlock: vi.fn()
 }));
 
-/*
- * Return-value stub of an obsidian-lib utility. The real base's `bind` duck-types every
- * value component it receives via `getTextBasedComponentValue` -> `isTextBasedComponent`,
- * which READS `setPlaceholderValue` on the component to decide whether it is text-based.
- * The obsidian-test-mocks value components are wrapped in a strict proxy that THROWS on
- * an unmocked property read (a real Obsidian component would yield `undefined` and the
- * probe would simply move on), so the read blows up before `bind` can continue. Stubbing
- * the probe's return value to `null` (its real result for a non-text-based component)
- * lets the REAL base `bind` run end to end over the REAL test-mocks
- * `Setting` controls. This only neutralizes an obsidian-lib-internal text-placeholder branch
- * that is covered by obsidian-lib's own tests; the lines under test here merely call
- * `this.bind(...)` and are exercised regardless.
- */
-vi.mock('@mnaoumov/obsidian-lib/setting-components/text-based-component', () => ({
-  getTextBasedComponentValue: vi.fn(() => null)
-}));
-
 interface CapturedDropdown {
   readonly handler: (value: string) => unknown;
   readonly values: string[];

@@ -1,3 +1,4 @@
+import { appendCodeBlock } from '@mnaoumov/obsidian-lib/html-element';
 import { debounce } from 'obsidian';
 
 import type { PatternFinding } from './pattern-validation.ts';
@@ -35,7 +36,7 @@ export function appendFindingMessage(parentEl: DocumentFragment | HTMLElement, m
   let isCode = false;
   for (const part of message.split('`')) {
     if (isCode) {
-      parentEl.createEl('code', { text: part });
+      appendCodeBlock(parentEl, part);
     } else if (part !== '') {
       parentEl.appendText(part);
     }
