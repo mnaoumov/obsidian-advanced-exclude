@@ -62,19 +62,19 @@ const SAVE_LOCAL_PATTERNS_DEBOUNCE_INTERVAL_IN_MILLISECONDS = 500;
 const STORE_ACTIONS_CHUNK_SIZE = 2000;
 
 interface DatabaseFileEntry {
-  isIgnored: boolean;
-  path: string;
+  readonly isIgnored: boolean;
+  readonly path: string;
 }
 
 interface DatabaseMtimeEntry {
-  gitIgnoreMtime: number;
-  matcherVersion: number;
-  obsidianIgnoreMtime: number;
+  readonly gitIgnoreMtime: number;
+  readonly matcherVersion: number;
+  readonly obsidianIgnoreMtime: number;
   /**
    * The effective patterns and scalars: the base settings', or the active profile's expansion.
    */
-  settingsFingerprint: string;
-  userIgnoreFiltersString: string;
+  readonly settingsFingerprint: string;
+  readonly userIgnoreFiltersString: string;
 }
 
 const DEFAULT_MTIME_ENTRY: DatabaseMtimeEntry = {

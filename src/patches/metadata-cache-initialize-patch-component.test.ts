@@ -28,6 +28,7 @@ interface Fixture {
 }
 
 interface InitializeGate {
+  // eslint-disable-next-line typescript-dev-toolkit/readonly-interface-members -- The test replaces this mock member while exercising state changes.
   resolve?: () => void;
 }
 

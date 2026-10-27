@@ -23,14 +23,19 @@ type FileCacheValue = MetadataCache['fileCache'][string];
  * verbatim without re-reading or re-parsing the file.
  */
 interface HiddenSnapshot {
+  // eslint-disable-next-line typescript-dev-toolkit/readonly-interface-members -- Hiding a file populates this snapshot field after creating the shared snapshot.
   fileCache?: FileCacheValue;
   readonly inboundDemotions: InboundDemotion[];
   readonly isFile: boolean;
+  // eslint-disable-next-line typescript-dev-toolkit/readonly-interface-members -- Hiding a file populates this snapshot field after creating the shared snapshot.
   mtime?: number;
   readonly node: TAbstractFile;
   readonly parent: null | TFolder;
+  // eslint-disable-next-line typescript-dev-toolkit/readonly-interface-members -- Hiding a file populates this snapshot field after creating the shared snapshot.
   resolvedLinks?: LinkMap;
+  // eslint-disable-next-line typescript-dev-toolkit/readonly-interface-members -- Hiding a file populates this snapshot field after creating the shared snapshot.
   size?: number;
+  // eslint-disable-next-line typescript-dev-toolkit/readonly-interface-members -- Hiding a file populates this snapshot field after creating the shared snapshot.
   unresolvedLinks?: LinkMap;
 }
 

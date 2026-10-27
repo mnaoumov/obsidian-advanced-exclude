@@ -65,8 +65,10 @@ interface ExpansionState {
   readonly importedFileContents: ImportedFileContents;
   // Its keys, in insertion order, are the imported paths.
   readonly importingProfileNames: Map<string, string>;
+  // eslint-disable-next-line typescript-dev-toolkit/readonly-interface-members -- Profile expansion replaces this accumulator when applying directives.
   lines: ResolvedPatternLine[];
   readonly profiles: readonly Readonly<SettingsProfile>[];
+  // eslint-disable-next-line typescript-dev-toolkit/readonly-interface-members -- Profile expansion replaces this accumulator when applying directives.
   scalars: ProfileScalarSettings;
 }
 

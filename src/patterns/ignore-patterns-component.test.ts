@@ -76,59 +76,61 @@ vi.mock('@mnaoumov/typescript-lib/object-utils', async (importOriginal) => ({
 }));
 
 interface CreateComponentOverrides {
-  app?: AppOriginal;
-  isSettingsTabOpen?: () => boolean;
-  onUpdateFileTree?: () => Promise<void>;
-  pluginNoticeComponent?: PluginNoticeComponent;
-  pluginSettingsComponent?: PluginSettingsComponent;
+  readonly app?: AppOriginal;
+  readonly isSettingsTabOpen?: () => boolean;
+  readonly onUpdateFileTree?: () => Promise<void>;
+  readonly pluginNoticeComponent?: PluginNoticeComponent;
+  readonly pluginSettingsComponent?: PluginSettingsComponent;
 }
 
 interface FileIgnoreEntry {
-  isIgnored: boolean;
-  path: string;
+  readonly isIgnored: boolean;
+  readonly path: string;
 }
 
 type MockCallEntry = [string, (...$arguments: unknown[]) => unknown];
 
 interface MockIDBObjectStore {
-  clear: ReturnType<typeof vi.fn>;
-  delete: ReturnType<typeof vi.fn>;
-  get: ReturnType<typeof vi.fn>;
-  getAll: ReturnType<typeof vi.fn>;
-  put: ReturnType<typeof vi.fn>;
+  readonly clear: ReturnType<typeof vi.fn>;
+  readonly delete: ReturnType<typeof vi.fn>;
+  readonly get: ReturnType<typeof vi.fn>;
+  readonly getAll: ReturnType<typeof vi.fn>;
+  readonly put: ReturnType<typeof vi.fn>;
 }
 
 interface MockIDBTransaction {
-  commit: ReturnType<typeof vi.fn>;
-  objectStore: ReturnType<typeof vi.fn>;
+  readonly commit: ReturnType<typeof vi.fn>;
+  readonly objectStore: ReturnType<typeof vi.fn>;
 }
 
 interface MtimeEntryWithGitIgnore {
-  gitIgnoreMtime: number;
+  readonly gitIgnoreMtime: number;
 }
 
 interface MtimeEntryWithObsidianIgnore {
-  obsidianIgnoreMtime: number;
+  readonly obsidianIgnoreMtime: number;
 }
 
 interface MtimeEntryWithUserIgnoreFilters {
-  userIgnoreFiltersString: string;
+  readonly userIgnoreFiltersString: string;
 }
 
 interface PendingOpen {
+  // eslint-disable-next-line typescript-dev-toolkit/readonly-interface-members -- The test replaces this mock member while exercising state changes.
   succeed?: () => void;
 }
 
 interface ProfileState {
+  // eslint-disable-next-line typescript-dev-toolkit/readonly-interface-members -- The test replaces this mock member while exercising state changes.
   activeProfileId: null | string;
 }
 
 interface SaveSettingsEffectiveValues {
-  ignorePatterns: string;
+  readonly ignorePatterns: string;
 }
 
 interface SaveSettingsState {
-  effectiveValues: SaveSettingsEffectiveValues;
+  readonly effectiveValues: SaveSettingsEffectiveValues;
 }
 
 interface SetupIndexedDatabaseParams {
@@ -145,12 +147,12 @@ interface SetupIndexedDatabaseResult {
 }
 
 interface TestableIgnorePatternsComponent {
-  clearCachedExcludeRegExps: () => void;
-  resetDatabase: () => Promise<void>;
+  readonly clearCachedExcludeRegExps: () => void;
+  readonly resetDatabase: () => Promise<void>;
 }
 
 interface UpgradeEvent {
-  newVersion: number;
+  readonly newVersion: number;
 }
 
 // Exposes the protected onLayoutReady so tests can invoke it directly, as they did before it became protected.

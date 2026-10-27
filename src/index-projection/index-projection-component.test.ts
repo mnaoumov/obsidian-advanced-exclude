@@ -82,22 +82,22 @@ interface IsIgnoredParams {
 }
 
 interface MockAdapter {
-  files: DataAdapterEx['files'];
-  reconcileFile: ReturnType<typeof vi.fn>;
-  stat: ReturnType<typeof vi.fn>;
+  readonly files: DataAdapterEx['files'];
+  readonly reconcileFile: ReturnType<typeof vi.fn>;
+  readonly stat: ReturnType<typeof vi.fn>;
 }
 
 interface MockEntry {
-  isFolderFlag: boolean;
-  path: string;
+  readonly isFolderFlag: boolean;
+  readonly path: string;
 }
 
 interface MockManualIndexHider {
-  dropStaleSnapshot: Mock<(normalizedPath: string) => void>;
-  getSnapshotStat: Mock<(normalizedPath: string) => null | SnapshotStat>;
-  hasSnapshot: Mock<(normalizedPath: string) => boolean>;
-  hide: Mock<(normalizedPaths: readonly string[]) => void>;
-  show: Mock<(normalizedPaths: readonly string[]) => string[]>;
+  readonly dropStaleSnapshot: Mock<(normalizedPath: string) => void>;
+  readonly getSnapshotStat: Mock<(normalizedPath: string) => null | SnapshotStat>;
+  readonly hasSnapshot: Mock<(normalizedPath: string) => boolean>;
+  readonly hide: Mock<(normalizedPaths: readonly string[]) => void>;
+  readonly show: Mock<(normalizedPaths: readonly string[]) => string[]>;
 }
 
 interface SetupParams {

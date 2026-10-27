@@ -76,12 +76,15 @@ interface VaultModelEnsureNodeParams {
 }
 
 interface VaultModelNode {
+  // eslint-disable-next-line typescript-dev-toolkit/readonly-interface-members -- The shadow tree updates this node state as vault visibility changes.
   children: Map<string, VaultModelNode> | null;
-  isFolder: boolean;
+  readonly isFolder: boolean;
+  // eslint-disable-next-line typescript-dev-toolkit/readonly-interface-members -- The shadow tree updates this node state as vault visibility changes.
   isIgnoredSelf: boolean;
+  // eslint-disable-next-line typescript-dev-toolkit/readonly-interface-members -- The shadow tree updates this node state as vault visibility changes.
   isVisible: boolean;
-  parent: null | VaultModelNode;
-  path: string;
+  readonly parent: null | VaultModelNode;
+  readonly path: string;
 }
 
 interface VaultModelSetPathParams {

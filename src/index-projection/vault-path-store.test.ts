@@ -12,11 +12,12 @@ import type { StoredVaultPaths } from './vault-path-store.ts';
 import { IndexedDatabaseVaultPathStore } from './vault-path-store.ts';
 
 interface MockPathsStore {
-  get: ReturnType<typeof vi.fn>;
-  put: ReturnType<typeof vi.fn>;
+  readonly get: ReturnType<typeof vi.fn>;
+  readonly put: ReturnType<typeof vi.fn>;
 }
 
 interface PendingOpen {
+  // eslint-disable-next-line typescript-dev-toolkit/readonly-interface-members -- The test replaces this mock member while exercising state changes.
   succeed?: () => void;
 }
 

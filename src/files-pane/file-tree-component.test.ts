@@ -21,11 +21,12 @@ import { FileTreeComponent } from './file-tree-component.ts';
 type FileItem = FileExplorerView['fileItems'][string];
 
 interface MockFileExplorerView {
-  fileItems: FileExplorerView['fileItems'];
-  onCreate: ReturnType<typeof vi.fn>;
-  onDelete: ReturnType<typeof vi.fn>;
+  readonly fileItems: FileExplorerView['fileItems'];
+  readonly onCreate: ReturnType<typeof vi.fn>;
+  readonly onDelete: ReturnType<typeof vi.fn>;
+  // eslint-disable-next-line typescript-dev-toolkit/readonly-interface-members -- The test replaces this mock member while exercising state changes.
   requestSort: FileExplorerView['requestSort'];
-  sort: ReturnType<typeof vi.fn>;
+  readonly sort: ReturnType<typeof vi.fn>;
 }
 
 interface MockLeaf {
