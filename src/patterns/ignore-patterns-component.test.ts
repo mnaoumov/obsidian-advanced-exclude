@@ -265,8 +265,8 @@ function setupIndexedDatabase(params?: SetupIndexedDatabaseParams): SetupIndexed
 
   const newVersion = params?.upgradeNewVersion ?? 1;
 
-  const mockAddEventListener = vi.fn((event: string, handler: ($event: UpgradeEvent) => void) => {
-    if (event === 'upgradeneeded') {
+  const mockAddEventListener = vi.fn(($event: string, handler: ($event: UpgradeEvent) => void) => {
+    if ($event === 'upgradeneeded') {
       handler({ newVersion });
     }
   });
@@ -1829,9 +1829,9 @@ describe('IgnorePatternsComponent', () => {
         result: mockDatabase
       });
       Object.defineProperty(pendingOpenRequest, 'addEventListener', {
-        value: vi.fn((event: string, handler: ($event: UpgradeEvent) => void) => {
+        value: vi.fn(($event: string, handler: ($event: UpgradeEvent) => void) => {
           // `success` fires immediately so the open promise resolves.
-          if (event === 'upgradeneeded' || event === 'success') {
+          if ($event === 'upgradeneeded' || $event === 'success') {
             handler({ newVersion: 1 });
           }
         })
@@ -1858,8 +1858,8 @@ describe('IgnorePatternsComponent', () => {
         result: mockDatabase
       });
       Object.defineProperty(pendingOpenRequest, 'addEventListener', {
-        value: vi.fn((event: string, handler: () => void) => {
-          if (event === 'success') {
+        value: vi.fn(($event: string, handler: () => void) => {
+          if ($event === 'success') {
             pendingOpen.succeed = handler;
           }
         })
@@ -1892,9 +1892,9 @@ describe('IgnorePatternsComponent', () => {
         readyState: 'pending'
       });
       Object.defineProperty(pendingOpenRequest, 'addEventListener', {
-        value: vi.fn((event: string, handler: () => void) => {
+        value: vi.fn(($event: string, handler: () => void) => {
           // Fire error handler immediately when it is registered
-          if (event === 'error') {
+          if ($event === 'error') {
             handler();
           }
         })
@@ -1921,8 +1921,8 @@ describe('IgnorePatternsComponent', () => {
         readyState: 'pending'
       });
       Object.defineProperty(pendingOpenRequest, 'addEventListener', {
-        value: vi.fn((event: string, handler: () => void) => {
-          if (event === 'error') {
+        value: vi.fn(($event: string, handler: () => void) => {
+          if ($event === 'error') {
             handler();
           }
         })

@@ -48,8 +48,8 @@ function setupDatabase(getValue: StoredVaultPaths | undefined | VaultModelEntry[
   // A pending open request that resolves via its `success` event (covers the async path).
   const openRequest = strictProxy<IDBOpenDBRequest>({ readyState: 'pending', result: mockDatabase });
   Object.defineProperty(openRequest, 'addEventListener', {
-    value: vi.fn((event: string, handler: () => void) => {
-      if (event === 'upgradeneeded' || event === 'success') {
+    value: vi.fn(($event: string, handler: () => void) => {
+      if ($event === 'upgradeneeded' || $event === 'success') {
         handler();
       }
     })
@@ -126,8 +126,8 @@ describe('IndexedDatabaseVaultPathStore', () => {
     const pendingOpen: PendingOpen = {};
     const openRequest = strictProxy<IDBOpenDBRequest>({ readyState: 'pending', result: mockDatabase });
     Object.defineProperty(openRequest, 'addEventListener', {
-      value: vi.fn((event: string, handler: () => void) => {
-        if (event === 'success') {
+      value: vi.fn(($event: string, handler: () => void) => {
+        if ($event === 'success') {
           pendingOpen.succeed = handler;
         }
       })
