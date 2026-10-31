@@ -60,7 +60,7 @@ Built on `@mnaoumov/obsidian-lib` with tooling from `@mnaoumov/obsidian-dev-tool
     - `vault-model.ts` — `VaultModel`: the in-memory shadow tree and its bottom-up visibility (`recomputeAll`, `applyDelta`, `seedHidden`)
     - `index-projection-component.ts` — `IndexProjectionComponent`: projects the model onto Obsidian's index in one event-free pass, drives the explorer, owns fast-enable and apply progress
     - `manual-index-hider.ts` — `ManualIndexHider`: S6 direct index mutation — hides/re-inserts files with no events, keeps the in-memory snapshots a same-session un-ignore restores from
-    - `vault-path-store.ts` — LocalDataStore persistence of individual hidden paths + universe signature (`IndexedDatabaseVaultPathStore`, `hidden-paths-v1`). Imports legacy structs and bare arrays atomically with a migration marker; malformed hidden paths reject the import and retain the legacy database
+    - `vault-path-store.ts` — LocalDataStore persistence of the hidden set + universe signature, as one record (per-path records made a ~90k save slow enough for a reload to abort it) (`IndexedDatabaseVaultPathStore`, `hidden-paths-v1`). Imports legacy structs and bare arrays atomically with a migration marker; malformed hidden paths reject the import and retain the legacy database
     - `universe-signature.ts` — order-independent signature of the file universe; a mismatch vetoes fast-enable
     - `restore-notice-component.ts` — restores hidden files synchronously on unload (added last so it unloads first)
     - `update-progress-notice-component.ts` — progress notice shown while a projection is applied

@@ -83,7 +83,7 @@ describe('IndexedDatabaseVaultPathStore', () => {
     const store = new IndexedDatabaseVaultPathStore('app-id');
     expect(await store.load()).toEqual({ entries: [{ isFolder: false, path: 'a.md' }], universeSignature: Array.isArray(legacy) ? null : '1:abc' });
     store.close();
-    expect(await readRecords()).toContainEqual(['path:a.md', { isFolder: false, path: 'a.md' }]);
+    expect(await readRecords()).toContainEqual(['hiddenSet', { entries: [{ isFolder: false, path: 'a.md' }], universeSignature: Array.isArray(legacy) ? null : '1:abc' }]);
   });
 
   it('persists replacements and signatures across restart without reimporting old paths', async () => {
@@ -95,6 +95,9 @@ describe('IndexedDatabaseVaultPathStore', () => {
     const second = new IndexedDatabaseVaultPathStore('app-id');
     expect(await second.load()).toEqual({ entries: [{ isFolder: false, path: 'new.md' }], universeSignature: 'new-signature' });
     second.close();
+    // One record for the whole set, so a reload cannot land between the paths of a save.
+    const records = await readRecords();
+    expect(records.map(([key]) => key)).toEqual(['hiddenSet', 'migration:legacy-v1']);
   });
 
   it('rejects malformed hidden paths without importing a partial hidden set', async () => {
@@ -115,7 +118,7 @@ describe('IndexedDatabaseVaultPathStore', () => {
     expect(await pending).toEqual({ entries: [], universeSignature: null });
     expect(await store.load()).toEqual({ entries: [], universeSignature: null });
     store.save([{ isFolder: true, path: 'late' }], 'late');
-    expect(await readRecords()).not.toContainEqual(['path:late', expect.anything()]);
+    expect(await readRecords()).not.toContainEqual(['hiddenSet', expect.objectContaining({ universeSignature: 'late' })]);
   });
 
   it('shares the pending import across concurrent loads', async () => {

@@ -8,6 +8,9 @@ import { LocalRecordStore } from '../local-record-store.ts';
 
 const STORE_NAME = 'paths';
 const PATHS_KEY = 'paths';
+// One record, not one per path: the set is only ever replaced whole, and ~90k puts in one
+// transaction took long enough for a window reload straight after a hide to abort it.
+const HIDDEN_SET_KEY = 'hiddenSet';
 
 /**
  * The persisted hidden set plus a signature of the file universe it was captured
@@ -49,8 +52,7 @@ export class IndexedDatabaseVaultPathStore implements VaultPathStore {
               throw new Error('Legacy hidden-path store is missing');
             }
             const value: unknown = await getResult(database.transaction(STORE_NAME).objectStore(STORE_NAME).get(PATHS_KEY));
-            const paths = normalizeStoredValue(value);
-            return [['universeSignature', paths.universeSignature], ...paths.entries.map((entry): [string, unknown] => [`path:${entry.path}`, entry])];
+            return [[HIDDEN_SET_KEY, normalizeStoredValue(value)]];
           }
         }),
       storeId: 'hidden-paths-v1',
@@ -69,27 +71,21 @@ export class IndexedDatabaseVaultPathStore implements VaultPathStore {
     if (this.checkClosed()) {
       return { entries: [], universeSignature: null };
     }
-    const records = await this.store.entries();
+    const value = await this.store.get(HIDDEN_SET_KEY);
     if (this.checkClosed()) {
       return { entries: [], universeSignature: null };
     }
     this.isLoaded = true;
-    return normalizeStoredValue({
-      entries: records.filter(([key]) => key.startsWith('path:')).map(([, value]) => value),
-      universeSignature: records.find(([key]) => key === 'universeSignature')?.[1] ?? null
-    });
+    return normalizeStoredValue(value);
   }
 
   public save(entries: readonly VaultModelEntry[], universeSignature: string): void {
     if (!this.isLoaded || this.isClosed) {
       return;
     }
-    const snapshot = [...entries];
-    // Queue the replacement as one operation so concurrent saves cannot retain obsolete paths.
+    const hiddenSet: StoredVaultPaths = { entries: [...entries], universeSignature };
     invokeAsyncSafely(async () => {
-      await this.store.replace({
-        entries: [['universeSignature', universeSignature], ...snapshot.map((entry): [string, unknown] => [`path:${entry.path}`, entry])]
-      });
+      await this.store.replace({ entries: [[HIDDEN_SET_KEY, hiddenSet]] });
     });
   }
 
