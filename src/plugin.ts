@@ -1,3 +1,4 @@
+import { OpenBugReportCommandHandler } from '@mnaoumov/obsidian-lib/command-handlers/open-bug-report-command-handler';
 import { OpenDemoVaultCommandHandler } from '@mnaoumov/obsidian-lib/command-handlers/open-demo-vault-command-handler';
 import { OpenSettingsCommandHandler } from '@mnaoumov/obsidian-lib/command-handlers/open-settings-command-handler';
 import { PluginSettingsTabComponent } from '@mnaoumov/obsidian-lib/components/plugin-settings-tab-component';
@@ -154,6 +155,11 @@ export class Plugin extends PluginBase {
       new OpenSettingsCommandHandler({
         app: this.app,
         settingTab: pluginSettingsTab
+      }),
+      new OpenBugReportCommandHandler({
+        app: this.app,
+        gitHubRepo: 'mnaoumov/obsidian-advanced-exclude',
+        pluginId: this.manifest.id
       }),
       new OpenDemoVaultCommandHandler({
         app: this.app,
