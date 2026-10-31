@@ -810,7 +810,10 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
     this.pendingStoreActions.clear();
     this.storeGeneration++;
     this.verdictsLoaded = true;
-    await this.database.replace({ entries: [['fingerprint', currentMtimeEntry]] });
+    // Not awaited: the in-memory state above is already authoritative, and the store lock is requested
+    // synchronously, so every later write still queues behind the reset. Awaiting it held the apply behind
+    // the clear of a ~90k-verdict store and behind the flush batch in flight.
+    invokeAsyncSafely(() => this.database.replace({ entries: [['fingerprint', currentMtimeEntry]] }));
   }
 
   /**
