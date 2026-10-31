@@ -50,7 +50,7 @@ describe('verdict records migration', () => {
     expect(await first.get('fingerprint')).toEqual({ settingsFingerprint: 'full-config' });
     expect(await first.entries()).toContainEqual(['path:a.md', { isIgnored: true, path: 'a.md' }]);
     expect(await first.get('path:invalid.md')).toBeUndefined();
-    await first.replace({ entries: [['fingerprint', { settingsFingerprint: 'new-config' }]], keyPrefix: 'path:' });
+    await first.replace({ entries: [['fingerprint', { settingsFingerprint: 'new-config' }]] });
     await first.close();
     const restarted = createVerdictRecordStore('vault');
     expect(await restarted.get('path:a.md')).toBeUndefined();

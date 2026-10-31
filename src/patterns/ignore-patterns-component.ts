@@ -810,7 +810,7 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
     this.pendingStoreActions.clear();
     this.storeGeneration++;
     this.verdictsLoaded = true;
-    await this.database.replace({ entries: [['fingerprint', currentMtimeEntry]], keyPrefix: 'path:' });
+    await this.database.replace({ entries: [['fingerprint', currentMtimeEntry]] });
   }
 
   /**

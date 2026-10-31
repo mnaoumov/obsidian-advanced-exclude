@@ -17,7 +17,6 @@ interface LocalRecordStoreConstructorParams {
 
 interface LocalRecordStoreReplaceParams {
   readonly entries: readonly (readonly [string, unknown])[];
-  readonly keyPrefix: string;
 }
 
 /**
@@ -64,11 +63,12 @@ export class LocalRecordStore {
     return await this.run(async (store) => await store.get(key));
   }
 
+  /**
+  Replaces every record in one transaction, re-seeding the migration marker with it so a restart cannot reimport legacy state.
+  */
   public async replace(params: LocalRecordStoreReplaceParams): Promise<void> {
     await this.run(async (store) => {
-      const records = await store.entries();
-      const removedKeys = records.map(([key]) => key).filter((key) => key.startsWith(params.keyPrefix));
-      await store.commit({ entries: params.entries, removedKeys });
+      await store.commit({ entries: [...params.entries, [MIGRATION_KEY, true]], shouldClear: true });
     });
   }
 

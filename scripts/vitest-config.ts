@@ -58,6 +58,8 @@ const LAYOUT_READY_TIMEOUT_IN_MILLISECONDS = 240_000;
  */
 const DEMO_VAULT_TEST_FILES = 'src/**/*.demo-vault.integration.test.ts';
 
+const DESKTOP_RESTART_PERFORMANCE_TEST_FILES = 'src/**/*.desktop-restart-performance.integration.test.ts';
+
 /**
  * One `it` per note runs every button in that note, and each button re-opens the note, walks the
  * preview to find itself and then waits up to 15s for a result. A note with a dozen buttons therefore
@@ -69,6 +71,14 @@ const DEMO_VAULT_TIMEOUT_IN_MILLISECONDS = 600_000;
 export const config = defineObsidianPluginVitestConfig({
   customProjects(context: ObsidianPluginVitestConfigContext): TestProjectConfiguration[] {
     return [
+      {
+        test: {
+          ...context.desktopPerformance,
+          globalSetup: ['./scripts/vitest-global-setup-performance-restart.ts'],
+          include: [DESKTOP_RESTART_PERFORMANCE_TEST_FILES],
+          name: 'integration-tests:desktop-performance:restart'
+        }
+      },
       {
         test: {
           ...context.desktop,

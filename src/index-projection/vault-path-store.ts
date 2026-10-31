@@ -88,8 +88,7 @@ export class IndexedDatabaseVaultPathStore implements VaultPathStore {
     // Queue the replacement as one operation so concurrent saves cannot retain obsolete paths.
     invokeAsyncSafely(async () => {
       await this.store.replace({
-        entries: [['universeSignature', universeSignature], ...snapshot.map((entry): [string, unknown] => [`path:${entry.path}`, entry])],
-        keyPrefix: 'path:'
+        entries: [['universeSignature', universeSignature], ...snapshot.map((entry): [string, unknown] => [`path:${entry.path}`, entry])]
       });
     });
   }

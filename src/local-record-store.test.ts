@@ -25,7 +25,7 @@ describe('LocalRecordStore', () => {
     await first.commit({ entries: [['fingerprint', before]] });
     await first.commit({ entries: [['path:valid', true]], expectedFingerprint: JSON.stringify(before) });
     expect(await first.get('path:valid')).toBe(true);
-    await second.replace({ entries: [['fingerprint', after]], keyPrefix: 'path:' });
+    await second.replace({ entries: [['fingerprint', after]] });
     await first.commit({ entries: [['path:stale', true]], expectedFingerprint: JSON.stringify(before) });
     expect(await second.get('path:stale')).toBeUndefined();
     expect(await second.get('fingerprint')).toEqual(after);
@@ -67,6 +67,34 @@ describe('LocalRecordStore', () => {
     const second = open();
     expect(await second.get('path')).toBe('new');
     expect(imports).toBe(1);
+    await second.close();
+  });
+
+  it('replaces every record and keeps the import marker across restart', async () => {
+    const factory = new IDBFactory();
+    let imports = 0;
+    function open(): LocalRecordStore {
+      return new LocalRecordStore({
+        factory,
+        importLegacy(): Promise<[string, unknown][]> {
+          imports++;
+          return Promise.resolve([['path:legacy', true]]);
+        },
+        storeId: 'replace-v1',
+        vaultId: 'vault'
+      });
+    }
+    const first = open();
+    await first.commit({ entries: [['universeSignature', 'old'], ['path:old', true]] });
+    await first.replace({ entries: [['universeSignature', 'new'], ['path:new', true]] });
+    await first.close();
+    const second = open();
+    const entries = new Map(await second.entries());
+    expect(imports).toBe(1);
+    expect(entries.get('universeSignature')).toBe('new');
+    expect(entries.get('path:new')).toBe(true);
+    expect(entries.has('path:old')).toBe(false);
+    expect(entries.has('path:legacy')).toBe(false);
     await second.close();
   });
 
