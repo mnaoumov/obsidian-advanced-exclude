@@ -22,6 +22,8 @@ Baseline with **only advanced-exclude loaded: ~6s total** (recompute ~2s + core 
 
 **There is also a correctness hazard, not just speed:** these deletions are *synthetic* — the file still exists on disk, it is only hidden. Plugins that react to a "delete" by mutating the vault (rewriting links, removing "orphaned" attachments) can do the wrong thing.
 
+This happened on 2026-06-22, before S6 shipped. With `W*` excluded, the maintainer's vault lost the attachments of six hidden `W*` notes from disk. `consistent-attachments-and-links` (`shouldDeleteAttachmentsWithNote`) and `custom-attachment-location` (`shouldDeleteOrphanAttachments`) took each synthetic note deletion as real and deleted the note's attachments while those were still in the index. Only some were lost, because the outcome depended on whether a note's attachments were hidden before its handler ran. S6 fires no `delete` event, which closes this path. `src/index-projection/hide-keeps-attachments.desktop.integration.test.ts` guards it: a listener that deletes a note's attachment folder when the note is deleted, then a hide, a disable and an enable while hidden, and an un-hide. The test fails with the attachments gone from disk when the hide calls `reconcileDeletion` again.
+
 ## Two hook shapes (this determines which fix works)
 
 1. **Event listeners** — `vault.on('delete'|'rename'|'create')`, `metadataCache.on('deleted'|'changed')`. Example: `consistent-attachments-and-links` (and, transitively, `custom-attachment-location`). These can be stopped by suppressing the event *dispatch* during the projection.
