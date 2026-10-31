@@ -49,12 +49,12 @@
     "typescript": "6.0.3"
   },
   "dependencies": {
-    "@mnaoumov/obsidian-lib": "^8.1.0",
+    "@mnaoumov/obsidian-lib": "^10.5.0",
     "@mnaoumov/typescript-lib": "^2.0.0"
   },
   "devDependencies": {
     "@commitlint/cli": "^21.2.4",
-    "@mnaoumov/obsidian-dev-toolkit": "^7.1.1",
+    "@mnaoumov/obsidian-dev-toolkit": "^7.4.0",
     "@mnaoumov/typescript-dev-toolkit": "^5.4.2",
     "@mnaoumov/typescript-test-toolkit": "^1.0.3",
     "@obsidian-typings/obsidian-public-latest": "^6.50.0",

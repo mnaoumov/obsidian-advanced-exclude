@@ -243,6 +243,15 @@ describe('Plugin', () => {
     );
   });
 
+  it('should register the report a bug command via its command handler', async () => {
+    const plugin = new Plugin(app.asOriginalType__(), manifest);
+    const addCommandSpy = vi.spyOn(plugin, 'addCommand');
+    await plugin.onload();
+    expect(addCommandSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'report-bug' })
+    );
+  });
+
   it('should register the profile commands', async () => {
     const plugin = new Plugin(app.asOriginalType__(), manifest);
     const addCommandSpy = vi.spyOn(plugin, 'addCommand');
