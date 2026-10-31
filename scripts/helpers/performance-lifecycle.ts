@@ -357,7 +357,14 @@ async function runStep(vaultPath: string, step: LifecycleStep, excludeMode: Excl
         switch (currentStep) {
           case 'coldEnable': {
             await disableTimed();
-            for (const name of [`${app.appId}/advanced-exclude`, `${app.appId}/advanced-exclude-vault-paths`]) {
+            for (
+              const name of [
+                `${app.appId}/advanced-exclude`,
+                `${app.appId}/advanced-exclude-vault-paths`,
+                `obsidian-lib:${JSON.stringify([app.appId, pluginId, 'verdicts-v1'])}`,
+                `obsidian-lib:${JSON.stringify([app.appId, pluginId, 'hidden-paths-v1'])}`
+              ]
+            ) {
               await emptyDatabase(name);
             }
             await enableAndWait();

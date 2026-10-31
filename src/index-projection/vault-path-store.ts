@@ -1,10 +1,16 @@
+import { invokeAsyncSafely } from '@mnaoumov/typescript-lib/async';
+
 import type { VaultModelEntry } from './vault-model.ts';
 
 import { getResult } from '../indexed-database-utils.ts';
+import { readLegacyDatabase } from '../legacy-database.ts';
+import { LocalRecordStore } from '../local-record-store.ts';
 
-const DB_VERSION = 1;
 const STORE_NAME = 'paths';
 const PATHS_KEY = 'paths';
+// One record, not one per path: the set is only ever replaced whole, and ~90k puts in one
+// transaction took long enough for a window reload straight after a hide to abort it.
+const HIDDEN_SET_KEY = 'hiddenSet';
 
 /**
  * The persisted hidden set plus a signature of the file universe it was captured
@@ -29,94 +35,81 @@ export interface VaultPathStore {
   readonly save: (entries: readonly VaultModelEntry[], universeSignature: string) => void;
 }
 
-/**
- * The raw value stored under {@link PATHS_KEY}: the current struct, or a legacy
- * bare array written by an older plugin version.
- */
-type PersistedValue = StoredVaultPaths | VaultModelEntry[];
-
 export class IndexedDatabaseVaultPathStore implements VaultPathStore {
-  private database: IDBDatabase | null = null;
-  private readonly databaseName: string;
   private isClosed = false;
-  private openPromise: null | Promise<IDBDatabase> = null;
+  private isLoaded = false;
+  private readonly store: LocalRecordStore;
 
   public constructor(appId: string) {
-    this.databaseName = `${appId}/advanced-exclude-vault-paths`;
+    this.store = new LocalRecordStore({
+      factory: window.indexedDB,
+      importLegacy: async (): Promise<readonly (readonly [string, unknown])[]> =>
+        await readLegacyDatabase({
+          factory: window.indexedDB,
+          name: `${appId}/advanced-exclude-vault-paths`,
+          async read(database): Promise<[string, unknown][]> {
+            if (!database.objectStoreNames.contains(STORE_NAME)) {
+              throw new Error('Legacy hidden-path store is missing');
+            }
+            const value: unknown = await getResult(database.transaction(STORE_NAME).objectStore(STORE_NAME).get(PATHS_KEY));
+            return [[HIDDEN_SET_KEY, normalizeStoredValue(value)]];
+          }
+        }),
+      storeId: 'hidden-paths-v1',
+      vaultId: appId
+    });
   }
 
-  /**
-   * Releases the connection. An open connection blocks every later `deleteDatabase` and version
-   * upgrade, and each enable opened a new one, so a disable must let it go. A pending `save`
-   * still lands: `close` waits for running transactions. A connection still opening is closed as
-   * soon as it opens.
-   */
   public close(): void {
     this.isClosed = true;
-    this.database?.close();
-    this.database = null;
+    invokeAsyncSafely(async () => {
+      await this.store.close();
+    });
   }
 
   public async load(): Promise<StoredVaultPaths> {
-    const database = await this.openDatabase();
-    // Closed by an unload: the caller is aborting, and a closed connection cannot start a transaction.
-    if (this.isClosed) {
-      return normalizeStoredValue(undefined);
+    if (this.checkClosed()) {
+      return { entries: [], universeSignature: null };
     }
-    const store = database.transaction([STORE_NAME], 'readonly').objectStore(STORE_NAME);
-    const value = await getResult(store.get(PATHS_KEY)) as PersistedValue | undefined;
+    const value = await this.store.get(HIDDEN_SET_KEY);
+    if (this.checkClosed()) {
+      return { entries: [], universeSignature: null };
+    }
+    this.isLoaded = true;
     return normalizeStoredValue(value);
   }
 
-  /**
-   * Persists the hidden set and its universe signature immediately. `load()` must
-   * have run first so the database is open; builds are infrequent, so no debounce
-   * is needed.
-   */
   public save(entries: readonly VaultModelEntry[], universeSignature: string): void {
-    if (!this.database) {
+    if (!this.isLoaded || this.isClosed) {
       return;
     }
-    const transaction = this.database.transaction([STORE_NAME], 'readwrite');
-    const stored: StoredVaultPaths = { entries: [...entries], universeSignature };
-    transaction.objectStore(STORE_NAME).put(stored, PATHS_KEY);
-    // Commit explicitly so the write lands before a disable/enable abandons the connection.
-    transaction.commit();
-  }
-
-  /**
-   * Opens the connection once. Concurrent callers share the one request, and a connection that
-   * finishes opening after {@link close} is closed at once: either way a second connection would
-   * never be closed, and would block every later `deleteDatabase`.
-   */
-  private async openDatabase(): Promise<IDBDatabase> {
-    this.openPromise ??= this.requestDatabase();
-    return await this.openPromise;
-  }
-
-  private async requestDatabase(): Promise<IDBDatabase> {
-    const request = window.indexedDB.open(this.databaseName, DB_VERSION);
-    request.addEventListener('upgradeneeded', () => {
-      request.result.createObjectStore(STORE_NAME);
+    const hiddenSet: StoredVaultPaths = { entries: [...entries], universeSignature };
+    invokeAsyncSafely(async () => {
+      await this.store.replace({ entries: [[HIDDEN_SET_KEY, hiddenSet]] });
     });
-    const database = await getResult(request);
-    if (this.isClosed) {
-      database.close();
-    } else {
-      this.database = database;
-    }
-    return database;
+  }
+
+  private checkClosed(): boolean {
+    return this.isClosed;
   }
 }
 
-/**
- * Coerces the raw persisted value into a {@link StoredVaultPaths}: a missing value
- * yields an empty set with no signature; a legacy bare array yields its entries
- * with a `null` signature (fast-enable ineligible).
- */
-function normalizeStoredValue(value: PersistedValue | undefined): StoredVaultPaths {
-  if (!value) {
+function checkEntry(value: unknown): value is VaultModelEntry {
+  return !!value && typeof value === 'object' && 'path' in value && typeof value.path === 'string'
+    && 'isFolder' in value && typeof value.isFolder === 'boolean';
+}
+
+function normalizeStoredValue(value: unknown): StoredVaultPaths {
+  if (value === undefined) {
     return { entries: [], universeSignature: null };
   }
-  return Array.isArray(value) ? { entries: value, universeSignature: null } : { entries: value.entries, universeSignature: value.universeSignature };
+  const entries: unknown = Array.isArray(value) ? value : (value && typeof value === 'object' && 'entries' in value ? value.entries : undefined);
+  if (!Array.isArray(entries) || !entries.every(checkEntry)) {
+    throw new Error('Malformed hidden-path records; legacy database retained');
+  }
+  const signature: unknown = !Array.isArray(value) && value && typeof value === 'object' && 'universeSignature' in value ? value.universeSignature : null;
+  if (signature !== null && typeof signature !== 'string') {
+    throw new Error('Malformed universe signature; legacy database retained');
+  }
+  return { entries, universeSignature: signature };
 }

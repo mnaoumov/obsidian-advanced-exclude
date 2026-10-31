@@ -8,7 +8,10 @@ import { registerAsyncEvent } from '@mnaoumov/obsidian-lib/components/async-even
 import { PluginNoticeMode } from '@mnaoumov/obsidian-lib/components/plugin-notice-component';
 import { ensureMetadataCacheReady } from '@mnaoumov/obsidian-lib/metadata-cache';
 import { invokeAsyncSafelyAfterDelay } from '@mnaoumov/typescript-lib/async';
-import { noop } from '@mnaoumov/typescript-lib/function';
+import {
+  noop,
+  noopAsync
+} from '@mnaoumov/typescript-lib/function';
 import {
   castTo,
   isDeepEqual
@@ -24,6 +27,7 @@ import {
   vi
 } from 'vitest';
 
+import type { LocalRecordStore } from '../local-record-store.ts';
 import type {
   EffectiveSettings,
   ImportedFileContents
@@ -43,6 +47,17 @@ import {
   REPORTED_MISSING_IMPORTS_LOCAL_STORAGE_KEY
 } from './ignore-patterns-component.ts';
 import { LOCAL_PATTERNS_HEADER } from './local-patterns.ts';
+
+const storeState = vi.hoisted(() => ({ current: undefined as LocalRecordStore | undefined }));
+vi.mock('./verdict-record-store.ts', async (importOriginal) => ({
+  ...await importOriginal<typeof import('./verdict-record-store.ts')>(),
+  createVerdictRecordStore: (): LocalRecordStore => {
+    if (!storeState.current) {
+      throw new Error('Store not configured');
+    }
+    return storeState.current;
+  }
+}));
 
 vi.mock('../data-adapter-safe.ts', () => ({
   readIfExists: vi.fn().mockResolvedValue(null),
@@ -91,16 +106,11 @@ interface FileIgnoreEntry {
 type MockCallEntry = [string, (...$arguments: unknown[]) => unknown];
 
 interface MockIDBObjectStore {
-  readonly clear: ReturnType<typeof vi.fn>;
-  readonly delete: ReturnType<typeof vi.fn>;
-  readonly get: ReturnType<typeof vi.fn>;
-  readonly getAll: ReturnType<typeof vi.fn>;
-  readonly put: ReturnType<typeof vi.fn>;
-}
-
-interface MockIDBTransaction {
-  readonly commit: ReturnType<typeof vi.fn>;
-  readonly objectStore: ReturnType<typeof vi.fn>;
+  readonly clear: ReturnType<typeof vi.fn<(...$arguments: unknown[]) => unknown>>;
+  readonly delete: ReturnType<typeof vi.fn<(...$arguments: unknown[]) => unknown>>;
+  readonly get: ReturnType<typeof vi.fn<(...$arguments: unknown[]) => unknown>>;
+  readonly getAll: ReturnType<typeof vi.fn<(...$arguments: unknown[]) => unknown>>;
+  readonly put: ReturnType<typeof vi.fn<(...$arguments: unknown[]) => unknown>>;
 }
 
 interface MtimeEntryWithGitIgnore {
@@ -115,9 +125,9 @@ interface MtimeEntryWithUserIgnoreFilters {
   readonly userIgnoreFiltersString: string;
 }
 
-interface PendingOpen {
-  // eslint-disable-next-line typescript-dev-toolkit/readonly-interface-members -- The test replaces this mock member while exercising state changes.
-  succeed?: () => void;
+interface PendingResult<T> {
+  readonly promise: Promise<T>;
+  readonly resolve: (value: T) => void;
 }
 
 interface ProfileState {
@@ -136,23 +146,19 @@ interface SaveSettingsState {
 interface SetupIndexedDatabaseParams {
   readonly filesEntries?: FileIgnoreEntry[];
   readonly mtimeEntry?: unknown;
-  readonly upgradeNewVersion?: number;
 }
 
 interface SetupIndexedDatabaseResult {
   readonly filesStore: MockIDBObjectStore;
   readonly mockDatabase: IDBDatabase;
   readonly mtimeStore: MockIDBObjectStore;
-  readonly openFunction: ReturnType<typeof vi.fn>;
+  readonly openFunction: ReturnType<typeof vi.fn<(...$arguments: unknown[]) => unknown>>;
 }
 
 interface TestableIgnorePatternsComponent {
   readonly clearCachedExcludeRegExps: () => void;
+  readonly processStoreActions: () => Promise<void>;
   readonly resetDatabase: () => Promise<void>;
-}
-
-interface UpgradeEvent {
-  readonly newVersion: number;
 }
 
 // Exposes the protected onLayoutReady so tests can invoke it directly, as they did before it became protected.
@@ -170,7 +176,6 @@ function createApp(): AppOriginal {
   Object.defineProperty(appWithConfig.vault, 'getConfig', { value: vi.fn().mockReturnValue([]), writable: true });
   return appWithConfig;
 }
-
 function createComponent(overrides?: CreateComponentOverrides): TestIgnorePatternsComponent {
   return new TestIgnorePatternsComponent({
     app: overrides?.app ?? createApp(),
@@ -201,10 +206,16 @@ function createMockRequest<T>(result: T): IDBRequest<T> {
   return request as IDBRequest<T>;
 }
 
-function createMockTransaction(stores: Record<string, MockIDBObjectStore>): MockIDBTransaction {
+function createPending<T>(): PendingResult<T> {
+  let resolve: (value: T) => void = noop;
+  const promise = new Promise<T>((resolver) => {
+    resolve = resolver;
+  });
   return {
-    commit: vi.fn(),
-    objectStore: vi.fn((name: string) => stores[name])
+    promise,
+    resolve: (value): void => {
+      resolve(value);
+    }
   };
 }
 
@@ -248,50 +259,141 @@ function getFragmentText(message: DocumentFragment | string | undefined): string
 }
 
 function getMtimeEntries(mtimeStore: MockIDBObjectStore): unknown[] {
-  return mtimeStore.put.mock.calls.map(([entry]) => entry as unknown);
+  return mtimeStore.put.mock.calls.map(([entry]) => entry);
 }
 
 function setupIndexedDatabase(params?: SetupIndexedDatabaseParams): SetupIndexedDatabaseResult {
   const filesStore = createMockObjectStore(params?.filesEntries ?? []);
   const mtimeStore = createMockObjectStore();
-  mtimeStore.get.mockReturnValue(createMockRequest(params?.mtimeEntry));
-
-  const mockDatabase = strictProxy<IDBDatabase>({
-    close: vi.fn(),
-    createObjectStore: vi.fn()
-  });
-  const mockTransactionFunction = vi.fn(() => createMockTransaction({ files: filesStore, mtime: mtimeStore }));
-  Object.defineProperty(mockDatabase, 'transaction', { value: mockTransactionFunction });
-
-  const newVersion = params?.upgradeNewVersion ?? 1;
-
-  const mockAddEventListener = vi.fn(($event: string, handler: ($event: UpgradeEvent) => void) => {
-    if ($event === 'upgradeneeded') {
-      handler({ newVersion });
+  const openFunction = vi.fn();
+  const mockDatabase = strictProxy<IDBDatabase>({ close: vi.fn(), createObjectStore: vi.fn(), transaction: vi.fn() });
+  let hasOpened = false;
+  storeState.current = strictProxy<LocalRecordStore>({
+    close(): Promise<void> {
+      mockDatabase.close();
+      return noopAsync();
+    },
+    commit(commitParams): Promise<void> {
+      mockDatabase.transaction('records', 'readwrite');
+      for (const [key, value] of commitParams.entries) {
+        if (key === 'fingerprint') {
+          mtimeStore.put(value, 0);
+        } else {
+          filesStore.put(value);
+        }
+      }
+      for (const key of commitParams.removedKeys ?? []) {
+        filesStore.delete(key.slice(5));
+      }
+      return noopAsync();
+    },
+    entries(): Promise<[string, unknown][]> {
+      filesStore.getAll();
+      return Promise.resolve((params?.filesEntries ?? []).map((entry): [string, unknown] => [`path:${entry.path}`, entry]));
+    },
+    get(): Promise<unknown> {
+      if (!hasOpened) {
+        openFunction();
+        hasOpened = true;
+      }
+      return Promise.resolve(params?.mtimeEntry);
+    },
+    replace(replaceParams): Promise<void> {
+      filesStore.clear();
+      for (const [, value] of replaceParams.entries) {
+        mtimeStore.put(value, 0);
+      }
+      return noopAsync();
     }
   });
-  const openRequestProxy = strictProxy<IDBOpenDBRequest>({
-    readyState: 'done',
-    result: mockDatabase
-  });
-  Object.defineProperty(openRequestProxy, 'addEventListener', { value: mockAddEventListener });
-
-  const openFunction = vi.fn().mockReturnValue(openRequestProxy);
-
-  Object.defineProperty(window, 'indexedDB', {
-    configurable: true,
-    value: strictProxy<IDBFactory>({
-      open: openFunction
-    }),
-    writable: true
-  });
-
+  Object.defineProperty(window, 'indexedDB', { configurable: true, value: strictProxy<IDBFactory>({}), writable: true });
   return { filesStore, mockDatabase, mtimeStore, openFunction };
 }
-
 describe('IgnorePatternsComponent', () => {
   beforeEach(() => {
     vi.useFakeTimers();
+  });
+
+  it('does not hydrate stale verdicts when configuration resets during the read', async () => {
+    setupIndexedDatabase();
+    const component = createComponent();
+    await component.loadWithPromises();
+    const pending = createPending<[string, unknown][]>();
+    const store = storeState.current;
+    if (!store) {
+      throw new Error('Missing store');
+    }
+    vi.spyOn(store, 'entries').mockReturnValueOnce(pending.promise);
+    const hydration = component.ensureVerdictsLoaded();
+    await castTo<TestableIgnorePatternsComponent>(component).resetDatabase();
+    pending.resolve([['path:a.md', { isIgnored: true, path: 'a.md' }]]);
+    await hydration;
+    expect(component.isIgnored({ isFolder: false, normalizedPath: 'a.md' })).toBe(false);
+  });
+
+  it('retains failed writes for retry and shares a flush already in flight', async () => {
+    const { filesStore } = setupIndexedDatabase();
+    const component = createComponent();
+    await component.loadWithPromises();
+    component.isIgnored({ isFolder: false, normalizedPath: 'a.md' });
+    const store = storeState.current;
+    if (!store) {
+      throw new Error('Missing store');
+    }
+    const commit = vi.spyOn(store, 'commit').mockRejectedValueOnce(new Error('quota'));
+    const internal = castTo<TestableIgnorePatternsComponent>(component);
+    await expect(internal.processStoreActions()).rejects.toThrow('quota');
+    await Promise.all([internal.processStoreActions(), internal.processStoreActions()]);
+    expect(commit).toHaveBeenCalledTimes(2);
+    expect(filesStore.put).toHaveBeenCalledOnce();
+  });
+
+  it('keeps newer queued actions and cancels a stale generation after commit', async () => {
+    const { filesStore } = setupIndexedDatabase();
+    const component = createComponent();
+    await component.loadWithPromises();
+    const store = storeState.current;
+    if (!store) {
+      throw new Error('Missing store');
+    }
+    const commit = store.commit.bind(store);
+    component.isIgnored({ isFolder: false, normalizedPath: 'a.md' });
+    vi.spyOn(store, 'commit').mockImplementationOnce(async (params) => {
+      await commit(params);
+      await component.handleDeletedOrDotFile('a.md');
+    });
+    const internal = castTo<TestableIgnorePatternsComponent>(component);
+    const flushing = internal.processStoreActions();
+    await vi.runAllTimersAsync();
+    await flushing;
+    expect(filesStore.delete).toHaveBeenCalledWith('a.md');
+    component.isIgnored({ isFolder: false, normalizedPath: 'b.md' });
+    vi.spyOn(store, 'commit').mockImplementationOnce(async (params) => {
+      await commit(params);
+      await internal.resetDatabase();
+    });
+    await internal.processStoreActions();
+    expect(filesStore.clear).toHaveBeenCalledOnce();
+  });
+
+  it('closes a store when unload happens while the fingerprint is loading', async () => {
+    setupIndexedDatabase();
+    const store = storeState.current;
+    if (!store) {
+      throw new Error('Missing store');
+    }
+    const pending = createPending<unknown>();
+    const get = vi.spyOn(store, 'get').mockReturnValueOnce(pending.promise);
+    const close = vi.spyOn(store, 'close');
+    const component = createComponent();
+    const loading = component.loadWithPromises();
+    await vi.waitFor(() => {
+      expect(get).toHaveBeenCalled();
+    });
+    component.unload();
+    pending.resolve(undefined);
+    await loading;
+    expect(close).toHaveBeenCalled();
   });
 
   afterEach(async () => {
@@ -366,7 +468,7 @@ describe('IgnorePatternsComponent', () => {
     it('should test exclude regexps when shouldIgnoreExcludedFiles is true', async () => {
       setupIndexedDatabase();
       const app = createApp();
-      vi.mocked(app.vault.getConfig as ReturnType<typeof vi.fn>).mockReturnValue(['secret']);
+      vi.mocked(app.vault.getConfig as ReturnType<typeof vi.fn<(...$arguments: unknown[]) => unknown>>).mockReturnValue(['secret']);
       const pluginSettingsComponent = createPluginSettingsComponent({
         shouldIgnoreExcludedFiles: true
       });
@@ -379,7 +481,7 @@ describe('IgnorePatternsComponent', () => {
     it('should handle regex exclude filters wrapped in slashes', async () => {
       setupIndexedDatabase();
       const app = createApp();
-      vi.mocked(app.vault.getConfig as ReturnType<typeof vi.fn>).mockReturnValue([String.raw`/\.tmp$/`]);
+      vi.mocked(app.vault.getConfig as ReturnType<typeof vi.fn<(...$arguments: unknown[]) => unknown>>).mockReturnValue([String.raw`/\.tmp$/`]);
       const pluginSettingsComponent = createPluginSettingsComponent({
         shouldIgnoreExcludedFiles: true
       });
@@ -393,7 +495,7 @@ describe('IgnorePatternsComponent', () => {
     it('should handle invalid regex filters gracefully', async () => {
       setupIndexedDatabase();
       const app = createApp();
-      vi.mocked(app.vault.getConfig as ReturnType<typeof vi.fn>).mockReturnValue(['/[invalid/']);
+      vi.mocked(app.vault.getConfig as ReturnType<typeof vi.fn<(...$arguments: unknown[]) => unknown>>).mockReturnValue(['/[invalid/']);
       const pluginSettingsComponent = createPluginSettingsComponent({
         shouldIgnoreExcludedFiles: true
       });
@@ -408,7 +510,7 @@ describe('IgnorePatternsComponent', () => {
     it('should not use exclude regexps when shouldIgnoreExcludedFiles is false', async () => {
       setupIndexedDatabase();
       const app = createApp();
-      vi.mocked(app.vault.getConfig as ReturnType<typeof vi.fn>).mockReturnValue(['secret']);
+      vi.mocked(app.vault.getConfig as ReturnType<typeof vi.fn<(...$arguments: unknown[]) => unknown>>).mockReturnValue(['secret']);
       const pluginSettingsComponent = createPluginSettingsComponent({
         shouldIgnoreExcludedFiles: false
       });
@@ -421,7 +523,7 @@ describe('IgnorePatternsComponent', () => {
     it('should return cached exclude regexps on subsequent calls', async () => {
       setupIndexedDatabase();
       const app = createApp();
-      const getConfigMock = vi.mocked(app.vault.getConfig as ReturnType<typeof vi.fn>);
+      const getConfigMock = vi.mocked(app.vault.getConfig as ReturnType<typeof vi.fn<(...$arguments: unknown[]) => unknown>>);
       getConfigMock.mockReturnValue(['secret']);
       const pluginSettingsComponent = createPluginSettingsComponent({
         shouldIgnoreExcludedFiles: true
@@ -441,7 +543,7 @@ describe('IgnorePatternsComponent', () => {
     it('should handle single-character filter that looks like regex delimiter', async () => {
       setupIndexedDatabase();
       const app = createApp();
-      vi.mocked(app.vault.getConfig as ReturnType<typeof vi.fn>).mockReturnValue(['/']);
+      vi.mocked(app.vault.getConfig as ReturnType<typeof vi.fn<(...$arguments: unknown[]) => unknown>>).mockReturnValue(['/']);
       const pluginSettingsComponent = createPluginSettingsComponent({
         shouldIgnoreExcludedFiles: true
       });
@@ -461,7 +563,7 @@ describe('IgnorePatternsComponent', () => {
       component.isIgnored({ isFolder: false, normalizedPath: 'test.md' });
 
       // Trigger the debounced store actions
-      vi.runAllTimers();
+      await vi.runAllTimersAsync();
 
       expect(filesStore.put).toHaveBeenCalled();
     });
@@ -502,16 +604,16 @@ describe('IgnorePatternsComponent', () => {
   });
 
   describe('onunload', () => {
-    it('drops the queued verdict writes and closes the database', async () => {
+    it('drains the queued verdict writes and closes the database', async () => {
       const { filesStore, mockDatabase } = setupIndexedDatabase();
       const component = createComponent();
       await component.loadWithPromises();
       component.isIgnored({ isFolder: false, normalizedPath: 'test.md' });
 
       component.unload();
-      vi.runAllTimers();
+      await vi.runAllTimersAsync();
 
-      expect(filesStore.put).not.toHaveBeenCalled();
+      expect(filesStore.put).toHaveBeenCalledOnce();
       expect(mockDatabase.close).toHaveBeenCalledOnce();
     });
 
@@ -524,7 +626,7 @@ describe('IgnorePatternsComponent', () => {
         component.isIgnored({ isFolder: false, normalizedPath: `note-${String(index)}.md` });
       }
 
-      vi.runAllTimers();
+      await vi.runAllTimersAsync();
 
       expect(filesStore.put).toHaveBeenCalledTimes(2500);
       expect(vi.mocked(mockDatabase.transaction).mock.calls.length - transactionCallsBefore).toBe(2);
@@ -538,12 +640,12 @@ describe('IgnorePatternsComponent', () => {
         component.isIgnored({ isFolder: false, normalizedPath: `note-${String(index)}.md` });
       }
       // Let the debounce fire the first chunk only.
-      vi.advanceTimersByTime(5000);
+      await vi.advanceTimersByTimeAsync(5000);
       expect(filesStore.put).toHaveBeenCalledTimes(2000);
 
       // The verdicts were computed for the store just cleared, so the rest must not land.
       await castTo<TestableIgnorePatternsComponent>(component).resetDatabase();
-      vi.runAllTimers();
+      await vi.runAllTimersAsync();
 
       expect(filesStore.put).toHaveBeenCalledTimes(2000);
     });
@@ -555,7 +657,7 @@ describe('IgnorePatternsComponent', () => {
       component.unload();
 
       component.isIgnored({ isFolder: false, normalizedPath: 'late.md' });
-      vi.runAllTimers();
+      await vi.runAllTimersAsync();
 
       expect(filesStore.put).not.toHaveBeenCalled();
     });
@@ -571,16 +673,16 @@ describe('IgnorePatternsComponent', () => {
   });
 
   describe('pagehide', () => {
-    it('closes the database and drops the queued verdict writes when the window unloads', async () => {
+    it('drains queued verdict writes when the window unloads', async () => {
       const { filesStore, mockDatabase } = setupIndexedDatabase();
       const component = createComponent();
       await component.loadWithPromises();
       component.isIgnored({ isFolder: false, normalizedPath: 'test.md' });
 
       window.dispatchEvent(new Event('pagehide'));
-      vi.runAllTimers();
+      await vi.runAllTimersAsync();
 
-      expect(filesStore.put).not.toHaveBeenCalled();
+      expect(filesStore.put).toHaveBeenCalledOnce();
       expect(mockDatabase.close).toHaveBeenCalledOnce();
       component.unload();
     });
@@ -639,7 +741,7 @@ describe('IgnorePatternsComponent', () => {
 
       await component.handleDeletedOrDotFile('nonexistent.md');
 
-      vi.runAllTimers();
+      await vi.runAllTimersAsync();
       // The put from initial isIgnored should not be present since we never called isIgnored
       expect(filesStore.delete).not.toHaveBeenCalled();
     });
@@ -1131,31 +1233,6 @@ describe('IgnorePatternsComponent', () => {
   });
 
   describe('config fingerprint and lazy verdict loading', () => {
-    it('should open IndexedDB with correct name', async () => {
-      const { openFunction } = setupIndexedDatabase();
-      const app = createApp();
-      const component = createComponent({ app });
-      await component.loadWithPromises();
-
-      expect(openFunction).toHaveBeenCalledWith('test-app/advanced-exclude', 1);
-    });
-
-    it('should create object stores on upgradeneeded with newVersion 1', async () => {
-      const { mockDatabase } = setupIndexedDatabase();
-      const component = createComponent();
-      await component.loadWithPromises();
-
-      expect(mockDatabase.createObjectStore).toHaveBeenCalledTimes(2);
-    });
-
-    it('should skip object store creation when newVersion is not 1', async () => {
-      const { mockDatabase } = setupIndexedDatabase({ upgradeNewVersion: 2 });
-      const component = createComponent();
-      await component.loadWithPromises();
-
-      expect(mockDatabase.createObjectStore).not.toHaveBeenCalled();
-    });
-
     it('marks the config unchanged and defers the verdict getAll when mtime matches', async () => {
       vi.mocked(isDeepEqual).mockReturnValue(true);
       const { filesStore } = setupIndexedDatabase({
@@ -1586,7 +1663,7 @@ describe('IgnorePatternsComponent', () => {
       component.isIgnored({ isFolder: false, normalizedPath: 'file2.md' });
 
       // Run the debounced timer
-      vi.runAllTimers();
+      await vi.runAllTimersAsync();
 
       expect(filesStore.put).toHaveBeenCalledTimes(2);
     });
@@ -1597,12 +1674,12 @@ describe('IgnorePatternsComponent', () => {
       await component.loadWithPromises();
 
       component.isIgnored({ isFolder: false, normalizedPath: 'file1.md' });
-      vi.runAllTimers();
+      await vi.runAllTimersAsync();
 
       const putCallsAfterFirst = filesStore.put.mock.calls.length;
 
       // Running timers again should not trigger more puts
-      vi.runAllTimers();
+      await vi.runAllTimersAsync();
 
       expect(filesStore.put.mock.calls.length).toBe(putCallsAfterFirst);
     });
@@ -1619,7 +1696,7 @@ describe('IgnorePatternsComponent', () => {
       component.isIgnored({ isFolder: false, normalizedPath: 'file1.md' });
       await component.handleDeletedOrDotFile('file1.md');
 
-      vi.runAllTimers();
+      await vi.runAllTimersAsync();
 
       expect(filesStore.put).not.toHaveBeenCalled();
       expect(filesStore.delete).toHaveBeenCalledExactlyOnceWith('file1.md');
@@ -1699,7 +1776,7 @@ describe('IgnorePatternsComponent', () => {
     it('should include userIgnoreFilters in mtime entry', async () => {
       vi.mocked(isDeepEqual).mockReturnValue(false);
       const app = createApp();
-      vi.mocked(app.vault.getConfig as ReturnType<typeof vi.fn>).mockReturnValue(['filter1', 'filter2']);
+      vi.mocked(app.vault.getConfig as ReturnType<typeof vi.fn<(...$arguments: unknown[]) => unknown>>).mockReturnValue(['filter1', 'filter2']);
       const pluginSettingsComponent = createPluginSettingsComponent({
         shouldIgnoreExcludedFiles: true
       });
@@ -1737,7 +1814,7 @@ describe('IgnorePatternsComponent', () => {
     it('should handle null userIgnoreFilters from vault config', async () => {
       vi.mocked(isDeepEqual).mockReturnValue(false);
       const app = createApp();
-      vi.mocked(app.vault.getConfig as ReturnType<typeof vi.fn>).mockReturnValue(null);
+      vi.mocked(app.vault.getConfig as ReturnType<typeof vi.fn<(...$arguments: unknown[]) => unknown>>).mockReturnValue(null);
       const pluginSettingsComponent = createPluginSettingsComponent({
         shouldIgnoreExcludedFiles: true
       });
@@ -1805,142 +1882,8 @@ describe('IgnorePatternsComponent', () => {
       // Now handle it as deleted
       await component.handleDeletedOrDotFile('cached.md');
 
-      vi.runAllTimers();
+      await vi.runAllTimersAsync();
       expect(filesStore.delete).toHaveBeenCalledWith('cached.md');
-    });
-  });
-
-  describe('getResult with pending request', () => {
-    it('should resolve via success event when readyState is not done', async () => {
-      const filesStore = createMockObjectStore();
-      const mtimeStore = createMockObjectStore();
-      mtimeStore.get.mockReturnValue(createMockRequest(undefined));
-
-      const mockDatabase = strictProxy<IDBDatabase>({
-        createObjectStore: vi.fn()
-      });
-      Object.defineProperty(mockDatabase, 'transaction', {
-        value: vi.fn(() => createMockTransaction({ files: filesStore, mtime: mtimeStore }))
-      });
-
-      // Create an open request that is pending (not done)
-      const pendingOpenRequest = strictProxy<IDBOpenDBRequest>({
-        readyState: 'pending',
-        result: mockDatabase
-      });
-      Object.defineProperty(pendingOpenRequest, 'addEventListener', {
-        value: vi.fn(($event: string, handler: ($event: UpgradeEvent) => void) => {
-          // `success` fires immediately so the open promise resolves.
-          if ($event === 'upgradeneeded' || $event === 'success') {
-            handler({ newVersion: 1 });
-          }
-        })
-      });
-
-      Object.defineProperty(window, 'indexedDB', {
-        configurable: true,
-        value: strictProxy<IDBFactory>({
-          open: vi.fn().mockReturnValue(pendingOpenRequest)
-        }),
-        writable: true
-      });
-
-      const component = createComponent();
-      await component.loadWithPromises();
-      expect(component).toBeInstanceOf(IgnorePatternsComponent);
-    });
-
-    it('closes a connection that finishes opening after the component unloaded', async () => {
-      const mockDatabase = strictProxy<IDBDatabase>({ close: vi.fn() });
-      const pendingOpen: PendingOpen = {};
-      const pendingOpenRequest = strictProxy<IDBOpenDBRequest>({
-        readyState: 'pending',
-        result: mockDatabase
-      });
-      Object.defineProperty(pendingOpenRequest, 'addEventListener', {
-        value: vi.fn(($event: string, handler: () => void) => {
-          if ($event === 'success') {
-            pendingOpen.succeed = handler;
-          }
-        })
-      });
-      Object.defineProperty(window, 'indexedDB', {
-        configurable: true,
-        value: strictProxy<IDBFactory>({
-          open: vi.fn().mockReturnValue(pendingOpenRequest)
-        }),
-        writable: true
-      });
-
-      const component = createComponent();
-      const loadPromise = component.loadWithPromises();
-      // The open is requested only after the imported files are read.
-      await vi.waitFor(() => {
-        expect(pendingOpen.succeed).toBeDefined();
-      });
-      component.unload();
-      pendingOpen.succeed?.();
-      await loadPromise;
-
-      expect(mockDatabase.close).toHaveBeenCalledOnce();
-    });
-
-    it('should reject via error event when readyState is not done', async () => {
-      const testError = new Error('Test DB error');
-      const pendingOpenRequest = strictProxy<IDBOpenDBRequest>({
-        error: testError,
-        readyState: 'pending'
-      });
-      Object.defineProperty(pendingOpenRequest, 'addEventListener', {
-        value: vi.fn(($event: string, handler: () => void) => {
-          // Fire error handler immediately when it is registered
-          if ($event === 'error') {
-            handler();
-          }
-        })
-      });
-
-      Object.defineProperty(window, 'indexedDB', {
-        configurable: true,
-        value: strictProxy<IDBFactory>({
-          open: vi.fn().mockReturnValue(pendingOpenRequest)
-        }),
-        writable: true
-      });
-
-      const component = createComponent();
-      // 70.0.0 collects onloadAsync errors and rejects with an AggregateError wrapping them.
-      await expect(component.loadWithPromises()).rejects.toMatchObject({
-        errors: [expect.objectContaining({ message: 'Test DB error' })]
-      });
-    });
-
-    it('should reject with Unknown error when request.error is null', async () => {
-      const pendingOpenRequest = strictProxy<IDBOpenDBRequest>({
-        error: null,
-        readyState: 'pending'
-      });
-      Object.defineProperty(pendingOpenRequest, 'addEventListener', {
-        value: vi.fn(($event: string, handler: () => void) => {
-          if ($event === 'error') {
-            handler();
-          }
-        })
-      });
-
-      Object.defineProperty(window, 'indexedDB', {
-        configurable: true,
-        value: strictProxy<IDBFactory>({
-          open: vi.fn().mockReturnValue(pendingOpenRequest)
-        }),
-        writable: true
-      });
-
-      const component = createComponent();
-      // 70.0.0 collects onloadAsync errors and rejects with an AggregateError wrapping them.
-      await expect(component.loadWithPromises()).rejects.toMatchObject({
-        errors: [expect.objectContaining({ message: 'Unknown error' })]
-      });
     });
   });
 
@@ -1948,7 +1891,7 @@ describe('IgnorePatternsComponent', () => {
     it('should treat filter starting and ending with / but length > 1 as regex', async () => {
       setupIndexedDatabase();
       const app = createApp();
-      vi.mocked(app.vault.getConfig as ReturnType<typeof vi.fn>).mockReturnValue(['/test.*/']);
+      vi.mocked(app.vault.getConfig as ReturnType<typeof vi.fn<(...$arguments: unknown[]) => unknown>>).mockReturnValue(['/test.*/']);
       const pluginSettingsComponent = createPluginSettingsComponent({
         shouldIgnoreExcludedFiles: true
       });
@@ -1961,7 +1904,7 @@ describe('IgnorePatternsComponent', () => {
     it('should treat plain filter as anchored prefix match', async () => {
       setupIndexedDatabase();
       const app = createApp();
-      vi.mocked(app.vault.getConfig as ReturnType<typeof vi.fn>).mockReturnValue(['docs']);
+      vi.mocked(app.vault.getConfig as ReturnType<typeof vi.fn<(...$arguments: unknown[]) => unknown>>).mockReturnValue(['docs']);
       const pluginSettingsComponent = createPluginSettingsComponent({
         shouldIgnoreExcludedFiles: true
       });
