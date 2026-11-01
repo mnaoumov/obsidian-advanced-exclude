@@ -23,6 +23,7 @@ import { UseBaseSettingsCommandHandler } from './profiles/use-base-settings-comm
 import { PublishCompatibilityWarningComponent } from './publish-compatibility-warning-component.ts';
 import { PluginSettingsComponent } from './settings/plugin-settings-component.ts';
 import { PluginSettingsTab } from './settings/plugin-settings-tab.ts';
+import { FeatureEntryPatchComponent } from './soft-exclude/feature-entry-patch-component.ts';
 import { SoftExcludePatchComponent } from './soft-exclude/soft-exclude-patch-component.ts';
 
 export class Plugin extends PluginBase {
@@ -128,10 +129,18 @@ export class Plugin extends PluginBase {
       })
     );
 
-    this.addChild(
+    const softExcludePatchComponent = this.addChild(
       new SoftExcludePatchComponent({
         app: this.app,
         ignorePatternsComponent,
+        pluginSettingsComponent
+      })
+    );
+
+    this.addChild(
+      new FeatureEntryPatchComponent({
+        app: this.app,
+        getFeatureScopedApp: softExcludePatchComponent.getFeatureScopedApp.bind(softExcludePatchComponent),
         pluginSettingsComponent
       })
     );

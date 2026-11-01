@@ -38,6 +38,35 @@ const GITIGNORE_SYNTAX_URL = 'https://git-scm.com/docs/gitignore#_pattern_format
 // A dropdown value cannot be `null`, and a profile id never contains a space.
 const BASE_SETTINGS_VALUE = 'base settings';
 
+interface SoftExcludeFeatureToggle {
+  readonly description: string;
+  readonly name: string;
+  readonly propertyName: 'shouldSoftExcludeFromGraph' | 'shouldSoftExcludeFromOtherFeatures' | 'shouldSoftExcludeFromSearch' | 'shouldSoftExcludeFromUnlinkedMentions';
+}
+
+const SOFT_EXCLUDE_FEATURE_TOGGLES: readonly SoftExcludeFeatureToggle[] = [
+  {
+    description: 'Whether ignored files are left out of the search view.',
+    name: 'Soft: exclude from search',
+    propertyName: 'shouldSoftExcludeFromSearch'
+  },
+  {
+    description: 'Whether ignored files are left out of the graph and the local graph.',
+    name: 'Soft: exclude from graph',
+    propertyName: 'shouldSoftExcludeFromGraph'
+  },
+  {
+    description: 'Whether ignored files are left out of unlinked mentions, in the Backlinks and Outgoing links panes and in backlinks shown in a note.',
+    name: 'Soft: exclude from unlinked mentions',
+    propertyName: 'shouldSoftExcludeFromUnlinkedMentions'
+  },
+  {
+    description: 'Whether ignored files are left out of everything else Obsidian\'s own Excluded files covers: the quick switcher, link suggestions, Bases, the tag pane, the property type list and embedded search queries.',
+    name: 'Soft: exclude from other features',
+    propertyName: 'shouldSoftExcludeFromOtherFeatures'
+  }
+];
+
 interface PluginSettingsTabConstructorParams extends PluginSettingsTabBaseConstructorParams<PluginSettings> {
   readonly ignorePatternsComponent: IgnorePatternsComponent;
   readonly pluginSettingsComponent: PluginSettingsComponent;
@@ -223,6 +252,28 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginSettings> {
               });
             }
           }),
+          ...SOFT_EXCLUDE_FEATURE_TOGGLES.map((toggleDefinition) =>
+            this.settingEx({
+              desc: createFragment((f) => {
+                f.appendText(toggleDefinition.description);
+                f.createEl('br');
+                f.appendText('Applies in the ');
+                appendCodeBlock(f, 'Soft');
+                f.appendText(' exclude mode only. Obsidian\'s own ');
+                appendCodeBlock(f, 'Excluded files');
+                f.appendText(' still apply everywhere.');
+              }),
+              name: toggleDefinition.name,
+              render: (setting) => {
+                setting.addToggle((toggle) => {
+                  this.bind({
+                    propertyName: toggleDefinition.propertyName,
+                    valueComponent: toggle
+                  });
+                });
+              }
+            })
+          ),
           this.settingEx({
             desc: createFragment((f) => {
               f.appendText('Notes to exclude by their properties, one rule per line: ');

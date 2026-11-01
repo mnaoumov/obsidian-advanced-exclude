@@ -70,6 +70,44 @@ await require('/demoSetup.ts').changeSettings(app, { propertyRules: '' });
 
 Manual equivalent: pick **Soft** in the **Exclude mode** dropdown and type `visibility: gm-only` into **Exclude notes by property**. A search for `dragon` then finds nothing, while [Shared/Spoilers](<./Shared/Spoilers.md>) still shows in the Files pane.
 
+## Choose the features the Soft mode reaches
+
+In the **Soft** mode, four toggles, all on by default, choose which features leave ignored files out:
+
+- **Soft: exclude from search**: the search view.
+- **Soft: exclude from graph**: the graph and the local graph.
+- **Soft: exclude from unlinked mentions**: unlinked mentions in the Backlinks and Outgoing links panes, and in backlinks shown in a note.
+- **Soft: exclude from other features**: everything else Obsidian's own **Excluded files** covers. That is the quick switcher, link suggestions, Bases, the tag pane, the property type list and embedded search queries.
+
+Turn off all but **unlinked mentions** to keep a folder of reference notes from cluttering every note's unlinked mentions, while search, graph and the quick switcher still find it. Obsidian's own **Excluded files** still apply everywhere.
+
+```code-button
+---
+caption: Soft mode, Archive left out of unlinked mentions only
+---
+await require('/demoSetup.ts').changeSettings(app, {
+  excludeMode: 'Soft',
+  shouldSoftExcludeFromGraph: false,
+  shouldSoftExcludeFromOtherFeatures: false,
+  shouldSoftExcludeFromSearch: false,
+  shouldSoftExcludeFromUnlinkedMentions: true
+});
+```
+
+```code-button
+---
+caption: Turn every Soft feature back on
+---
+await require('/demoSetup.ts').changeSettings(app, {
+  shouldSoftExcludeFromGraph: true,
+  shouldSoftExcludeFromOtherFeatures: true,
+  shouldSoftExcludeFromSearch: true,
+  shouldSoftExcludeFromUnlinkedMentions: true
+});
+```
+
+Manual equivalent: pick **Soft** in the **Exclude mode** dropdown, then turn off every **Soft: exclude from ...** toggle except **unlinked mentions**. A search for `Draft` then finds the archived note again.
+
 ## Reuse Obsidian's excluded files
 
 **Ignore excluded files** (a toggle) pulls in whatever you have configured under Obsidian's core **Files and links > Excluded files** setting and treats those entries as ignore patterns too. The **Go to settings** button next to it jumps straight to that core setting. Turn it on if you want your existing excluded-files list to get the full `Advanced Exclude` treatment.
