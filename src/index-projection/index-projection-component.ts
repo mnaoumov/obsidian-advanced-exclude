@@ -7,10 +7,7 @@ import { isFolder } from '@mnaoumov/obsidian-lib/file-system';
 import { ensureMetadataCacheReady } from '@mnaoumov/obsidian-lib/metadata-cache';
 import { requestAnimationFrameAsync } from '@mnaoumov/typescript-lib/async';
 import { noop } from '@mnaoumov/typescript-lib/function';
-import {
-  getDataAdapterEx,
-  ViewType
-} from '@obsidian-typings/obsidian-public-latest/implementations';
+import { getDataAdapterEx } from '@obsidian-typings/obsidian-public-latest/implementations';
 
 import type { VaultLoadPatchComponent } from '../patches/vault-load-patch-component.ts';
 import type { IgnorePatternsComponent } from '../patterns/ignore-patterns-component.ts';
@@ -29,6 +26,7 @@ import { skipFolderListings } from '../bulk-index-update/folder-listing-suspensi
 import { suspendRelatedLinksUpdates } from '../bulk-index-update/related-links-batch.ts';
 import { ROOT_PATH } from '../constants.ts';
 import { ExcludeMode } from '../settings/plugin-settings.ts';
+import { refreshLinkViews } from './refresh-link-views.ts';
 import { computeUniverseSignature } from './universe-signature.ts';
 import { VaultModel } from './vault-model.ts';
 
@@ -400,7 +398,7 @@ export class IndexProjectionComponent extends ComponentEx {
       this.addToFilesPane(entry.path);
     }
     endBulkIndexUpdate();
-    this.refreshLinkViews();
+    refreshLinkViews(this.app);
     return withoutSnapshot.size === 0;
   }
 
@@ -462,7 +460,7 @@ export class IndexProjectionComponent extends ComponentEx {
       this.needsFullProjection = false;
       // In Soft mode the projection changed what isUserIgnored answers, which these views read too.
       if (this.projectionMode !== ExcludeMode.FilesPane) {
-        this.refreshLinkViews();
+        refreshLinkViews(this.app);
       }
     } finally {
       endBulkIndexUpdate();
@@ -651,50 +649,6 @@ export class IndexProjectionComponent extends ComponentEx {
     return true;
   }
 
-  /**
-   * Redraws open global/local graphs and recomputes link side-panes after a
-   * `Full`-mode projection. The projection mutates the link index without firing events, so
-   * these views would otherwise render stale links (a hidden file lingering as a backlink)
-   * until the next interaction: their components recompute only on an active-file change or
-   * a `metadataCache` event, neither of which the projection fires. Each component caches
-   * the file it last rendered in its `*File` fields and its `update()` short-circuits while
-   * they still match the active file, so clearing those trackers (but not `file`, the current
-   * target) makes `update()` recompute. Graph views redraw from the current index directly.
-   * Refresh each open view once, without vault or metadata events. Deferred leaves are skipped.
-   */
-  private refreshLinkViews(): void {
-    for (const leaf of this.app.workspace.getLeavesOfType(ViewType.Graph)) {
-      if ('dataEngine' in leaf.view) {
-        leaf.view.update();
-      }
-    }
-    for (const leaf of this.app.workspace.getLeavesOfType(ViewType.LocalGraph)) {
-      if ('engine' in leaf.view) {
-        leaf.view.update();
-      }
-    }
-    for (const leaf of this.app.workspace.getLeavesOfType(ViewType.Backlink)) {
-      if (!('backlink' in leaf.view)) {
-        continue;
-      }
-
-      const { backlink } = leaf.view;
-      backlink.backlinkFile = null;
-      backlink.unlinkedFile = null;
-      backlink.update();
-    }
-    for (const leaf of this.app.workspace.getLeavesOfType(ViewType.OutgoingLink)) {
-      if (!('outgoingLink' in leaf.view)) {
-        continue;
-      }
-
-      const { outgoingLink } = leaf.view;
-      outgoingLink.outgoingFile = null;
-      outgoingLink.unlinkedFile = null;
-      outgoingLink.update();
-    }
-  }
-
   private async reportApplyProgress(progress: Readonly<ApplyProgress>): Promise<void> {
     const { processed, total } = progress;
     // Time-based cadence: yield only once APPLY_YIELD_INTERVAL_IN_MILLISECONDS have
@@ -814,7 +768,7 @@ export class IndexProjectionComponent extends ComponentEx {
         hiddenPaths.push(target.path);
       }
       this.hideFromIndex(hiddenPaths);
-      this.refreshLinkViews();
+      refreshLinkViews(this.app);
     } finally {
       endBulkIndexUpdate();
       this.endProjection();

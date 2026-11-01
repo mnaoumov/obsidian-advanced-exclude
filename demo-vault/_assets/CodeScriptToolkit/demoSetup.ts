@@ -12,6 +12,10 @@ interface DemoSettingsPatch {
   shouldHideEmptyFolders?: boolean;
   shouldIgnoreExcludedFiles?: boolean;
   shouldIncludeGitIgnorePatterns?: boolean;
+  shouldSoftExcludeFromGraph?: boolean;
+  shouldSoftExcludeFromOtherFeatures?: boolean;
+  shouldSoftExcludeFromSearch?: boolean;
+  shouldSoftExcludeFromUnlinkedMentions?: boolean;
 }
 
 /**

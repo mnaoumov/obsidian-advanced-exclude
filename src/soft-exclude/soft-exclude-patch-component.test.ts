@@ -21,6 +21,7 @@ import {
   ExcludeMode,
   PluginSettings
 } from '../settings/plugin-settings.ts';
+import { SoftExcludeFeature } from './feature-scoped-app.ts';
 import { SoftExcludePatchComponent } from './soft-exclude-patch-component.ts';
 
 const FOLDER = castTo<TAbstractFile>({ kind: 'folder' });
@@ -144,6 +145,61 @@ describe('SoftExcludePatchComponent', () => {
 
     fixture.settings.propertyRules = 'status: done';
     expect(fixture.app.metadataCache.isUserIgnored('a.md')).toBe(true);
+  });
+
+  it('applies the verdict to the other features by their toggle', () => {
+    fixture = createFixture({ isIgnored: true });
+    fixture.settings.shouldSoftExcludeFromOtherFeatures = false;
+
+    expect(fixture.app.metadataCache.isUserIgnored('a.md')).toBe(false);
+    expect(fixture.isIgnored).not.toHaveBeenCalled();
+  });
+
+  it('answers through a scoped app for its own feature only', () => {
+    fixture = createFixture({ isIgnored: true });
+    fixture.settings.shouldSoftExcludeFromOtherFeatures = false;
+    fixture.settings.shouldSoftExcludeFromSearch = false;
+
+    const unlinkedMentionsApp = fixture.component.getFeatureScopedApp(SoftExcludeFeature.UnlinkedMentions);
+    const searchApp = fixture.component.getFeatureScopedApp(SoftExcludeFeature.Search);
+    const graphApp = fixture.component.getFeatureScopedApp(SoftExcludeFeature.Graph);
+
+    expect(unlinkedMentionsApp.metadataCache.isUserIgnored('a.md')).toBe(true);
+    expect(graphApp.metadataCache.isUserIgnored('a.md')).toBe(true);
+    expect(searchApp.metadataCache.isUserIgnored('a.md')).toBe(false);
+    // The scope ends with the call.
+    expect(fixture.app.metadataCache.isUserIgnored('a.md')).toBe(false);
+  });
+
+  it('keeps what Obsidian already ignores in a feature whose toggle is off', () => {
+    fixture = createFixture({ isUserIgnored: true });
+    fixture.settings.shouldSoftExcludeFromGraph = false;
+
+    expect(fixture.component.getFeatureScopedApp(SoftExcludeFeature.Graph).metadataCache.isUserIgnored('a.md')).toBe(true);
+  });
+
+  it('creates one scoped app per feature', () => {
+    expect(fixture.component.getFeatureScopedApp(SoftExcludeFeature.Graph)).toBe(fixture.component.getFeatureScopedApp(SoftExcludeFeature.Graph));
+    expect(fixture.component.getFeatureScopedApp(SoftExcludeFeature.Graph)).not.toBe(fixture.component.getFeatureScopedApp(SoftExcludeFeature.Search));
+  });
+
+  it('restores the outer feature after a nested scoped call', () => {
+    fixture = createFixture();
+    fixture.settings.shouldSoftExcludeFromGraph = false;
+    fixture.settings.shouldSoftExcludeFromOtherFeatures = false;
+    const graphApp = fixture.component.getFeatureScopedApp(SoftExcludeFeature.Graph);
+    const searchApp = fixture.component.getFeatureScopedApp(SoftExcludeFeature.Search);
+    const results: boolean[] = [];
+    fixture.isIgnored.mockImplementationOnce(() => {
+      const isIgnoredInNestedGraph = graphApp.metadataCache.isUserIgnored('b.md');
+      // Back in the search scope: a plain call made inside it answers for search.
+      results.push(isIgnoredInNestedGraph, fixture.app.metadataCache.isUserIgnored('c.md'));
+      return true;
+    }).mockReturnValue(true);
+
+    expect(searchApp.metadataCache.isUserIgnored('a.md')).toBe(true);
+    expect(results).toEqual([false, true]);
+    expect(fixture.app.metadataCache.isUserIgnored('a.md')).toBe(false);
   });
 
   it('restores the original method on unload', () => {

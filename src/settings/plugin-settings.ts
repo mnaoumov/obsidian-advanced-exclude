@@ -32,4 +32,8 @@ export class PluginSettings {
   public shouldHideEmptyFolders = false;
   public shouldIgnoreExcludedFiles = false;
   public shouldIncludeGitIgnorePatterns = false;
+  public shouldSoftExcludeFromGraph = true;
+  public shouldSoftExcludeFromOtherFeatures = true;
+  public shouldSoftExcludeFromSearch = true;
+  public shouldSoftExcludeFromUnlinkedMentions = true;
 }
