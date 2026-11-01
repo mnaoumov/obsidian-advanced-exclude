@@ -1,6 +1,7 @@
 export enum ExcludeMode {
   FilesPane = 'FilesPane',
-  Full = 'Full'
+  Full = 'Full',
+  Soft = 'Soft'
 }
 
 /**
@@ -27,6 +28,7 @@ export class PluginSettings {
   public excludeMode: ExcludeMode = ExcludeMode.Full;
   public ignorePatterns = '';
   public profiles: SettingsProfile[] = [];
+  public propertyRules = '';
   public shouldHideEmptyFolders = false;
   public shouldIgnoreExcludedFiles = false;
   public shouldIncludeGitIgnorePatterns = false;

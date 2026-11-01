@@ -8,6 +8,7 @@ const PLUGIN_ID = 'advanced-exclude';
 interface DemoSettingsPatch {
   excludeMode?: string;
   ignorePatterns?: string;
+  propertyRules?: string;
   shouldHideEmptyFolders?: boolean;
   shouldIgnoreExcludedFiles?: boolean;
   shouldIncludeGitIgnorePatterns?: boolean;

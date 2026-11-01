@@ -40,7 +40,7 @@ import {
 const INHERIT_VALUE = 'inherit';
 const ON_VALUE = 'on';
 const OFF_VALUE = 'off';
-const EXCLUDE_MODE_BY_VALUE = new Map<string, ExcludeMode>([[ExcludeMode.FilesPane, ExcludeMode.FilesPane], [ExcludeMode.Full, ExcludeMode.Full]]);
+const EXCLUDE_MODE_BY_VALUE = new Map<string, ExcludeMode>([[ExcludeMode.FilesPane, ExcludeMode.FilesPane], [ExcludeMode.Full, ExcludeMode.Full], [ExcludeMode.Soft, ExcludeMode.Soft]]);
 
 type BooleanScalarName = 'shouldHideEmptyFolders' | 'shouldIgnoreExcludedFiles' | 'shouldIncludeGitIgnorePatterns';
 
@@ -136,6 +136,7 @@ export class ProfileEditModal extends Modal {
           .addOption(INHERIT_VALUE, 'Inherit')
           .addOption(ExcludeMode.Full, 'Full')
           .addOption(ExcludeMode.FilesPane, 'Files pane')
+          .addOption(ExcludeMode.Soft, 'Soft')
           .setValue(this.draft.excludeMode ?? INHERIT_VALUE)
           .onChange((value) => {
             this.draft.excludeMode = EXCLUDE_MODE_BY_VALUE.get(value);

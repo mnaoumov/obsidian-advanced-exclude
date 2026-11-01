@@ -105,6 +105,11 @@ interface MockManualIndexHider {
   readonly show: Mock<(normalizedPaths: readonly string[]) => string[]>;
 }
 
+interface MutableEffectiveSettings {
+  // eslint-disable-next-line typescript-dev-toolkit/readonly-interface-members -- The test switches the exclude mode under a running component.
+  excludeMode: ExcludeMode;
+}
+
 interface SetupParams {
   readonly configUnchanged?: boolean;
   readonly entries: readonly MockEntry[];
@@ -136,7 +141,12 @@ interface SetupResult {
 }
 
 interface TestableIndexProjectionComponent {
+  readonly pluginSettingsComponent: TestablePluginSettingsComponent;
   readonly vaultModel: VaultModel;
+}
+
+interface TestablePluginSettingsComponent {
+  readonly effectiveSettings: MutableEffectiveSettings;
 }
 
 /**
@@ -813,6 +823,104 @@ describe('IndexProjectionComponent', () => {
       expect(addToFilesPane).toHaveBeenCalledExactlyOnceWith('drop.md');
       expect(hiddenPaths(manualIndexHider)).toEqual(['keep.md']);
       expect(deleteFromFilesPane).toHaveBeenCalledExactlyOnceWith('keep.md');
+    });
+  });
+
+  describe('exclude mode change', () => {
+    function setExcludeMode(component: IndexProjectionComponent, excludeMode: ExcludeMode): void {
+      castTo<TestableIndexProjectionComponent>(component).pluginSettingsComponent.effectiveSettings.excludeMode = excludeMode;
+    }
+
+    it('re-adds what Full mode hid and hides nothing in Soft mode', async () => {
+      const { addToFilesPane, app, component, manualIndexHider } = setup({
+        entries: [
+          { isFolderFlag: false, path: 'drop.md' },
+          { isFolderFlag: false, path: 'keep.md' }
+        ],
+        isIgnored: (path) => path === 'drop.md'
+      });
+      await component.update();
+      manualIndexHider.hide.mockClear();
+      vi.mocked(app.workspace.getLeavesOfType).mockClear();
+
+      setExcludeMode(component, ExcludeMode.Soft);
+      await component.update();
+
+      expect(manualIndexHider.show).toHaveBeenCalledWith(['drop.md']);
+      expect(addToFilesPane).toHaveBeenCalledExactlyOnceWith('drop.md');
+      expect(manualIndexHider.hide).not.toHaveBeenCalled();
+      expect(component.getHiddenCount()).toBe(0);
+      // Soft mode changed what `isUserIgnored` answers, so the link views redraw.
+      expect(app.workspace.getLeavesOfType).toHaveBeenCalled();
+    });
+
+    it('re-adds what Full mode hid to the index before Files pane mode hides it from the explorer only', async () => {
+      const { addToFilesPane, component, deleteFromFilesPane, manualIndexHider } = setup({
+        entries: [{ isFolderFlag: false, path: 'drop.md' }],
+        isIgnored: (path) => path === 'drop.md'
+      });
+      await component.update();
+      manualIndexHider.hide.mockClear();
+      deleteFromFilesPane.mockClear();
+
+      setExcludeMode(component, ExcludeMode.FilesPane);
+      await component.update();
+
+      expect(manualIndexHider.show).toHaveBeenCalledWith(['drop.md']);
+      expect(addToFilesPane).toHaveBeenCalledWith('drop.md');
+      expect(deleteFromFilesPane).toHaveBeenCalledExactlyOnceWith('drop.md');
+      expect(manualIndexHider.hide).not.toHaveBeenCalled();
+    });
+
+    it('re-adds a hidden folder before the hidden files under it', async () => {
+      const { component, manualIndexHider } = setup({
+        entries: [
+          { isFolderFlag: true, path: 'dir' },
+          { isFolderFlag: false, path: 'dir/note.md' },
+          { isFolderFlag: false, path: 'top.md' }
+        ],
+        isIgnored: (path) => path === 'dir/note.md' || path === 'top.md'
+      });
+      await component.update();
+
+      setExcludeMode(component, ExcludeMode.Soft);
+      await component.update();
+
+      const shownPaths = manualIndexHider.show.mock.calls.flatMap(([paths]) => paths);
+      expect(shownPaths.indexOf('top.md')).toBeLessThan(shownPaths.indexOf('dir/note.md'));
+      expect(component.getHiddenCount()).toBe(0);
+    });
+
+    it('hides from the index again when switching back from Soft mode to Full mode', async () => {
+      const { component, manualIndexHider } = setup({
+        entries: [{ isFolderFlag: false, path: 'drop.md' }],
+        excludeMode: ExcludeMode.Soft,
+        isIgnored: (path) => path === 'drop.md'
+      });
+      await component.update();
+      expect(manualIndexHider.hide).not.toHaveBeenCalled();
+
+      setExcludeMode(component, ExcludeMode.Full);
+      await component.update();
+
+      expect(manualIndexHider.show).not.toHaveBeenCalled();
+      expect(hiddenPaths(manualIndexHider)).toEqual(['drop.md']);
+    });
+
+    it('leaves the switch to the superseding update when aborted while showing', async () => {
+      const { component, manualIndexHider } = setup({
+        entries: [{ isFolderFlag: false, path: 'drop.md' }],
+        isIgnored: (path) => path === 'drop.md'
+      });
+      await component.update();
+
+      setExcludeMode(component, ExcludeMode.Soft);
+      const firstUpdate = component.update();
+      const secondUpdate = component.update();
+      await Promise.all([firstUpdate, secondUpdate]);
+
+      expect(manualIndexHider.show).toHaveBeenCalledExactlyOnceWith(['drop.md']);
+      expect(component.getHiddenCount()).toBe(0);
     });
   });
 
