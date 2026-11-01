@@ -184,7 +184,7 @@ describe('PluginSettingsTab', () => {
       settingsState: {
         effectiveValues: settings,
         inputValues: settings,
-        validationMessages: { excludeMode: '', ignorePatterns: '', profiles: '', shouldHideEmptyFolders: '', shouldIgnoreExcludedFiles: '', shouldIncludeGitIgnorePatterns: '' }
+        validationMessages: { excludeMode: '', ignorePatterns: '', profiles: '', propertyRules: '', shouldHideEmptyFolders: '', shouldIgnoreExcludedFiles: '', shouldIncludeGitIgnorePatterns: '' }
       }
     });
 
@@ -370,8 +370,8 @@ describe('PluginSettingsTab', () => {
       await waitForAllAsyncOperations();
       expect(refreshLocalPatterns).toHaveBeenCalled();
 
-      // The global row binds its text area through the base; the local row's is the only one with its own handler.
-      onChangeHandlers.at(-1)?.('# header\nlocal/\nmore/');
+      // The local row's handler is followed by the one of the property rules' text area, which binds through the base.
+      onChangeHandlers.at(-2)?.('# header\nlocal/\nmore/');
       await waitForAllAsyncOperations();
 
       expect(scheduleLocalPatternsSave).toHaveBeenCalledWith('# header\nlocal/\nmore/');

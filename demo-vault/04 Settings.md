@@ -18,7 +18,9 @@ Open **Settings -> Community plugins -> `Advanced Exclude`** to configure the pl
 ## Scope
 
 - `excludeMode`
-  - how far the exclusion reaches: `Full` hides ignored files from the whole app (Files pane, Backlinks, Graph, search, ...), while `FilesPane` hides them from the Files pane only. See [03 Exclude mode and sources](<./03 Exclude mode and sources.md>).
+  - how far the exclusion reaches: `Full` hides ignored files from the whole app (Files pane, Backlinks, Graph, search, ...), `FilesPane` hides them from the Files pane only, and `Soft` leaves them out of what Obsidian's own **Excluded files** setting does (search, quick switcher, link suggestions, Graph, unlinked mentions, Bases). See [03 Exclude mode and sources](<./03 Exclude mode and sources.md>).
+- `propertyRules`
+  - notes to exclude by their properties, one rule per line: `key: value`, or `key` alone for any value. Applies in the `Soft` mode only. See [03 Exclude mode and sources](<./03 Exclude mode and sources.md>).
 - `shouldHideEmptyFolders`
   - when on, also hide folders left empty because every file inside them is excluded. This cascades to parent folders: when a folder and all of its subfolders become empty, the whole chain is hidden. Genuinely empty folders (with no files at all) stay visible.
 

@@ -1,6 +1,6 @@
 # Exclude mode and sources
 
-Beyond the ignore patterns from [01 Exclude a folder](<./01 Exclude a folder.md>) and [02 Whitelist with negation](<./02 Whitelist with negation.md>), `Advanced Exclude` has three more settings that change *how far* the exclusion reaches and *which sources* feed the ignore list, and a second place to keep patterns, for one device only. All of them live in **Settings -> Community plugins -> `Advanced Exclude`**; each key is documented in [04 Settings](<./04 Settings.md>).
+Beyond the ignore patterns from [01 Exclude a folder](<./01 Exclude a folder.md>) and [02 Whitelist with negation](<./02 Whitelist with negation.md>), `Advanced Exclude` has four more settings that change *how far* the exclusion reaches and *which sources* feed the ignore list, and a second place to keep patterns, for one device only. All of them live in **Settings -> Community plugins -> `Advanced Exclude`**; each key is documented in [04 Settings](<./04 Settings.md>).
 
 ## Exclude mode
 
@@ -9,8 +9,10 @@ The **Exclude mode** dropdown controls how aggressively ignored files are hidden
 - **Full** (default) - excludes files from the entire Obsidian app: the Files pane, Backlinks, Graph, search, quick switcher, everything. This is what [01 Exclude a folder](<./01 Exclude a folder.md>) demonstrates.
 - **Files pane**
   - excludes files from the **Files pane only**. They stay reachable from Backlinks, Graph, and search.
+- **Soft**
+  - works like Obsidian's own **Files and links > Excluded files**: ignored files stay in the Files pane, Backlinks and links, and are left out of search, the quick switcher, link suggestions, Graph, unlinked mentions and Bases. Nothing is removed from Obsidian's index, so this mode is safe with [Obsidian Sync](https://help.obsidian.md/sync) and [Obsidian Publish](https://help.obsidian.md/publish). It is also the only mode where **Exclude notes by property** (below) applies.
 
-Try it: with `Archive/` still ignored, switch the mode to **Files pane**. The `Archive/` folder stays hidden in the Files pane, but a search for `Draft` finds the note again. Switch back to **Full** to hide it everywhere.
+Try it: with `Archive/` still ignored, switch the mode to **Files pane**. The `Archive/` folder stays hidden in the Files pane, but a search for `Draft` finds the note again. Switch to **Soft**: the folder is back in the Files pane, and a search for `Draft` finds nothing. Switch back to **Full** to hide it everywhere.
 
 ```code-button
 ---
@@ -33,7 +35,40 @@ caption: Exclude mode - Full (the default)
 await require('/demoSetup.ts').changeSettings(app, { excludeMode: 'Full' });
 ```
 
-Manual equivalent: pick from the **Exclude mode** dropdown. Search for `Draft` after each one - it is found under **Files pane** and not under **Full**.
+```code-button
+---
+caption: Exclude mode - Soft, like Obsidian's Excluded files
+---
+await require('/demoSetup.ts').changeSettings(app, { excludeMode: 'Soft' });
+```
+
+Manual equivalent: pick from the **Exclude mode** dropdown. Search for `Draft` after each one - it is found under **Files pane** and not under **Full** or **Soft**.
+
+## Exclude notes by property
+
+**Exclude notes by property** leaves out notes by their properties instead of their paths, one rule per line:
+
+- `key: value` matches a note whose property `key` has that value, or has it as one item of a list.
+- `key` alone matches a note whose property `key` has any value.
+- Names and values ignore case, and a line starting with `#` is a comment.
+
+It applies in the **Soft** mode only: the other modes hide a file before Obsidian has read its properties. [Shared/Spoilers](<./Shared/Spoilers.md>) carries `visibility: gm-only`, the kind of note a game master keeps out of search while preparing a session.
+
+```code-button
+---
+caption: Soft mode, and exclude notes with visibility gm-only
+---
+await require('/demoSetup.ts').changeSettings(app, { excludeMode: 'Soft', propertyRules: 'visibility: gm-only' });
+```
+
+```code-button
+---
+caption: Clear the property rules
+---
+await require('/demoSetup.ts').changeSettings(app, { propertyRules: '' });
+```
+
+Manual equivalent: pick **Soft** in the **Exclude mode** dropdown and type `visibility: gm-only` into **Exclude notes by property**. A search for `dragon` then finds nothing, while [Shared/Spoilers](<./Shared/Spoilers.md>) still shows in the Files pane.
 
 ## Reuse Obsidian's excluded files
 

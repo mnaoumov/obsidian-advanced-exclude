@@ -108,6 +108,8 @@ export class IndexProjectionComponent extends ComponentEx {
 
   private readonly addToFilesPane: (normalizedPath: string) => void;
   private readonly app: App;
+  // The exclude mode the last projection ran under, or `null` before the first one; see `projectionMode`.
+  private appliedExcludeMode: ExcludeMode | null = null;
   private applyingProjectionDepth = 0;
   // Nesting depth of `beginBulkIndexUpdate`: only the outermost scope suspends and resumes, so a
   // superseding update that overlaps the one it aborts shares a single suspension.
@@ -151,6 +153,14 @@ export class IndexProjectionComponent extends ComponentEx {
     return this.pluginSettingsComponent.effectiveSettings.excludeMode;
   }
 
+  /**
+   * The mode the current hidden set was hidden under: undoing a hide must use the mode that did it, which differs from
+   * {@link excludeMode} between a mode change in the settings and the projection that applies it.
+   */
+  private get projectionMode(): ExcludeMode {
+    return this.appliedExcludeMode ?? this.excludeMode;
+  }
+
   public constructor(params: IndexProjectionComponentConstructorParams) {
     super();
     this.app = params.app;
@@ -164,7 +174,8 @@ export class IndexProjectionComponent extends ComponentEx {
     this.suspendFilesPaneSort = params.suspendFilesPaneSort;
     this.updateProgressNotice = params.updateProgressNotice;
     this.vaultModel = new VaultModel(
-      (normalizedPath, isFolderPath) => params.ignorePatternsComponent.isIgnored({ isFolder: isFolderPath, normalizedPath }),
+      // Soft mode hides nothing from the index or the explorer: SoftExcludePatchComponent applies it.
+      (normalizedPath, isFolderPath) => this.excludeMode !== ExcludeMode.Soft && params.ignorePatternsComponent.isIgnored({ isFolder: isFolderPath, normalizedPath }),
       () => this.pluginSettingsComponent.effectiveSettings.shouldHideEmptyFolders
     );
   }
@@ -317,7 +328,7 @@ export class IndexProjectionComponent extends ComponentEx {
    * model needs no rebuild — `recordCreate` keeps it current through the vault load.
    */
   public reapplyToFilesPane(): void {
-    if (this.excludeMode !== ExcludeMode.FilesPane) {
+    if (this.projectionMode !== ExcludeMode.FilesPane) {
       return;
     }
     const targets = this.vaultModel.getPathsByVisibility(false).sort((a, b) => pathDepth(b.path) - pathDepth(a.path));
@@ -373,7 +384,7 @@ export class IndexProjectionComponent extends ComponentEx {
     // wasted work, and driving the tearing-down explorer could throw.
     // `FilesPane` mode never mutates the index (`hideFromIndex` is a no-op), so there
     // is nothing to restore and no reload is ever needed.
-    if (this.isQuitting || this.excludeMode !== ExcludeMode.Full) {
+    if (this.isQuitting || this.projectionMode !== ExcludeMode.Full) {
       return true;
     }
 
@@ -418,6 +429,9 @@ export class IndexProjectionComponent extends ComponentEx {
       // An abort during this yield needs no check here: `recomputeAll`/`applyFull` short-
       // circuit on the signal, and the post-phase `aborted` checks below still bail.
       await requestAnimationFrameAsync();
+      if (!await this.undoAppliedModeOnModeChange(abortSignal)) {
+        return;
+      }
       if (!this.hasBuiltModel || this.needsFullProjection) {
         this.hasBuiltModel = true;
         // Pessimistic for the same reason as the delta branch below, and for a sharper
@@ -446,7 +460,8 @@ export class IndexProjectionComponent extends ComponentEx {
         return;
       }
       this.needsFullProjection = false;
-      if (this.excludeMode === ExcludeMode.Full) {
+      // In Soft mode the projection changed what isUserIgnored answers, which these views read too.
+      if (this.projectionMode !== ExcludeMode.FilesPane) {
         this.refreshLinkViews();
       }
     } finally {
@@ -540,7 +555,7 @@ export class IndexProjectionComponent extends ComponentEx {
    * must be re-added. Empty in `FilesPane` mode.
    */
   private getMissingVisiblePaths(): VaultModelEntry[] {
-    if (this.excludeMode !== ExcludeMode.Full) {
+    if (this.projectionMode !== ExcludeMode.Full) {
       return [];
     }
     const loadedPaths = new Set(this.app.vault.getAllLoadedFiles().map((file) => file.path));
@@ -553,7 +568,7 @@ export class IndexProjectionComponent extends ComponentEx {
    * a re-parse). No-op in `FilesPane` mode, where hiding is purely the explorer.
    */
   private hideFromIndex(normalizedPaths: readonly string[]): void {
-    if (this.excludeMode === ExcludeMode.Full && normalizedPaths.length > 0) {
+    if (this.projectionMode === ExcludeMode.Full && normalizedPaths.length > 0) {
       this.manualIndexHider.hide(normalizedPaths);
     }
   }
@@ -705,7 +720,7 @@ export class IndexProjectionComponent extends ComponentEx {
    * concurrently. In `FilesPane` mode the show is purely the explorer.
    */
   private async showChunk(adapter: DataAdapterEx, chunk: readonly VaultModelEntry[]): Promise<void> {
-    if (this.excludeMode !== ExcludeMode.Full) {
+    if (this.projectionMode !== ExcludeMode.Full) {
       for (const entry of chunk) {
         this.addToFilesPane(entry.path);
       }
@@ -742,7 +757,7 @@ export class IndexProjectionComponent extends ComponentEx {
   private async showEntries(entries: readonly VaultModelEntry[], progress: ApplyProgress, abortSignal?: AbortSignal): Promise<boolean> {
     const adapter = getDataAdapterEx(this.app);
     // Each re-parsed folder's subtree is shown by the chunks below; see `skipFolderListings`.
-    const resumeFolderListings = this.excludeMode === ExcludeMode.Full
+    const resumeFolderListings = this.projectionMode === ExcludeMode.Full
       ? skipFolderListings(adapter, new Set(entries.filter((entry) => entry.isFolder).map((entry) => entry.path)))
       : noop;
     try {
@@ -805,7 +820,28 @@ export class IndexProjectionComponent extends ComponentEx {
       this.endProjection();
     }
 
+    this.appliedExcludeMode = ExcludeMode.Full;
     this.fastEnableApplied = true;
+    return true;
+  }
+
+  /**
+   * When the exclude mode changed since the last projection, shows what that projection hid, the way its mode hid it,
+   * and leaves the rest to a full projection under the new mode. Without it a switch away from `Full` left the hidden
+   * files out of the index until a restart: the model's verdicts are the same in every mode but `Soft`, so the delta
+   * path found nothing to show. Returns `false` when aborted.
+   */
+  private async undoAppliedModeOnModeChange(abortSignal: AbortSignal): Promise<boolean> {
+    const targetMode = this.excludeMode;
+    if (this.appliedExcludeMode !== null && this.appliedExcludeMode !== targetMode) {
+      const hidden = this.vaultModel.getPathsByVisibility(false).sort((a, b) => pathDepth(a.path) - pathDepth(b.path));
+      this.lastApplyYieldInMilliseconds = performance.now();
+      if (!await this.showEntries(hidden, { processed: 0, total: hidden.length }, abortSignal)) {
+        return false;
+      }
+      this.needsFullProjection = true;
+    }
+    this.appliedExcludeMode = targetMode;
     return true;
   }
 }

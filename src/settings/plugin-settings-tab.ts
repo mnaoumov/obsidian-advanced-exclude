@@ -204,17 +204,50 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginSettings> {
               f.createEl('br');
               appendCodeBlock(f, 'Files Pane');
               f.appendText(' - Exclude files and folders from the Files Pane only.');
+              f.createEl('br');
+              appendCodeBlock(f, 'Soft');
+              f.appendText(' - Leave files and folders out of what Obsidian\'s own ');
+              appendCodeBlock(f, 'Files and links > Excluded files');
+              f.appendText(' leaves them out of: search, the quick switcher, link suggestions, graph, unlinked mentions and Bases. They stay in the Files Pane, backlinks and links.');
             }),
             name: 'Exclude mode',
             render: (setting) => {
               setting.addDropdown((dropdown) => {
                 dropdown.addOption(ExcludeMode.Full, 'Full');
                 dropdown.addOption(ExcludeMode.FilesPane, 'Files pane');
+                dropdown.addOption(ExcludeMode.Soft, 'Soft');
                 this.bind({
                   propertyName: 'excludeMode',
                   valueComponent: dropdown
                 });
               });
+            }
+          }),
+          this.settingEx({
+            desc: createFragment((f) => {
+              f.appendText('Notes to exclude by their properties, one rule per line: ');
+              appendCodeBlock(f, 'key: value');
+              f.appendText(' matches a property with that value (any item of a list), ');
+              appendCodeBlock(f, 'key');
+              f.appendText(' alone matches any value. Names and values ignore case; a line starting with ');
+              appendCodeBlock(f, '#');
+              f.appendText(' is a comment.');
+              f.createEl('br');
+              f.appendText('Applies in the ');
+              appendCodeBlock(f, 'Soft');
+              f.appendText(' exclude mode only: the other modes hide a note before Obsidian has read its properties.');
+            }),
+            name: 'Exclude notes by property',
+            render: (setting) => {
+              setting.addTextArea((textArea) => {
+                textArea.setPlaceholder('Visibility: gm-only');
+                textArea.inputEl.addClass('ignore-patterns-control');
+                this.bind({
+                  propertyName: 'propertyRules',
+                  valueComponent: textArea
+                });
+              });
+              this.addApplyButton(setting);
             }
           })
         ]

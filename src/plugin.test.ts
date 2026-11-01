@@ -113,6 +113,13 @@ vi.mock('./patches/metadata-cache-initialize-patch-component.ts', () => ({
   })
 }));
 
+vi.mock('./soft-exclude/soft-exclude-patch-component.ts', () => ({
+  // eslint-disable-next-line prefer-arrow-callback, func-names -- mock must be constructable with `new` and return a real loadable Component.
+  SoftExcludePatchComponent: vi.fn(function () {
+    return new Component();
+  })
+}));
+
 vi.mock('./patches/vault-load-patch-component.ts', () => ({
   // eslint-disable-next-line prefer-arrow-callback, func-names -- mock must be constructable with `new` and return a real loadable Component.
   VaultLoadPatchComponent: vi.fn(function () {
@@ -220,7 +227,7 @@ describe('Plugin', () => {
      * `onloadImpl` children, which the override routes into the gated
      * feature-surface tier.
      */
-    const EXPECTED_ADD_CHILD_CALLS = 13;
+    const EXPECTED_ADD_CHILD_CALLS = 14;
     const appOriginal = app.asOriginalType__();
 
     // Spy on the real addChild (calls through) so the real children still load.

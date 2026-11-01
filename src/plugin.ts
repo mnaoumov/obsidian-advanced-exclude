@@ -23,6 +23,7 @@ import { UseBaseSettingsCommandHandler } from './profiles/use-base-settings-comm
 import { PublishCompatibilityWarningComponent } from './publish-compatibility-warning-component.ts';
 import { PluginSettingsComponent } from './settings/plugin-settings-component.ts';
 import { PluginSettingsTab } from './settings/plugin-settings-tab.ts';
+import { SoftExcludePatchComponent } from './soft-exclude/soft-exclude-patch-component.ts';
 
 export class Plugin extends PluginBase {
   protected override async onloadImpl(): Promise<void> {
@@ -123,6 +124,14 @@ export class Plugin extends PluginBase {
         fileTreeComponent,
         ignorePatternsComponent,
         indexProjectionComponent,
+        pluginSettingsComponent
+      })
+    );
+
+    this.addChild(
+      new SoftExcludePatchComponent({
+        app: this.app,
+        ignorePatternsComponent,
         pluginSettingsComponent
       })
     );
