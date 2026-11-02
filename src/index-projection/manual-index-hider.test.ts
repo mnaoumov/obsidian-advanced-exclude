@@ -243,6 +243,35 @@ describe('ManualIndexHider', () => {
       expect(fixture.resolvedLinks['linker.md']?.['a.md']).toBe(2);
     });
   });
+
+  describe('captureFileCache', () => {
+    it('takes a late cache entry for a hidden file into its snapshot, so show restores it', () => {
+      hider.hide(['a.md']);
+
+      expect(hider.captureFileCache('a.md', { hash: 'late', mtime: 2, size: 2 })).toBe(true);
+      expect(fixture.fileCache['a.md']).toBeUndefined();
+
+      hider.show(['a.md']);
+
+      expect(fixture.fileCache['a.md']).toEqual({ hash: 'late', mtime: 2, size: 2 });
+    });
+
+    it('leaves a removal of a hidden file to the caller', () => {
+      hider.hide(['a.md']);
+
+      expect(hider.captureFileCache('a.md', null)).toBe(false);
+    });
+
+    it('leaves a path with no snapshot to the caller', () => {
+      expect(hider.captureFileCache('a.md', { hash: 'late', mtime: 2, size: 2 })).toBe(false);
+    });
+
+    it('leaves a hidden folder to the caller', () => {
+      hider.hide(['f']);
+
+      expect(hider.captureFileCache('f', { hash: 'late', mtime: 2, size: 2 })).toBe(false);
+    });
+  });
 });
 
 function childrenPaths(folderPath: string): string[] {

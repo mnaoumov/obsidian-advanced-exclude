@@ -73,6 +73,24 @@ export class ManualIndexHider {
   }
 
   /**
+   * Takes a `fileCache` entry Obsidian writes for a hidden file into its snapshot instead of the index,
+   * and reports whether it did. Returns `false` for a path with no file snapshot, and for a removal
+   * (`null`), which the caller lets through.
+   *
+   * A parse that was in flight when the file was hidden still finishes: it writes the entry back and
+   * queues the path for link resolution. Obsidian's `resolveLinks` then finds a cache but no file and
+   * throws, and that kills its link resolver loop until the app reloads, so no link resolves again.
+   */
+  public captureFileCache(normalizedPath: string, fileCache: FileCacheValue | null): boolean {
+    const snapshot = this.snapshots.get(normalizedPath);
+    if (!fileCache || !snapshot?.isFile) {
+      return false;
+    }
+    snapshot.fileCache = fileCache;
+    return true;
+  }
+
+  /**
    * Discards the snapshot for `normalizedPath` because it is stale (the file changed on
    * disk while hidden), re-promoting its demoted inbound links but **not** re-inserting the
    * stale cached content. A following {@link show} then reports the path as having no

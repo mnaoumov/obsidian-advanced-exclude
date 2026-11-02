@@ -15,6 +15,7 @@ import { IndexedDatabaseVaultPathStore } from './index-projection/vault-path-sto
 import { AdapterPatchComponent } from './patches/adapter-patch-component.ts';
 import { FileExplorerViewOnCreatePatchComponent } from './patches/file-explorer-view-on-create-patch-component.ts';
 import { MetadataCacheInitializePatchComponent } from './patches/metadata-cache-initialize-patch-component.ts';
+import { MetadataCacheSaveFileCachePatchComponent } from './patches/metadata-cache-save-file-cache-patch-component.ts';
 import { VaultLoadPatchComponent } from './patches/vault-load-patch-component.ts';
 import { IgnorePatternsComponent } from './patterns/ignore-patterns-component.ts';
 import { ProfileSwitcherComponent } from './profiles/profile-switcher-component.ts';
@@ -76,13 +77,16 @@ export class Plugin extends PluginBase {
     // only called from `onLayoutReady`/`processConfigChanges`, so awaiting here cannot reach it early.
     await ignorePatternsComponent.loadWithPromises();
 
+    const manualIndexHider = new ManualIndexHider(this.app);
+    this.addChild(new MetadataCacheSaveFileCachePatchComponent({ app: this.app, manualIndexHider }));
+
     const indexProjectionComponent = this.addChild(
       new IndexProjectionComponent({
         addToFilesPane: fileTreeComponent.addToFilesPane.bind(fileTreeComponent),
         app: this.app,
         deleteFromFilesPane: fileTreeComponent.deleteFromFilesPane.bind(fileTreeComponent),
         ignorePatternsComponent,
-        manualIndexHider: new ManualIndexHider(this.app),
+        manualIndexHider,
         pluginSettingsComponent,
         suspendFilesPaneSort: fileTreeComponent.suspendSort.bind(fileTreeComponent),
         updateProgressNotice,

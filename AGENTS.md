@@ -90,6 +90,7 @@ Built on `@mnaoumov/obsidian-lib` with tooling from `@mnaoumov/obsidian-dev-tool
     - `vault-load-patch-component.ts` — intercepts initial vault load
     - `file-explorer-view-on-create-patch-component.ts` — patches `FileExplorerView.onCreate`
     - `metadata-cache-initialize-patch-component.ts` — batches the related-links passes of `metadataCache.initialize`'s startup purge
+    - `metadata-cache-save-file-cache-patch-component.ts` — a parse still in flight when its file is hidden finishes after the hide and calls `saveFileCache`; the entry goes into the file's hide snapshot (`ManualIndexHider.captureFileCache`), not the index. Written to the index, it made `resolveLinks` throw on the missing file, which stopped Obsidian's link resolver loop until a reload, so no link resolved again. Guard: `src/index-projection/hide-during-parse.desktop.integration.test.ts`, red with the capture disabled
 - **Test files** live next to the source: `alpha.ts` → `alpha.test.ts`. Integration tests are named by the vitest project that runs them: `.desktop.` / `.android.` / `.cross-platform.` / `.no-app.` / `.desktop-performance.` / `.demo-vault.` / `.desktop-capture.` / `.android-capture.` + `.integration.test.ts`.
 - **`main` field** points to `src/main.ts` (Obsidian plugin source entry — built artifact is `dist/build/main.js`, not published to npm).
 
