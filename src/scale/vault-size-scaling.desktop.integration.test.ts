@@ -1,4 +1,5 @@
 import type { DataAdapterEx } from '@obsidian-typings/obsidian-public-latest';
+import type { MetadataCache } from 'obsidian';
 
 import { evalInObsidian } from 'obsidian-integration-testing';
 import { getTemporaryVault } from 'obsidian-integration-testing/vitest-global-setup-plugin';
@@ -96,6 +97,21 @@ function scenarioTimeout(fileCount: number): number {
   return BASE_TIMEOUT_IN_MS + fileCount * PER_FILE_TIMEOUT_IN_MS;
 }
 
+/*
+ * Removing a scenario's thousands of files leaves Obsidian work to do after `rmdir` returns: the
+ * watcher's deletions, the metadata cache's parse queue and the link resolver's queue. The next test
+ * file shares this Obsidian instance, so `afterEach` waits until the vault no longer holds the
+ * scenario and the metadata cache is clean, in polls of `CLEANUP_POLL_IN_MS` (each one CDP call,
+ * under its 30s command timeout) for up to `CLEANUP_TIMEOUT_IN_MS`. A link resolver that stopped,
+ * as it did when a hide raced an in-flight parse, fails here instead of in a later file.
+ */
+const CLEANUP_POLL_IN_MS = 20_000;
+const CLEANUP_TIMEOUT_IN_MS = 120_000;
+
+interface CleanCacheProbe extends MetadataCache {
+  readonly isCacheClean: () => boolean;
+}
+
 afterEach(async () => {
   const topFolders = [...FLAT_SIZES.map((size) => `bulk-${String(size)}`), NESTED_ROOT, MANY_PARENT];
   const controlFiles = [...FLAT_SIZES.map((size) => `control-${String(size)}.md`), 'control-nested.md', 'control-many.md'];
@@ -128,7 +144,43 @@ afterEach(async () => {
     },
     vaultPath: getTemporaryVault().path
   });
-});
+
+  const deadline = Date.now() + CLEANUP_TIMEOUT_IN_MS;
+  let backlog = '';
+  while (Date.now() < deadline) {
+    backlog = await evalInObsidian({
+      async callback({ app, pollInMs, topFolders: folders }) {
+        function describeBacklog(): string {
+          const loadedFolders = folders.filter((folder) => app.vault.getAbstractFileByPath(folder) !== null);
+          const isCacheClean = (app.metadataCache as CleanCacheProbe).isCacheClean();
+          return loadedFolders.length === 0 && isCacheClean ? '' : JSON.stringify({ inProgressTaskCount: app.metadataCache.inProgressTaskCount, isCacheClean, loadedFolders });
+        }
+        const pollDeadline = Date.now() + pollInMs;
+        let current = describeBacklog();
+        while (current && Date.now() < pollDeadline) {
+          await sleep(100);
+          current = describeBacklog();
+        }
+        return current;
+
+        function sleep(ms: number): Promise<void> {
+          return new Promise((resolve) => {
+            window.setTimeout(resolve, ms);
+          });
+        }
+      },
+      input: {
+        pollInMs: CLEANUP_POLL_IN_MS,
+        topFolders
+      },
+      vaultPath: getTemporaryVault().path
+    });
+    if (!backlog) {
+      return;
+    }
+  }
+  throw new Error(`Obsidian did not work off the removed scenario files within ${String(CLEANUP_TIMEOUT_IN_MS)} ms: ${backlog}`);
+}, CLEANUP_TIMEOUT_IN_MS + BASE_TIMEOUT_IN_MS);
 
 describe('Vault size scaling — Full mode', () => {
   for (const size of FLAT_SIZES) {

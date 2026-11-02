@@ -113,6 +113,13 @@ vi.mock('./patches/metadata-cache-initialize-patch-component.ts', () => ({
   })
 }));
 
+vi.mock('./patches/metadata-cache-save-file-cache-patch-component.ts', () => ({
+  // eslint-disable-next-line prefer-arrow-callback, func-names -- mock must be constructable with `new` and return a real loadable Component.
+  MetadataCacheSaveFileCachePatchComponent: vi.fn(function () {
+    return new Component();
+  })
+}));
+
 vi.mock('./soft-exclude/soft-exclude-patch-component.ts', () => ({
   // eslint-disable-next-line prefer-arrow-callback, func-names -- mock must be constructable with `new` and return a real loadable Component.
   SoftExcludePatchComponent: vi.fn(function () {
@@ -234,7 +241,7 @@ describe('Plugin', () => {
      * `onloadImpl` children, which the override routes into the gated
      * feature-surface tier.
      */
-    const EXPECTED_ADD_CHILD_CALLS = 15;
+    const EXPECTED_ADD_CHILD_CALLS = 16;
     const appOriginal = app.asOriginalType__();
 
     // Spy on the real addChild (calls through) so the real children still load.
