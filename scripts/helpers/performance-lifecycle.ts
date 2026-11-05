@@ -493,7 +493,7 @@ async function runStep(vaultPath: string, step: LifecycleStep, excludeMode: Excl
         await waitFor(() => {
           const enabledPlugin = app.plugins.getPlugin(pluginId);
           const projection = enabledPlugin && findComponent(enabledPlugin, 'IndexProjectionComponent') as ProjectionLike | undefined;
-          return projection ? projection.applyingProjectionDepth === 0 && (projection.fastEnableApplied || (projection.hasBuiltModel && projection.updateAbortController === null)) : false;
+          return !!projection && projection.applyingProjectionDepth === 0 && (projection.fastEnableApplied || (projection.hasBuiltModel && projection.updateAbortController === null));
         });
       }
 

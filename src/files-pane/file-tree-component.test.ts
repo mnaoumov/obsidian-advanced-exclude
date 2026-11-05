@@ -18,8 +18,6 @@ import {
 
 import { FileTreeComponent } from './file-tree-component.ts';
 
-type FileItem = FileExplorerView['fileItems'][string];
-
 interface MockFileExplorerView {
   readonly fileItems: FileExplorerView['fileItems'];
   readonly onCreate: ReturnType<typeof vi.fn>;
@@ -97,6 +95,7 @@ function setup(fileExplorerView?: object): SetupResult {
 }
 
 describe('FileTreeComponent', () => {
+  type FileItem = FileExplorerView['fileItems'][string];
   beforeEach(() => {
     vi.clearAllMocks();
   });

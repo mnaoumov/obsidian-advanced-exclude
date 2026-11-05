@@ -55,7 +55,7 @@ describe('ManualIndexHider', () => {
       expect(fixture.fileMap['a.md']).toBeUndefined();
       expect(fixture.fileCache['a.md']).toBeUndefined();
       expect(fixture.app.vault.getAbstractFileByPath('a.md')).toBeNull();
-      expect(childrenPaths('/')).not.toContain('a.md');
+      expect(rootChildrenPaths()).not.toContain('a.md');
       expect(hider.hasSnapshot('a.md')).toBe(true);
     });
 
@@ -126,16 +126,16 @@ describe('ManualIndexHider', () => {
       expect(fixture.resolvedLinks['linker.md']?.['a.md']).toBe(2);
       expect(fixture.unresolvedLinks['linker.md']?.['a.md']).toBeUndefined();
       expect(hider.hasSnapshot('a.md')).toBe(false);
-      expect(childrenPaths('/')).toContain('a.md');
+      expect(rootChildrenPaths()).toContain('a.md');
     });
 
     it('hides and restores several children of one folder in one pass each', () => {
       hider.hide(['a.md', 'linker.md']);
-      expect(childrenPaths('/')).not.toContain('a.md');
-      expect(childrenPaths('/')).not.toContain('linker.md');
+      expect(rootChildrenPaths()).not.toContain('a.md');
+      expect(rootChildrenPaths()).not.toContain('linker.md');
 
       hider.show(['a.md', 'linker.md']);
-      expect(childrenPaths('/')).toEqual(expect.arrayContaining(['a.md', 'linker.md']));
+      expect(rootChildrenPaths()).toEqual(expect.arrayContaining(['a.md', 'linker.md']));
     });
 
     it('does not add a restored node twice when its parent already lists it again', () => {
@@ -146,7 +146,7 @@ describe('ManualIndexHider', () => {
 
       hider.show(['a.md']);
 
-      expect(childrenPaths('/').filter((path) => path === 'a.md')).toHaveLength(1);
+      expect(rootChildrenPaths().filter((path) => path === 'a.md')).toHaveLength(1);
     });
 
     it('restores a file with outgoing resolved and unresolved links', () => {
@@ -180,7 +180,7 @@ describe('ManualIndexHider', () => {
       hider.hide(['a.md']);
       hider.show(['a.md']);
 
-      expect(childrenPaths('/').filter((path) => path === 'a.md')).toHaveLength(1);
+      expect(rootChildrenPaths().filter((path) => path === 'a.md')).toHaveLength(1);
     });
 
     it('re-promotes an inbound link even when the source was hidden after the demotion (recreates its link maps)', () => {
@@ -274,11 +274,6 @@ describe('ManualIndexHider', () => {
   });
 });
 
-function childrenPaths(folderPath: string): string[] {
-  const folder = fixture.fileMap[folderPath];
-  return folder instanceof TFolder ? folder.children.map((child) => child.path) : [];
-}
-
 function createFixture(): Fixture {
   /*
    * The test-mocks Vault models `fileMap__`, not the real `fileMap` this module mutates, and a
@@ -344,4 +339,9 @@ function createFixture(): Fixture {
   const app = castTo<App>({ metadataCache, vault });
 
   return { app, fileCache, fileMap, resolvedLinks, unresolvedLinks };
+}
+
+function rootChildrenPaths(): string[] {
+  const folder = fixture.fileMap['/'];
+  return folder instanceof TFolder ? folder.children.map((child) => child.path) : [];
 }

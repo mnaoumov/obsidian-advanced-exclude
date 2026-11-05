@@ -30,8 +30,6 @@ vi.mock('../index-projection/refresh-link-views.ts', () => ({
   refreshSearchViews: vi.fn()
 }));
 
-type SettingsListener = () => void;
-
 /*
  * Each fake records the `app` its entry method saw, as a core view does when it starts.
  */
@@ -77,6 +75,8 @@ class FakeSearchView {
 }
 
 describe('FeatureEntryPatchComponent', () => {
+  type SettingsListener = () => void;
+
   let app: App;
   let component: FeatureEntryPatchComponent;
   let leavesByType: Map<string, unknown[]>;

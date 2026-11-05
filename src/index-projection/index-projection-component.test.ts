@@ -73,7 +73,7 @@ vi.mock('@mnaoumov/obsidian-lib/metadata-cache', () => ({
 }));
 
 const mockGetDataAdapterEx = vi.mocked(getDataAdapterEx);
-const mockIsFolder = vi.mocked(isFolder);
+const isFolderMock = vi.mocked(isFolder);
 const mockSkipFolderListings = vi.mocked(skipFolderListings);
 const mockSuspendFileRecoveryCreateSnapshots = vi.mocked(suspendFileRecoveryCreateSnapshots);
 const mockSuspendRelatedLinksUpdates = vi.mocked(suspendRelatedLinksUpdates);
@@ -189,7 +189,7 @@ function setup(params: SetupParams): SetupResult {
 
   const loadedFiles = entries.map((entry) => strictProxy<TAbstractFile>({ path: entry.path }));
   const flagByPath = new Map(entries.map((entry) => [entry.path, entry.isFolderFlag]));
-  mockIsFolder.mockImplementation((file) => flagByPath.get((file as TAbstractFile).path) ?? false);
+  isFolderMock.mockImplementation((file) => flagByPath.get((file as TAbstractFile).path) ?? false);
 
   let workspaceLayoutReadyCallback: (() => void) | undefined;
   let workspaceQuitCallback: (() => void) | undefined;
@@ -402,9 +402,9 @@ describe('IndexProjectionComponent', () => {
       expect(resumeFileRecoverySnapshots).toHaveBeenCalledTimes(1);
       const [suspendOrder] = mockSuspendFileRecoveryCreateSnapshots.mock.invocationCallOrder;
       const [reParseOrder] = mockAdapter.reconcileFile.mock.invocationCallOrder;
-      const [resumeOrder] = resumeFileRecoverySnapshots.mock.invocationCallOrder;
+      const [resumeOrder = 0] = resumeFileRecoverySnapshots.mock.invocationCallOrder;
       expect(suspendOrder).toBeLessThan(reParseOrder ?? 0);
-      expect(reParseOrder).toBeLessThan(resumeOrder ?? 0);
+      expect(reParseOrder).toBeLessThan(resumeOrder);
     });
 
     it('skips the adapter listing of each re-shown folder until the re-show ends', async () => {
@@ -424,9 +424,9 @@ describe('IndexProjectionComponent', () => {
       expect(resumeFolderListings).toHaveBeenCalledTimes(1);
       const [skipOrder] = mockSkipFolderListings.mock.invocationCallOrder;
       const reParseOrders = mockAdapter.reconcileFile.mock.invocationCallOrder;
-      const [resumeOrder] = resumeFolderListings.mock.invocationCallOrder;
+      const [resumeOrder = 0] = resumeFolderListings.mock.invocationCallOrder;
       expect(skipOrder).toBeLessThan(reParseOrders[0] ?? 0);
-      expect(reParseOrders.at(-1)).toBeLessThan(resumeOrder ?? 0);
+      expect(reParseOrders.at(-1)).toBeLessThan(resumeOrder);
     });
   });
 
