@@ -197,7 +197,7 @@ describe('Ignore patterns — Full mode (vault-level exclusion)', () => {
           return { error: 'Plugin not loaded' };
         }
 
-        const pluginSettingsComponent = findComponent(plugin, 'PluginSettingsComponent') as PluginSettingsComponent | undefined;
+        const pluginSettingsComponent = findPluginSettingsComponent(plugin) as PluginSettingsComponent | undefined;
         if (!pluginSettingsComponent) {
           return { error: 'Could not locate PluginSettingsComponent' };
         }
@@ -228,7 +228,7 @@ describe('Ignore patterns — Full mode (vault-level exclusion)', () => {
          */
         const reloadedPlugin = app.plugins.getPlugin(pluginId);
         const reloadedSettingsComponent = reloadedPlugin
-          ? findComponent(reloadedPlugin, 'PluginSettingsComponent') as PluginSettingsComponent | undefined
+          ? findPluginSettingsComponent(reloadedPlugin) as PluginSettingsComponent | undefined
           : undefined;
         await reloadedSettingsComponent?.editAndSave((settings) => {
           settings.shouldIncludeGitIgnorePatterns = false;
@@ -239,8 +239,8 @@ describe('Ignore patterns — Full mode (vault-level exclusion)', () => {
           error: null
         };
 
-        function findComponent(root: object, className: string): unknown {
-          if (root.constructor.name === className) {
+        function findPluginSettingsComponent(root: object): unknown {
+          if (root.constructor.name === 'PluginSettingsComponent') {
             return root;
           }
 
@@ -249,7 +249,7 @@ describe('Ignore patterns — Full mode (vault-level exclusion)', () => {
               continue;
             }
 
-            const found = findComponent(child, className);
+            const found = findPluginSettingsComponent(child);
             if (found) {
               return found;
             }

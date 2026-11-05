@@ -256,16 +256,10 @@ export class IndexProjectionComponent extends ComponentEx {
     this.reapplyToFilesPane();
     // The fast-enable path already applied the persisted hide; a full `update()` here
     // would trigger a whole-vault `applyFull` and undo the win.
-    if (this.fastEnableApplied) {
-      return;
-    }
     // Enabled after layout ready (mid-session): the load-time projection already saw the whole
     // loaded vault, so a second whole-vault projection here would only repeat it — on a 91k-node
     // real vault that doubled a re-enable and raced the first one.
-    if (this.wasEnabledAfterLayoutReady) {
-      return;
-    }
-    if (this.vaultLoadPatch.wasVaultLoadCalled) {
+    if (this.fastEnableApplied || this.wasEnabledAfterLayoutReady || this.vaultLoadPatch.wasVaultLoadCalled) {
       return;
     }
 

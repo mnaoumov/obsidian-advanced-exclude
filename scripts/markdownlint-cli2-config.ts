@@ -9,6 +9,11 @@ export const config: MarkdownlintCli2ConfigurationSchema = {
     // Turned on here, against the shared default of off: every paragraph in this repo's markdown is one
     // physical line, and this is what stops hard wrapping from coming back. The key has to live inside
     // `config` - the spread above replaces the whole object, so a key beside it would be silently ignored.
-    'no-soft-break-in-paragraph': true
+    'no-soft-break-in-paragraph': true,
+    'tool-name-as-code': {
+      // `node` here is always a tree or graph node (the shadow tree, the graph view), never the Node.js
+      // command, so marking it as code would misname it.
+      excludedToolNames: ['node']
+    }
   }
 };

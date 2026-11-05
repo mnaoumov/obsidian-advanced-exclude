@@ -452,7 +452,7 @@ describe('VaultModel', () => {
 
     it('yields and reports progress when a yieldFunction is supplied for a large model', async () => {
       // A model larger than the yield chunk so a chunk boundary is reached.
-      const model = build(largeFolderEntries(6000), () => false);
+      const model = build(largeFolderEntries(), () => false);
 
       const progress: number[][] = [];
       let yieldCount = 0;
@@ -474,7 +474,7 @@ describe('VaultModel', () => {
 
     it('stops early when aborted during the ignore-evaluation pass', async () => {
       let isIgnoredNow = false;
-      const model = build(largeFolderEntries(6000), () => isIgnoredNow);
+      const model = build(largeFolderEntries(), () => isIgnoredNow);
       isIgnoredNow = true;
       const controller = new AbortController();
 
@@ -493,7 +493,7 @@ describe('VaultModel', () => {
 
     it('stops early when aborted during the visibility pass, keeping flips collected so far', async () => {
       let isIgnoredNow = false;
-      const model = build(largeFolderEntries(6000), () => isIgnoredNow);
+      const model = build(largeFolderEntries(), () => isIgnoredNow);
       isIgnoredNow = true;
       const controller = new AbortController();
       let yieldCount = 0;
@@ -562,9 +562,10 @@ function buildHidingEmpty(entries: readonly VaultModelEntry[], isIgnored: IsIgno
   return model;
 }
 
-function largeFolderEntries(count: number): VaultModelEntry[] {
+function largeFolderEntries(): VaultModelEntry[] {
+  const LARGE_FOLDER_FILE_COUNT = 6000;
   const entries: VaultModelEntry[] = [{ isFolder: true, path: 'big' }];
-  for (let index = 0; index < count; index++) {
+  for (let index = 0; index < LARGE_FOLDER_FILE_COUNT; index++) {
     entries.push({ isFolder: false, path: `big/file-${String(index)}.md` });
   }
   return entries;

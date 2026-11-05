@@ -4,7 +4,7 @@
 
 - fix: show the profile pattern syntax in the profile editor as rendered inline code
 - build(deps): float brace-expansion, sharp and fast-uri to their patched versions
-- chore(deps): move to obsidian-lib 6 and obsidian-dev-toolkit 5
+- chore(deps): move to `obsidian-lib` 6 and `obsidian-dev-toolkit` 5
 - docs(readme): lead the Debugging section with `Advanced Debug Mode`
 
 ## 4.2.0
@@ -25,27 +25,27 @@
 - chore: link Discussions from the issue chooser for questions
 - fix: re-apply Files Pane hiding to an explorer built after the projection (re #13 - \[BUG\] Exclude mode - FIles Pane : is not working for me)
 - ci: merge attesting release assets through the toolkit's reusable workflow
-- build(demo-vault): require `CodeScript Toolkit` 13.8.0 for the obsidian-lib demo script
+- build(demo-vault): require `CodeScript Toolkit` 13.8.0 for the `obsidian-lib` demo script
 - docs: document # comments in .obsidianignore, with a regression test (re #16 - \[BUG\] Are .gitignore comments supported?)
-- build: move off obsidian-dev-utils onto the @mnaoumov packages
+- build: move off `obsidian-dev-utils` onto the @mnaoumov packages
 - fix: mark plugin names as code in markdown, comments and UI
-- refactor: merge typing Obsidian internals from obsidian-typings
-- test: merge using the obsidian-typings declarations of Obsidian internals
+- refactor: merge typing Obsidian internals from `obsidian-typings`
+- test: merge using the `obsidian-typings` declarations of Obsidian internals
 
 ## 4.1.3
 
 - test(screenshots): merge setting the desktop capture theme with applyObsidianTheme
 - fix(ignore-patterns): merge applying an ignore file edited while the plugin runs
-- chore(deps): merge the obsidian-integration-testing 17 float
-- chore(deps): merge the obsidian-test-mocks 7 float
+- chore(deps): merge the `obsidian-integration-testing` 17 float
+- chore(deps): merge the `obsidian-test-mocks` 7 float
 - chore(deps): merge the devalue 5.9.4 float
 - style(comments): stop capitalizing the middle of a wrapped comment
-- chore: merge the npm run gate branch gate
+- chore: merge the `npm` run gate branch gate
 - chore(deps): merge the restored lockfile resolved and integrity fields
 - docs(contributing): merge the PR base branch correction
 - fix(test): merge the headless demo-vault toolkit install
 - chore: merge the vmThreads pool move for the restore-notice suite
-- chore: merge the obsidian-dev-utils 105 bump and the markdown unwrap
+- chore: merge the `obsidian-dev-utils` 105 bump and the markdown unwrap
 - test(settings): merge the per-step settings-persistence evaluations
 - test(perf): merge the performance vault wiring restore
 - chore(deps): drop the two dead dedupe overrides
@@ -65,14 +65,14 @@
 ## 4.1.2
 
 - chore(deps): sweep caret-ranged dependencies to latest
-- fix(deps): move to obsidian-integration-testing 11 and obsidian-dev-utils 96.5.2
+- fix(deps): move to `obsidian-integration-testing` 11 and `obsidian-dev-utils` 96.5.2
 - fix(deps): drop the brace-expansion file: override that breaks a clean install
 - docs: point plugin-directory links at community.obsidian.md
 
 ## 4.1.1
 
 - docs(demo-vault): unwrap the notes so Obsidian stops rendering a break per line
-- docs(readme): render the same in Obsidian's plugin page as on GitHub
+- docs(readme): render the same in Obsidian's plugin page as on `GitHub`
 - docs(agents): refresh the stale src/ map and the integration-test suffixes
 
 ## 4.1.0
@@ -87,12 +87,12 @@
 ## 4.0.0
 
 - feat!: default Include .gitignore patterns to false
-- chore: update obsidian-dev-utils to 94.6.1
-- chore: update obsidian-dev-utils to 94.6.0
+- chore: update `obsidian-dev-utils` to 94.6.1
+- chore: update `obsidian-dev-utils` to 94.6.0
 - fix: re-project fully when a superseding update aborts the first one
 - fix: override deepmerge-ts to clear GHSA-ggr8-5vv4-36mx
 - test: gate the demo vault by clicking every code button
-- chore: teach cspell the advisory wording
+- chore: teach `cspell` the advisory wording
 - chore: update libs
 - docs(demo-vault): give the demo vault its code buttons
 - docs: capture the community-store screenshot set
@@ -101,25 +101,25 @@
 ## 3.4.3
 
 - docs: make the demo vault the documentation, in the standard layout
-- feat(demo-vault): migrate to obsidian-dev-utils 93.3.1 and adopt the authoring convention
+- feat(demo-vault): migrate to `obsidian-dev-utils` 93.3.1 and adopt the authoring convention
 
 ## 3.4.2
 
-- chore: update libs and adopt obsidian-integration-testing 10
+- chore: update libs and adopt `obsidian-integration-testing` 10
 
 ## 3.4.1
 
 - fix: await the settings and ignore-pattern loads before the components that read them
 - chore: update libs
 - chore: update libs
-- chore(vitest): adopt the shared Obsidian plugin vitest configuration
+- chore(`vitest`): adopt the shared Obsidian plugin `vitest` configuration
 
 ## 3.4.0
 
 - test(index-projection): cover the fast-enable abort and depth sort
 - style: satisfy the lint gate
 - refactor(settings): move the settings tab onto the declarative settings API
-- chore: update libs and clear the npm audit
+- chore: update libs and clear the `npm` audit
 - docs: fix the demo vault download instructions
 
 ## 3.3.2
@@ -152,7 +152,7 @@
 ## 3.1.3
 
 - docs: standardize demo-vault README
-- docs: drop per-plugin demo-vault setup notes (bootstrap covered by the obsidian-dev-utils harness)
+- docs: drop per-plugin demo-vault setup notes (bootstrap covered by the `obsidian-dev-utils` harness)
 - docs: unnumber demo-vault setup notes
 - docs(demo-vault): create the `Advanced Exclude` demo vault
 
@@ -165,7 +165,7 @@
 - test: split vault-size-scaling creation across CDP calls to fit the command timeout
 - chore: overexposed
 - chore: update libs
-- chore: update obsidian-dev-utils to 85.0.0
+- chore: update `obsidian-dev-utils` to 85.0.0
 - test: bump expected PluginBase base child count to 6
 - refactor: pass params objects to vault/projection/ignore APIs
 - build: lock typescript to 6.0.3
@@ -193,7 +193,7 @@
 ## 2.1.3
 
 - chore: update libs
-- chore: use $name shorthand for eslint override
+- chore: use $name shorthand for `eslint` override
 
 ## 2.1.2
 
@@ -237,7 +237,7 @@
 
 - chore: update libs
 - chore: lint
-- chore: enable markdownlint
+- chore: enable `markdownlint`
 
 ## 2.0.17
 

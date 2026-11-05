@@ -103,8 +103,6 @@ interface FileIgnoreEntry {
   readonly path: string;
 }
 
-type MockCallEntry = [string, (...$arguments: unknown[]) => unknown];
-
 interface MockIDBObjectStore {
   readonly clear: ReturnType<typeof vi.fn<(...$arguments: unknown[]) => unknown>>;
   readonly delete: ReturnType<typeof vi.fn<(...$arguments: unknown[]) => unknown>>;
@@ -310,6 +308,7 @@ function setupIndexedDatabase(params?: SetupIndexedDatabaseParams): SetupIndexed
   return { filesStore, mockDatabase, mtimeStore, openFunction };
 }
 describe('IgnorePatternsComponent', () => {
+  type MockCallEntry = [string, (...$arguments: unknown[]) => unknown];
   beforeEach(() => {
     vi.useFakeTimers();
   });

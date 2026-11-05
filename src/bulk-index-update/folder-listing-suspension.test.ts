@@ -11,8 +11,6 @@ import {
 
 import { skipFolderListings } from './folder-listing-suspension.ts';
 
-type ListRecursive = DataAdapterEx['listRecursive'];
-
 class FakeAdapter {
   public readonly listed: string[] = [];
 
@@ -27,6 +25,7 @@ function asAdapter(adapter: object): DataAdapterEx {
 }
 
 describe('skipFolderListings', () => {
+  type ListRecursive = DataAdapterEx['listRecursive'];
   it('skips only the given folders and lists every other one', async () => {
     const fake = new FakeAdapter();
     const adapter = asAdapter(fake);

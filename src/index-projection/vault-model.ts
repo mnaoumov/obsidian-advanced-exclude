@@ -336,13 +336,12 @@ export class VaultModel {
       return !node.isIgnoredSelf;
     }
     const children = ensureNonNullable(node.children);
-    if (node.isIgnoredSelf) {
-      return this.hasVisibleChild(children);
-    }
-    // A non-ignored folder emptied by exclusion (has children but none visible)
-    // collapses only when the setting is on; a genuinely empty folder (no
-    // children on disk) always stays visible.
-    return !this.shouldHideEmptyFolders() || children.size === 0 || this.hasVisibleChild(children);
+    // An ignored folder stays visible only through a visible child. A non-ignored folder emptied by
+    // exclusion (has children but none visible) collapses only when the setting is on; a genuinely
+    // empty folder (no children on disk) always stays visible.
+    return node.isIgnoredSelf
+      ? this.hasVisibleChild(children)
+      : !this.shouldHideEmptyFolders() || children.size === 0 || this.hasVisibleChild(children);
   }
 
   private ensureNode(params: VaultModelEnsureNodeParams): VaultModelNode {

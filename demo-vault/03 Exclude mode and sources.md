@@ -114,7 +114,7 @@ Manual equivalent: pick **Soft** in the **Exclude mode** dropdown, then turn off
 
 ## Reuse `.gitignore`
 
-**Include `.gitignore` patterns** (a toggle, off by default) also honors any `.gitignore` file in your vault. If your vault is a git repository, the files git already ignores get hidden from Obsidian too - no need to restate them in the plugin. It starts off because a vault that happens to be a git repository should not change how it looks the moment the plugin is installed - turn it on when you want that.
+**Include `.gitignore` patterns** (a toggle, off by default) also honors any `.gitignore` file in your vault. If your vault is a `git` repository, the files `git` already ignores get hidden from Obsidian too - no need to restate them in the plugin. It starts off because a vault that happens to be a `git` repository should not change how it looks the moment the plugin is installed - turn it on when you want that.
 
 ```code-button
 ---
@@ -137,7 +137,7 @@ Manual equivalent: toggle **Ignore excluded files** and **Include `.gitignore` p
 The settings tab has two pattern sections, and both always apply, global first:
 
 1. **Global patterns** are stored in the plugin's `data.json`, so [Obsidian Sync](https://help.obsidian.md/sync) carries them to your other devices. Put here what every device should hide.
-2. **Local patterns** are the `.obsidianignore` file at the vault root, which the text area edits directly. Obsidian Sync never carries a file whose name starts with a dot, so these apply only on the device that has the file. Other sync tools, such as git or Syncthing, may carry it. A `!negation` here can re-include what a global pattern hid, on this device only.
+2. **Local patterns** are the `.obsidianignore` file at the vault root, which the text area edits directly. Obsidian Sync never carries a file whose name starts with a dot, so these apply only on the device that has the file. Other sync tools, such as `git` or Syncthing, may carry it. A `!negation` here can re-include what a global pattern hid, on this device only.
 
 The file is not created until you first type in the **Local patterns** text area, and then it starts with a few `#` comment lines saying what it is for. You can also edit it in any text editor: the plugin reads it again when you come back to Obsidian, and on desktop as soon as it changes. It keeps the line endings the file already uses.
 

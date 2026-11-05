@@ -19,10 +19,6 @@ import {
 } from '../settings/plugin-settings.ts';
 import { AdapterPatchBaseComponent } from './adapter-patch-base-component.ts';
 
-interface CreateComponentOverrides {
-  readonly settings?: PluginSettings;
-}
-
 class TestAdapterPatchBaseComponent extends AdapterPatchBaseComponent {
   public callGenerateReconcileWrapper(
     originalFunction: (normalizedPath: string, ...$arguments: unknown[]) => Promise<void>,
@@ -45,13 +41,12 @@ describe('AdapterPatchBaseComponent', () => {
     settings = new PluginSettings();
   });
 
-  function createComponent(overrides: CreateComponentOverrides = {}): TestAdapterPatchBaseComponent {
-    const effectiveSettings = overrides.settings ?? settings;
+  function createComponent(): TestAdapterPatchBaseComponent {
     ignorePatternsComponent = strictProxy<IgnorePatternsComponent>({
       isIgnored: vi.fn().mockReturnValue(false)
     });
     pluginSettingsComponent = strictProxy<PluginSettingsComponent>({
-      effectiveSettings
+      effectiveSettings: settings
     });
     fileTreeComponent = strictProxy<FileTreeComponent>({
       deleteFromFilesPane: vi.fn()

@@ -140,7 +140,7 @@ describe('Fast enable — re-hides the persisted set directly on unchanged confi
         //    Back to resolved.
         await app.plugins.disablePlugin(pluginId);
         const restoredAfterDisable = countHidden();
-        const linkStateWhenRestored = linkState(linkSource, linkTarget);
+        const linkStateWhenRestored = linkSourceState();
 
         // 3. Re-enable unchanged → FAST path. The folder is re-hidden and its inbound link
         //    Demoted to unresolved again.
@@ -148,7 +148,7 @@ describe('Fast enable — re-hides the persisted set directly on unchanged confi
         const isFastEnableAppliedOnFast = isFastEnableApplied();
         const hiddenAfterFastReEnable = countHidden();
         const isControlVisibleAfterFast = isControlVisible();
-        const linkStateAfterFastReEnable = linkState(linkSource, linkTarget);
+        const linkStateAfterFastReEnable = linkSourceState();
 
         // 4. Disable, change the universe on disk (a new ignored file the fingerprint
         //    Cannot detect), re-enable → the signature guard forces the FULL path.
@@ -204,12 +204,12 @@ describe('Fast enable — re-hides the persisted set directly on unchanged confi
           }
         }
 
-        function linkState(source: string, target: string): 'none' | 'resolved' | 'unresolved' {
+        function linkSourceState(): 'none' | 'resolved' | 'unresolved' {
           const { metadataCache } = app;
-          if ((metadataCache.resolvedLinks[source]?.[target] ?? 0) > 0) {
+          if ((metadataCache.resolvedLinks[linkSource]?.[linkTarget] ?? 0) > 0) {
             return 'resolved';
           }
-          return (metadataCache.unresolvedLinks[source]?.[target] ?? 0) > 0 ? 'unresolved' : 'none';
+          return (metadataCache.unresolvedLinks[linkSource]?.[linkTarget] ?? 0) > 0 ? 'unresolved' : 'none';
         }
 
         function findComponent(root: object, className: string): unknown {
