@@ -70,11 +70,15 @@ const CREATE_BATCH_SIZE = 50;
 /*
  * A single CDP `Runtime.evaluate` is aborted after 30s by the transport, and creating the
  * whole flat 5000-file scenario in one closure alone exceeds that. So file creation is split
- * across multiple `evalInObsidian` calls — one per chunk of this many files — each of which
- * finishes well under the command timeout. All calls hit the same running Obsidian, so the
- * vault state accumulates across them.
+ * across multiple `evalInObsidian` calls. A fixed count per call is not enough: under bulk
+ * load on a busy machine a 1000-file call itself ran past the cap. So each call is bounded by
+ * time instead: it creates batches until `CREATE_CALL_BUDGET_IN_MS` has elapsed, then returns
+ * how many it created, and the next call carries on from there. `MAX_FILES_PER_CALL` only
+ * bounds how many paths are serialized into one call. All calls hit the same running
+ * Obsidian, so the vault state accumulates across them.
  */
-const FILES_PER_CALL = 1000;
+const MAX_FILES_PER_CALL = 1000;
+const CREATE_CALL_BUDGET_IN_MS = 5000;
 
 /*
  * Upper bound for each readiness `waitUntil` (plugin load, hide, re-show). Each poll returns as soon as
@@ -343,22 +347,29 @@ async function runIgnoreScenario(spec: ScenarioSpec): Promise<VaultSizeScenarioR
   }
 
   async function createFilesInChunks(): Promise<void> {
-    // Keep the plugin off during creation; each chunk is its own CDP call so none blows the timeout.
-    for (let start = 0; start < spec.files.length; start += FILES_PER_CALL) {
-      const chunk = spec.files.slice(start, start + FILES_PER_CALL);
-      await evalInObsidian({
-        async callback({ app, chunk: chunkFiles, CREATE_BATCH_SIZE: batchSize }) {
-          for (let batchStart = 0; batchStart < chunkFiles.length; batchStart += batchSize) {
-            const batch = chunkFiles.slice(batchStart, batchStart + batchSize).map((path) => app.vault.create(path, ''));
-            await Promise.all(batch);
+    // Keep the plugin off during creation; each call stops at its time budget so none blows the timeout.
+    let start = 0;
+    while (start < spec.files.length) {
+      const chunk = spec.files.slice(start, start + MAX_FILES_PER_CALL);
+      const createdCount = await evalInObsidian({
+        async callback({ app, budgetInMs, chunk: chunkFiles, CREATE_BATCH_SIZE: batchSize }) {
+          const deadline = Date.now() + budgetInMs;
+          let created = 0;
+          while (created < chunkFiles.length && Date.now() < deadline) {
+            const batch = chunkFiles.slice(created, created + batchSize);
+            await Promise.all(batch.map((path) => app.vault.create(path, '')));
+            created += batch.length;
           }
+          return created;
         },
         input: {
+          budgetInMs: CREATE_CALL_BUDGET_IN_MS,
           chunk,
           CREATE_BATCH_SIZE
         },
         vaultPath
       });
+      start += createdCount;
     }
   }
 
