@@ -4,6 +4,7 @@ import { evalInObsidian } from 'obsidian-integration-testing';
 import { getTemporaryVault } from 'obsidian-integration-testing/vitest-global-setup-plugin';
 import {
   afterEach,
+  beforeEach,
   describe,
   expect,
   it
@@ -17,7 +18,12 @@ const NOTE_PATH = 'local-note.md';
 const LOCAL_PATTERN = 'local-note.md';
 const SECOND_NOTE_PATH = 'second-note.md';
 
-afterEach(async () => {
+// Other suites in the same vault end by writing an empty `.obsidianignore`, while these tests start from a missing file.
+// So the cleanup runs before each test as well as after it.
+beforeEach(resetLocalPatternsState);
+afterEach(resetLocalPatternsState);
+
+async function resetLocalPatternsState(): Promise<void> {
   await evalInObsidian({
     async callback({ app, NOTE_PATH: notePath, PLUGIN_ID: pluginId, SECOND_NOTE_PATH: secondNotePath }) {
       app.setting.close();
@@ -35,7 +41,7 @@ afterEach(async () => {
     input: { NOTE_PATH, PLUGIN_ID, SECOND_NOTE_PATH },
     vaultPath: getTemporaryVault().path
   });
-});
+}
 
 describe('Settings tab — local patterns', () => {
   it('shows the header for a missing .obsidianignore, creates the file only on the first edit, and applies it', async () => {
