@@ -30,313 +30,436 @@ A new `Soft` exclude mode leaves an ignored file in the Files pane and in links,
 
 ## 4.2.1
 
-- fix: show the profile pattern syntax in the profile editor as rendered inline code
-- build(deps): float brace-expansion, sharp and fast-uri to their patched versions
-- chore(deps): move to `obsidian-lib` 6 and `obsidian-dev-toolkit` 5
-- docs(readme): lead the Debugging section with `Advanced Debug Mode`
+This release has 1 fix and 1 documentation change. 2 maintenance commits (tests, build, CI, refactoring, dependencies) are not listed.
+
+### Fixed
+
+- show the profile pattern syntax in the profile editor as rendered inline code
+
+### Documentation
+
+- **readme:** lead the Debugging section with `Advanced Debug Mode`
 
 ## 4.2.0
 
-- test(lifecycle): measure a real app start with the folder hidden
-- fix(startup): batch the related-links passes of the metadata cache's startup purge
-- fix(projection): skip the adapter's recursive folder listing during a re-show
-- fix(projection): skip `File recovery` snapshots of re-shown notes
-- fix(settings): apply a settings save made outside the settings tab
-- fix(settings): link the whitelist demo note instead of a missing README heading
-- feat(profiles): import a vault file with `@import file:<path>`
-- feat: add switchable settings profiles composed with `@import`
-- perf: keep pattern edits and re-enables fast at real-vault scale (re #16 - \[BUG\] Are .gitignore comments supported?)
-- docs: mark plugin names as code
+This release has 2 new features, 5 fixes, 1 improvement and 1 documentation change. 1 maintenance commit (tests, build, CI, refactoring, dependencies) is not listed.
+
+### New
+
+- **profiles:** import a vault file with `@import file:<path>`
+- add switchable settings profiles composed with `@import`
+
+### Fixed
+
+- **startup:** batch the related-links passes of the metadata cache's startup purge
+- **projection:** skip the adapter's recursive folder listing during a re-show
+- **projection:** skip File recovery snapshots of re-shown notes
+- **settings:** apply a settings save made outside the settings tab
+- **settings:** link the whitelist demo note instead of a missing README heading
+
+### Improved
+
+- keep pattern edits and re-enables fast at real-vault scale (re #16 - \[BUG\] Are .gitignore comments supported?)
+
+### Documentation
+
+- mark plugin names as code
 
 ## 4.1.4
 
-- chore: link Discussions from the issue chooser for questions
-- fix: re-apply Files Pane hiding to an explorer built after the projection (re #13 - \[BUG\] Exclude mode - FIles Pane : is not working for me)
-- ci: merge attesting release assets through the toolkit's reusable workflow
-- build(demo-vault): require `CodeScript Toolkit` 13.8.0 for the `obsidian-lib` demo script
-- docs: document # comments in .obsidianignore, with a regression test (re #16 - \[BUG\] Are .gitignore comments supported?)
-- build: move off `obsidian-dev-utils` onto the @mnaoumov packages
-- fix: mark plugin names as code in markdown, comments and UI
-- refactor: merge typing Obsidian internals from `obsidian-typings`
-- test: merge using the `obsidian-typings` declarations of Obsidian internals
+This release has 2 fixes and 1 documentation change. 6 maintenance commits (tests, build, CI, refactoring, dependencies) are not listed.
+
+### Fixed
+
+- re-apply Files Pane hiding to an explorer built after the projection (re #13 - \[BUG\] Exclude mode - FIles Pane : is not working for me)
+- mark plugin names as code in markdown, comments and UI
+
+### Documentation
+
+- document # comments in .obsidianignore, with a regression test (re #16 - \[BUG\] Are .gitignore comments supported?)
 
 ## 4.1.3
 
-- test(screenshots): merge setting the desktop capture theme with applyObsidianTheme
-- fix(ignore-patterns): merge applying an ignore file edited while the plugin runs
-- chore(deps): merge the `obsidian-integration-testing` 17 float
-- chore(deps): merge the `obsidian-test-mocks` 7 float
-- chore(deps): merge the devalue 5.9.4 float
-- style(comments): stop capitalizing the middle of a wrapped comment
-- chore: merge the `npm` run gate branch gate
-- chore(deps): merge the restored lockfile resolved and integrity fields
-- docs(contributing): merge the PR base branch correction
-- fix(test): merge the headless demo-vault toolkit install
-- chore: merge the vmThreads pool move for the restore-notice suite
-- chore: merge the `obsidian-dev-utils` 105 bump and the markdown unwrap
-- test(settings): merge the per-step settings-persistence evaluations
-- test(perf): merge the performance vault wiring restore
-- chore(deps): drop the two dead dedupe overrides
-- chore(deps): drop the dead markdown-it override
-- chore(deps): drop the dead js-yaml override
-- fix(deps): override smol-toml to clear a denial-of-service advisory
-- docs: replace the private rule-id citations with what they assert
-- docs: name the library and the sibling plugins so a reader can resolve them
-- docs: replace the private tracker references with what they pointed at
-- docs: say where the debug command is run
-- test: bring the in-closure wait ceiling under the transport's per-eval cap
-- docs: name the unversioned demo-vault asset and the folder it unzips into
-- chore: make the LICENSE copyright line checkable by the linter and guard it against the year roll-over
-- test(test-mocks): drop the hand-rolled app.plugins stub, and sweep the dependencies
-- fix(build): wire build:compile to buildCompile and drop the duplicate leaf script
+This release has 4 fixes and 6 documentation changes. 17 maintenance commits (tests, build, CI, refactoring, dependencies) are not listed.
+
+### Fixed
+
+- **ignore-patterns:** merge applying an ignore file edited while the plugin runs
+- **test:** merge the headless demo-vault toolkit install
+- **deps:** override smol-toml to clear a denial-of-service advisory
+- **build:** wire build:compile to buildCompile and drop the duplicate leaf script
+
+### Documentation
+
+- **contributing:** merge the PR base branch correction
+- replace the private rule-id citations with what they assert
+- name the library and the sibling plugins so a reader can resolve them
+- replace the private tracker references with what they pointed at
+- say where the debug command is run
+- name the unversioned demo-vault asset and the folder it unzips into
 
 ## 4.1.2
 
-- chore(deps): sweep caret-ranged dependencies to latest
-- fix(deps): move to `obsidian-integration-testing` 11 and `obsidian-dev-utils` 96.5.2
-- fix(deps): drop the brace-expansion file: override that breaks a clean install
-- docs: point plugin-directory links at community.obsidian.md
+This release has 2 fixes and 1 documentation change. 1 maintenance commit (tests, build, CI, refactoring, dependencies) is not listed.
+
+### Fixed
+
+- **deps:** move to `obsidian-integration-testing` 11 and `obsidian-dev-utils` 96.5.2
+- **deps:** drop the brace-expansion file: override that breaks a clean install
+
+### Documentation
+
+- point plugin-directory links at community.obsidian.md
 
 ## 4.1.1
 
-- docs(demo-vault): unwrap the notes so Obsidian stops rendering a break per line
-- docs(readme): render the same in Obsidian's plugin page as on `GitHub`
-- docs(agents): refresh the stale src/ map and the integration-test suffixes
+This release has 3 documentation changes.
+
+### Documentation
+
+- **demo-vault:** unwrap the notes so Obsidian stops rendering a break per line
+- **readme:** render the same in Obsidian's plugin page as on `GitHub`
+- **agents:** refresh the stale src/ map and the integration-test suffixes
 
 ## 4.1.0
 
-- fix: re #14
+This release has 1 fix.
+
+### Fixed
+
+- \[BUG\] data.json is emptied then filled with default settings every reload after "include .gitignore patterns" is disabled. (#14)
 
 ## 4.0.1
 
-- fix(versions): correct the stale 1.13.8 minAppVersion row for 4.0.0
-- chore: update libs
+This release has 1 fix. 1 maintenance commit (tests, build, CI, refactoring, dependencies) is not listed.
+
+### Fixed
+
+- **versions:** correct the stale 1.13.8 minAppVersion row for 4.0.0
 
 ## 4.0.0
 
-- feat!: default Include .gitignore patterns to false
-- chore: update `obsidian-dev-utils` to 94.6.1
-- chore: update `obsidian-dev-utils` to 94.6.0
-- fix: re-project fully when a superseding update aborts the first one
-- fix: override deepmerge-ts to clear GHSA-ggr8-5vv4-36mx
-- test: gate the demo vault by clicking every code button
-- chore: teach `cspell` the advisory wording
-- chore: update libs
-- docs(demo-vault): give the demo vault its code buttons
-- docs: capture the community-store screenshot set
-- docs: retire the finished rewrite plan and use NATO placeholders
+This release has 1 breaking change, 2 fixes and 3 documentation changes. 5 maintenance commits (tests, build, CI, refactoring, dependencies) are not listed.
+
+### Breaking changes
+
+- default Include .gitignore patterns to false
+
+### Fixed
+
+- re-project fully when a superseding update aborts the first one
+- override deepmerge-ts to clear GHSA-ggr8-5vv4-36mx
+
+### Documentation
+
+- **demo-vault:** give the demo vault its code buttons
+- capture the community-store screenshot set
+- retire the finished rewrite plan and use NATO placeholders
 
 ## 3.4.3
 
-- docs: make the demo vault the documentation, in the standard layout
-- feat(demo-vault): migrate to `obsidian-dev-utils` 93.3.1 and adopt the authoring convention
+This release has 1 new feature and 1 documentation change.
+
+### New
+
+- **demo-vault:** migrate to `obsidian-dev-utils` 93.3.1 and adopt the authoring convention
+
+### Documentation
+
+- make the demo vault the documentation, in the standard layout
 
 ## 3.4.2
 
-- chore: update libs and adopt `obsidian-integration-testing` 10
+This release has maintenance changes only. 1 maintenance commit (tests, build, CI, refactoring, dependencies) is not listed.
 
 ## 3.4.1
 
-- fix: await the settings and ignore-pattern loads before the components that read them
-- chore: update libs
-- chore: update libs
-- chore(`vitest`): adopt the shared Obsidian plugin `vitest` configuration
+This release has 1 fix. 3 maintenance commits (tests, build, CI, refactoring, dependencies) are not listed.
+
+### Fixed
+
+- await the settings and ignore-pattern loads before the components that read them
 
 ## 3.4.0
 
-- test(index-projection): cover the fast-enable abort and depth sort
-- style: satisfy the lint gate
-- refactor(settings): move the settings tab onto the declarative settings API
-- chore: update libs and clear the `npm` audit
-- docs: fix the demo vault download instructions
+This release has 1 documentation change. 4 maintenance commits (tests, build, CI, refactoring, dependencies) are not listed.
+
+### Documentation
+
+- fix the demo vault download instructions
 
 ## 3.3.2
 
-- chore: update libs
+This release has maintenance changes only. 1 maintenance commit (tests, build, CI, refactoring, dependencies) is not listed.
 
 ## 3.3.1
 
-- perf(enable): fast-enable big vaults from the persisted hidden set re #10
+This release has 1 improvement.
+
+### Improved
+
+- **enable:** fast-enable big vaults from the persisted hidden set re #10
 
 ## 3.3.0
 
-- fix: remove duplicate plugin name from the progress notice
-- feat: restore the index instantly on disable re #10
+This release has 1 new feature and 1 fix.
+
+### New
+
+- restore the index instantly on disable re #10
+
+### Fixed
+
+- remove duplicate plugin name from the progress notice
 
 ## 3.2.0
 
-- fix: re #11
+This release has 1 fix.
+
+### Fixed
+
+- \[FR\] Add option to hide empty directories (#11)
 
 ## 3.1.5
 
-- chore: update libs
+This release has maintenance changes only. 1 maintenance commit (tests, build, CI, refactoring, dependencies) is not listed.
 
 ## 3.1.4
 
-- chore: update libs
-- chore(demo-vault): drop committed Invocables placeholder
-- fix(demo-vault): export invoke() from startup script; add Invocables folder
+This release has 1 fix. 2 maintenance commits (tests, build, CI, refactoring, dependencies) are not listed.
+
+### Fixed
+
+- **demo-vault:** export invoke() from startup script; add Invocables folder
 
 ## 3.1.3
 
-- docs: standardize demo-vault README
-- docs: drop per-plugin demo-vault setup notes (bootstrap covered by the `obsidian-dev-utils` harness)
-- docs: unnumber demo-vault setup notes
-- docs(demo-vault): create the `Advanced Exclude` demo vault
+This release has 4 documentation changes.
+
+### Documentation
+
+- standardize demo-vault README
+- drop per-plugin demo-vault setup notes (bootstrap covered by the `obsidian-dev-utils` harness)
+- unnumber demo-vault setup notes
+- **demo-vault:** create the `Advanced Exclude` demo vault
 
 ## 3.1.2
 
-- fix: re #8
+This release has 1 fix.
+
+### Fixed
+
+- \[BUG\] Negation doesn't seem to work in .obsidianignore (#8)
 
 ## 3.1.1
 
-- test: split vault-size-scaling creation across CDP calls to fit the command timeout
-- chore: overexposed
-- chore: update libs
-- chore: update `obsidian-dev-utils` to 85.0.0
-- test: bump expected PluginBase base child count to 6
-- refactor: pass params objects to vault/projection/ignore APIs
-- build: lock typescript to 6.0.3
-- test: wire integration-testing vitest-setup into integration projects
-- chore: update libs
-- chore: clean up tsconfig
+This release has maintenance changes only. 10 maintenance commits (tests, build, CI, refactoring, dependencies) are not listed.
 
 ## 3.1.0
 
-- perf: improve performance
+This release has 1 improvement.
+
+### Improved
+
+- improve performance
 
 ## 3.0.0
 
-- perf: improve performance
-- refactor: new template
+This release has 1 improvement. 1 maintenance commit (tests, build, CI, refactoring, dependencies) is not listed.
+
+### Improved
+
+- improve performance
 
 ## 2.1.5
 
-- chore: update template
+This release has maintenance changes only. 1 maintenance commit (tests, build, CI, refactoring, dependencies) is not listed.
 
 ## 2.1.4
 
-- chore: update libs
+This release has maintenance changes only. 1 maintenance commit (tests, build, CI, refactoring, dependencies) is not listed.
 
 ## 2.1.3
 
-- chore: update libs
-- chore: use $name shorthand for `eslint` override
+This release has maintenance changes only. 2 maintenance commits (tests, build, CI, refactoring, dependencies) are not listed.
 
 ## 2.1.2
 
-- chore: update libs
-- refactor(test): replace Record\<string, unknown\> mock types with real ones
-- chore: remove stale .czrc
+This release has maintenance changes only. 3 maintenance commits (tests, build, CI, refactoring, dependencies) are not listed.
 
 ## 2.1.1
 
-- refactor: update template
+This release has maintenance changes only. 1 maintenance commit (tests, build, CI, refactoring, dependencies) is not listed.
 
 ## 2.1.0
 
-- test: add integration tests
-- feat: add command handler with open-settings command
-- test: add unit tests
-- test: add smoke
-- chore: update template
+This release has 1 new feature. 4 maintenance commits (tests, build, CI, refactoring, dependencies) are not listed.
+
+### New
+
+- add command handler with open-settings command
 
 ## 2.0.23
 
-- chore: update template
+This release has maintenance changes only. 1 maintenance commit (tests, build, CI, refactoring, dependencies) is not listed.
 
 ## 2.0.22
 
-- chore: update libs
+This release has maintenance changes only. 1 maintenance commit (tests, build, CI, refactoring, dependencies) is not listed.
 
 ## 2.0.21
 
-- chore: update libs
+This release has maintenance changes only. 1 maintenance commit (tests, build, CI, refactoring, dependencies) is not listed.
 
 ## 2.0.20
 
-- chore: update libs
+This release has maintenance changes only. 1 maintenance commit (tests, build, CI, refactoring, dependencies) is not listed.
 
 ## 2.0.19
 
-- chore: update libs
+This release has maintenance changes only. 1 maintenance commit (tests, build, CI, refactoring, dependencies) is not listed.
 
 ## 2.0.18
 
-- chore: update libs
-- chore: lint
-- chore: enable `markdownlint`
+This release has maintenance changes only. 3 maintenance commits (tests, build, CI, refactoring, dependencies) are not listed.
 
 ## 2.0.17
 
-- fix: build
-- chore: update libs
+This release has 1 fix. 1 maintenance commit (tests, build, CI, refactoring, dependencies) is not listed.
+
+### Fixed
+
+- build
 
 ## 2.0.16
 
-- chore: enable conventional commits
+This release has maintenance changes only. 1 maintenance commit (tests, build, CI, refactoring, dependencies) is not listed.
 
 ## 2.0.15
+
+This release has 1 other change.
+
+### Other changes
 
 - Minor changes
 
 ## 2.0.14
 
+This release has 1 other change.
+
+### Other changes
+
 - Minor changes
 
 ## 2.0.13
+
+This release has 1 other change.
+
+### Other changes
 
 - Minor changes
 
 ## 2.0.12
 
+This release has 1 other change.
+
+### Other changes
+
 - Minor changes
 
 ## 2.0.11
+
+This release has 1 other change.
+
+### Other changes
 
 - Minor changes
 
 ## 2.0.10
 
+This release has 1 other change.
+
+### Other changes
+
 - Minor changes
 
 ## 2.0.9
+
+This release has 1 other change.
+
+### Other changes
 
 - Minor changes
 
 ## 2.0.8
 
+This release has 1 other change.
+
+### Other changes
+
 - Minor changes
 
 ## 2.0.7
+
+This release has 1 other change.
+
+### Other changes
 
 - Minor changes
 
 ## 2.0.6
 
+This release has 1 other change.
+
+### Other changes
+
 - Minor changes
 
 ## 2.0.5
+
+This release has 1 other change.
+
+### Other changes
 
 - Minor changes
 
 ## 2.0.4
 
+This release has 1 other change.
+
+### Other changes
+
 - Ensure excluded items don't reappear on view reload
 
 ## 2.0.3
+
+This release has 1 other change.
+
+### Other changes
 
 - Minor changes
 
 ## 2.0.2
 
+This release has 1 other change.
+
+### Other changes
+
 - Minor changes
 
 ## 2.0.1
 
+This release has 1 other change.
+
+### Other changes
+
 - Minor changes
 
 ## 2.0.0
+
+This release has 4 other changes.
+
+### Other changes
 
 - Cache in database
 - Prevent double load
@@ -345,34 +468,66 @@ A new `Soft` exclude mode leaves an ignored file in the Files pane and in links,
 
 ## 1.3.0
 
+This release has 1 other change.
+
+### Other changes
+
 - Add ExcludeMode
 
 ## 1.2.5
+
+This release has 1 other change.
+
+### Other changes
 
 - Stop loop on plugin unload
 
 ## 1.2.4
 
+This release has 1 other change.
+
+### Other changes
+
 - Minor changes
 
 ## 1.2.3
+
+This release has 1 other change.
+
+### Other changes
 
 - Minor changes
 
 ## 1.2.2
 
+This release has 1 other change.
+
+### Other changes
+
 - Minor changes
 
 ## 1.2.1
+
+This release has 1 other change.
+
+### Other changes
 
 - New template
 
 ## 1.2.0
 
+This release has 2 other changes.
+
+### Other changes
+
 - Show single progress bar
 - Avoid extra count
 
 ## 1.1.0
+
+This release has 3 other changes.
+
+### Other changes
 
 - Speed up on desktop
 - Add progress bar
@@ -380,9 +535,17 @@ A new `Soft` exclude mode leaves an ignored file in the Files pane and in links,
 
 ## 1.0.1
 
+This release has 2 other changes.
+
+### Other changes
+
 - Add warning
 - Change default
 
 ## 1.0.0
+
+This release has 1 other change.
+
+### Other changes
 
 - Initial release
