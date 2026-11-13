@@ -15,18 +15,23 @@ Every pattern box now checks its lines as you type: errors (a line that matches 
 
 A new `Soft` exclude mode leaves an ignored file in the Files pane and in links, and keeps it out of search, the quick switcher, link suggestions, graph, unlinked mentions and Bases, exactly where Obsidian's own `Excluded files` applies. Each of those features has its own toggle, so a folder can be left out of unlinked mentions only. In this mode, **Exclude notes by property** hides notes by a frontmatter value, such as `visibility: gm-only`.
 
-- fix: keep resolving links after hiding a note whose parse is in flight
-- feat: choose which features the Soft exclude mode reaches
-- feat: add a Soft exclude mode and an Exclude notes by property setting
-- feat: add a Report a bug command
-- refactor(storage): move verdicts and hidden paths to device-local records
-- fix: refresh graph views after index projection
-- fix: save .obsidianignore when typing pauses, and judge files by the applied patterns until Apply
-- feat: check exclude patterns as you type, and report errors an outside .obsidianignore edit brings
-- feat: keep per-device patterns in .obsidianignore beside the synced global patterns
-- feat: add global exclude patterns, kept in the synced plugin settings
-- fix: keep the space before the plugin name in the Publish warning's disable button
-- test(demo-vault): floor `CodeScript Toolkit` at 15.0.0
+This release has 6 new features and 4 fixes. 2 maintenance commits (tests, build, CI, refactoring, dependencies) are not listed.
+
+### New
+
+- add global exclude patterns, kept in the synced plugin settings
+- keep per-device patterns in `.obsidianignore` beside the synced global patterns
+- check exclude patterns as you type, and report errors an outside `.obsidianignore` edit brings
+- add a `Soft` exclude mode and an **Exclude notes by property** setting
+- choose which features the `Soft` exclude mode reaches
+- add a **Report a bug** command
+
+### Fixed
+
+- save `.obsidianignore` when typing pauses, and judge files by the applied patterns until Apply
+- refresh graph views after the excluded files change
+- keep resolving links after hiding a note whose parse is in flight
+- keep the space before the plugin name in the Publish warning's disable button
 
 ## 4.2.1
 
