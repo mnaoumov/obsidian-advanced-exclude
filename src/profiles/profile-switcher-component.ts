@@ -1,9 +1,7 @@
 import { registerAsyncEvent } from '@mnaoumov/obsidian-lib/components/async-events-component';
+import { ComponentEx } from '@mnaoumov/obsidian-lib/components/component-ex';
 import { invokeAsyncSafely } from '@mnaoumov/typescript-lib/async';
-import {
-  Component,
-  Menu
-} from 'obsidian';
+import { Menu } from 'obsidian';
 
 import type { PluginSettingsComponent } from '../settings/plugin-settings-component.ts';
 
@@ -21,7 +19,7 @@ interface ProfileSwitcherComponentConstructorParams {
  * The status-bar item that shows the profile active on this device, and switches it from a menu. It stays hidden
  * until a profile exists, so a vault that uses none sees no change.
  */
-export class ProfileSwitcherComponent extends Component {
+export class ProfileSwitcherComponent extends ComponentEx {
   private readonly addStatusBarItem: () => HTMLElement;
   private readonly pluginSettingsComponent: PluginSettingsComponent;
   private statusBarItemEl: HTMLElement | null = null;
