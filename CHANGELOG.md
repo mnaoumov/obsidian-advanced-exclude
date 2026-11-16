@@ -549,8 +549,12 @@ This release has 2 other changes.
 
 ## 1.0.0
 
-This release has 1 other change.
+First release. `Advanced Exclude` extends Obsidian's `Files and links > Excluded files` setting with full `gitignore` syntax, and makes ignored files invisible to Obsidian (the Files pane, Backlinks and the rest) instead of only dimming them.
 
-### Other changes
+### New
 
-- Initial release
+- Configure ignore patterns in [`gitignore`](https://git-scm.com/docs/gitignore) syntax in the plugin settings.
+- Edit the patterns by hand in a `.obsidianignore` file at the vault root; changes to it are picked up straight away.
+- Optionally apply the patterns from the vault's `.gitignore` file too.
+- Reuse the patterns already in Obsidian's `Excluded files` setting, in its string and regular-expression forms.
+- Works on desktop and mobile.
