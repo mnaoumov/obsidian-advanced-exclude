@@ -27,7 +27,7 @@ describe('appendFindingMessage', () => {
 
 describe('renderPatternFindings', () => {
   it('should replace the content with one line per finding, colored by severity and labelled by source', () => {
-    const el = createDiv({ text: 'stale' });
+    const el = createDiv({ text: 'Stale' });
 
     renderPatternFindings({
       findings: [

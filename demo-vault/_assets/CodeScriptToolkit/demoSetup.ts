@@ -1,21 +1,72 @@
-import type { App } from 'obsidian';
+import type {
+  App,
+  Plugin
+} from 'obsidian';
 
-import { Notice } from 'obsidian';
 import { configureCommunityPlugin } from '@mnaoumov/obsidian-lib/community-plugins';
+import {
+  asCodeBlock,
+  createFragmentWithCodeBlocks
+} from '@mnaoumov/obsidian-lib/html-element';
+import { Notice } from 'obsidian';
 
 const PLUGIN_ID = 'advanced-exclude';
+const PLUGIN_NAME = 'Advanced Exclude';
+
+interface AdvancedExcludePlugin extends Plugin {
+  readonly pluginSettingsComponent: ProfileSwitcher;
+}
+
+interface DemoProfile {
+  readonly id: string;
+  readonly name: string;
+  readonly patterns: string;
+}
 
 interface DemoSettingsPatch {
-  excludeMode?: string;
-  ignorePatterns?: string;
-  propertyRules?: string;
-  shouldHideEmptyFolders?: boolean;
-  shouldIgnoreExcludedFiles?: boolean;
-  shouldIncludeGitIgnorePatterns?: boolean;
-  shouldSoftExcludeFromGraph?: boolean;
-  shouldSoftExcludeFromOtherFeatures?: boolean;
-  shouldSoftExcludeFromSearch?: boolean;
-  shouldSoftExcludeFromUnlinkedMentions?: boolean;
+  readonly excludeMode?: string;
+  readonly ignorePatterns?: string;
+  readonly propertyRules?: string;
+  readonly shouldHideEmptyFolders?: boolean;
+  readonly shouldIgnoreExcludedFiles?: boolean;
+  readonly shouldIncludeGitIgnorePatterns?: boolean;
+  readonly shouldSoftExcludeFromGraph?: boolean;
+  readonly shouldSoftExcludeFromOtherFeatures?: boolean;
+  readonly shouldSoftExcludeFromSearch?: boolean;
+  readonly shouldSoftExcludeFromUnlinkedMentions?: boolean;
+}
+
+interface ProfileSwitcher {
+  readonly setActiveProfileId: (profileId: null | string) => Promise<void>;
+}
+
+/**
+ * Applies any other settings patch, live.
+ *
+ * Manual equivalent: change the same option in **Settings -> Community plugins -> `Advanced Exclude`**.
+ */
+export async function changeSettings(app: App, patch: DemoSettingsPatch): Promise<void> {
+  await configureCommunityPlugin({ app, pluginId: PLUGIN_ID, settings: patch });
+  new Notice('Applied.');
+}
+
+/**
+ * Clears every pattern, so the whole vault is visible again.
+ *
+ * Manual equivalent: empty the **Ignore patterns** text area and apply.
+ */
+export async function clearIgnorePatterns(app: App): Promise<void> {
+  await setIgnorePatterns(app, '');
+  new Notice('Patterns cleared — everything is visible again.');
+}
+
+/**
+ * Hides the `Archive/` folder and everything under it — the walkthrough in `01 Exclude a folder.md`.
+ *
+ * Manual equivalent: add the single line `Archive/` to **Ignore patterns** and apply.
+ */
+export async function excludeArchiveFolder(app: App): Promise<void> {
+  await setIgnorePatterns(app, 'Archive/\n');
 }
 
 /**
@@ -30,16 +81,7 @@ interface DemoSettingsPatch {
  */
 export async function setIgnorePatterns(app: App, ignorePatterns: string): Promise<void> {
   await configureCommunityPlugin({ app, pluginId: PLUGIN_ID, settings: { ignorePatterns } });
-  new Notice('Patterns applied. Look at the Files pane.');
-}
-
-/**
- * Hides the `Archive/` folder and everything under it — the walkthrough in `01 Exclude a folder.md`.
- *
- * Manual equivalent: add the single line `Archive/` to **Ignore patterns** and apply.
- */
-export async function excludeArchiveFolder(app: App): Promise<void> {
-  await setIgnorePatterns(app, 'Archive/\n');
+  new Notice('Patterns applied. Look at the files pane.');
 }
 
 /**
@@ -55,43 +97,29 @@ export async function excludeArchiveFolder(app: App): Promise<void> {
  * Manual equivalent: paste those four lines into **Ignore patterns** and apply.
  */
 export async function useMarkdownWhitelist(app: App): Promise<void> {
-  await setIgnorePatterns(app, ['# Ignore everything...', '*', '# ...but keep folders traversable...', '!*/', '# ...and re-include only Markdown notes.', '!*.md', ''].join('\n'));
-}
-
-/**
- * Clears every pattern, so the whole vault is visible again.
- *
- * Manual equivalent: empty the **Ignore patterns** text area and apply.
- */
-export async function clearIgnorePatterns(app: App): Promise<void> {
-  await setIgnorePatterns(app, '');
-  new Notice('Patterns cleared — everything is visible again.');
-}
-
-/**
- * Applies any other settings patch, live.
- *
- * Manual equivalent: change the same option in **Settings -> Community plugins -> `Advanced Exclude`**.
- */
-export async function changeSettings(app: App, patch: DemoSettingsPatch): Promise<void> {
-  await configureCommunityPlugin({ app, pluginId: PLUGIN_ID, settings: patch });
-  new Notice('Applied.');
-}
-
-interface DemoProfile {
-  id: string;
-  name: string;
-  patterns: string;
-}
-
-interface ProfileSwitcher {
-  setActiveProfileId(profileId: null | string): Promise<void>;
+  await setIgnorePatterns(app, '# Ignore everything...\n*\n# ...but keep folders traversable...\n!*/\n# ...and re-include only Markdown notes.\n!*.md\n');
 }
 
 const DEMO_PROFILES: DemoProfile[] = [
   { id: 'demo-hide-archive', name: 'Hide archive', patterns: 'Archive/' },
-  { id: 'demo-focus', name: 'Focus', patterns: ['@import Hide archive', 'Shared/'].join('\n') }
+  { id: 'demo-focus', name: 'Focus', patterns: '@import Hide archive\nShared/' }
 ];
+
+/**
+ * Makes `profileId` the active profile on this device, or goes back to the base settings for `null`.
+ *
+ * Manual equivalent: click the `Exclude:` item in the status bar and pick the profile, or run
+ * **`Advanced Exclude`: Switch profile...**.
+ */
+export async function activateProfile(app: App, profileId: null | string): Promise<void> {
+  const plugin = app.plugins.getPlugin(PLUGIN_ID) as AdvancedExcludePlugin | null;
+  if (!plugin) {
+    new Notice(createFragmentWithCodeBlocks(`Enable ${asCodeBlock(PLUGIN_NAME)} first.`));
+    return;
+  }
+  await plugin.pluginSettingsComponent.setActiveProfileId(profileId);
+  new Notice(profileId === null ? 'Back to the base settings.' : 'Profile active. Look at the files pane.');
+}
 
 /**
  * Creates the two profiles `05 Profiles.md` walks through: `Hide archive`, and `Focus`, which imports it and
@@ -102,23 +130,7 @@ const DEMO_PROFILES: DemoProfile[] = [
  */
 export async function createDemoProfiles(app: App): Promise<void> {
   await configureCommunityPlugin({ app, pluginId: PLUGIN_ID, settings: { profiles: DEMO_PROFILES } });
-  new Notice('Profiles created. Switch between them from the status bar or the "Switch profile..." command.');
-}
-
-/**
- * Makes `profileId` the active profile on this device, or goes back to the base settings for `null`.
- *
- * Manual equivalent: click the `Exclude:` item in the status bar and pick the profile, or run
- * **`Advanced Exclude`: Switch profile...**.
- */
-export async function activateProfile(app: App, profileId: null | string): Promise<void> {
-  const plugin = app.plugins.getPlugin(PLUGIN_ID) as unknown as null | { pluginSettingsComponent: ProfileSwitcher };
-  if (!plugin) {
-    new Notice('Enable Advanced Exclude first.');
-    return;
-  }
-  await plugin.pluginSettingsComponent.setActiveProfileId(profileId);
-  new Notice(profileId === null ? 'Back to the base settings.' : 'Profile active. Look at the Files pane.');
+  new Notice('Profiles created. Switch between them from the status bar or the command palette.');
 }
 
 /**
