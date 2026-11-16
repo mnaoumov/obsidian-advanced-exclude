@@ -332,8 +332,9 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
     this.registerDomEvent(window, 'focus', () => {
       invokeAsyncSafely(() => this.refreshLocalPatterns());
     });
-    this.registerDomEvent(document, 'visibilitychange', () => {
-      if (document.visibilityState === 'visible') {
+    // The main window's own document, the pair of the `window` focus listener above: a pop-out window's document comes and goes.
+    this.registerDomEvent(window.document, 'visibilitychange', () => {
+      if (window.document.visibilityState === 'visible') {
         invokeAsyncSafely(() => this.refreshLocalPatterns());
       }
     });
