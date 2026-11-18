@@ -1,5 +1,19 @@
 # CHANGELOG
 
+## 5.1.0
+
+This release has 1 new feature and 3 documentation changes. 5 maintenance commits (tests, build, CI, refactoring, dependencies) are not listed.
+
+### New
+
+- \[FR\] Allow @import file: to take an absolute path outside the vault on desktop (#18)
+
+### Documentation
+
+- describe the 1.0.0 release in the changelog
+- **changelog:** regroup the raw release notes for readers
+- **changelog:** regroup the published release notes for readers
+
 ## 5.0.0
 
 Exclude patterns now have two homes, shown as two sections of the settings tab:
