@@ -29,10 +29,12 @@ import {
 } from '../constants.ts';
 import {
   readIfExists,
+  readImportedFile,
   readSafe,
   statSafe,
   writeSafe
 } from '../data-adapter-safe.ts';
+import { isOutsideVaultImportPath } from '../profiles/profiles.ts';
 import {
   formatLocalPatternsFile,
   LOCAL_PATTERNS_HEADER,
@@ -328,14 +330,15 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
       this.releaseDatabase();
     });
     // A dot file raises no vault event, and only the desktop watcher reports it at all (as a `reconcileDeletion`), so
-    // an edit made in another app, or by a sync tool, is read when the user comes back to Obsidian.
+    // an edit made in another app, or by a sync tool, is read when the user comes back to Obsidian. A file imported
+    // from outside the vault raises no event at all, so it is re-read then too.
     this.registerDomEvent(window, 'focus', () => {
-      invokeAsyncSafely(() => this.refreshLocalPatterns());
+      invokeAsyncSafely(() => this.refreshOnReturn());
     });
     // The main window's own document, the pair of the `window` focus listener above: a pop-out window's document comes and goes.
     this.registerDomEvent(window.document, 'visibilitychange', () => {
       if (window.document.visibilityState === 'visible') {
-        invokeAsyncSafely(() => this.refreshLocalPatterns());
+        invokeAsyncSafely(() => this.refreshOnReturn());
       }
     });
     // Before the fingerprint: the imported files' contents are part of the expanded patterns it covers.
@@ -439,6 +442,17 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
   }
 
   /**
+   * Re-reads the files the active profile imports from outside the vault, and applies them when their content
+   * changed. Nothing watches such a file, so this runs when the user comes back to Obsidian.
+   */
+  public async refreshOutsideVaultImports(): Promise<void> {
+    if (this.pluginSettingsComponent.effectiveSettings.importedFilePaths.every((path) => !isOutsideVaultImportPath(path))) {
+      return;
+    }
+    await this.applyImportedFileChanges();
+  }
+
+  /**
    * Writes {@link text} to `.obsidianignore`, keeping the line ending and byte order mark the file already has. Like an
    * edit of the global patterns, it applies on the settings tab's hide or Apply while the tab is open, and at once
    * otherwise. Until it applies, files are still judged by the patterns applied before it.
@@ -481,6 +495,18 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
     // whole vault on every `processConfigChanges`.
     this.pendingStoreActions.set(normalizedPath, storeAction);
     this.processStoreActionsDebounced();
+  }
+
+  /**
+   * Re-reads every imported file, and re-applies the ignore state when any content changed.
+   */
+  private async applyImportedFileChanges(): Promise<void> {
+    if (!await this.readImportedFiles()) {
+      return;
+    }
+    this.cachedIgnoreTester = null;
+    this.hadConfigChanges = true;
+    await this.processConfigChanges();
   }
 
   /**
@@ -617,12 +643,10 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
    * Re-applies the ignore state when {@link path} is a file the active profile imports and its content changed.
    */
   private async handleImportedFileChange(path: string): Promise<void> {
-    if (!this.pluginSettingsComponent.effectiveSettings.importedFilePaths.includes(path) || !await this.readImportedFiles()) {
+    if (!this.pluginSettingsComponent.effectiveSettings.importedFilePaths.includes(path)) {
       return;
     }
-    this.cachedIgnoreTester = null;
-    this.hadConfigChanges = true;
-    await this.processConfigChanges();
+    await this.applyImportedFileChanges();
   }
 
   /**
@@ -692,7 +716,7 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
   private async readImportedFiles(): Promise<boolean> {
     const contents = new Map<string, null | string>();
     for (const path of this.pluginSettingsComponent.effectiveSettings.importedFilePaths) {
-      contents.set(path, await readIfExists(this.app, path));
+      contents.set(path, await readImportedFile(this.app, path));
     }
     this.reportMissingImports(contents);
     if (isSameImportedFileContents(this.pluginSettingsComponent.importedFileContents, contents)) {
@@ -735,6 +759,11 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
       ignoreCase: true
     }).add(ignorePatternsString.split('\n'));
     return this.cachedIgnoreTester;
+  }
+
+  private async refreshOnReturn(): Promise<void> {
+    await this.refreshLocalPatterns();
+    await this.refreshOutsideVaultImports();
   }
 
   private releaseDatabase(): void {

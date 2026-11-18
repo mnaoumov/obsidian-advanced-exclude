@@ -16,6 +16,7 @@ import {
 } from 'vitest';
 
 import {
+  readImportedFile,
   readSafe,
   statSafe,
   writeSafe
@@ -122,6 +123,38 @@ describe('data-adapter-safe', () => {
       });
     });
 
+    describe('readImportedFile', () => {
+      it('should read a vault path through the vault adapter', async () => {
+        mockFsPromises.access.mockResolvedValue(undefined);
+        mockFsPromises.readFile.mockResolvedValue('vault/');
+        expect(await readImportedFile(mockApp, 'Vault1Ignore')).toBe('vault/');
+        expect(mockFsPromises.readFile).toHaveBeenCalledWith('/vault/Vault1Ignore', 'utf-8');
+      });
+
+      it('should read an absolute path as it is', async () => {
+        mockFsPromises.readFile.mockResolvedValue('shared/');
+        expect(await readImportedFile(mockApp, 'C:/Users/me/AllVaultsIgnore')).toBe('shared/');
+        expect(mockFsPromises.readFile).toHaveBeenCalledWith('C:/Users/me/AllVaultsIgnore', 'utf-8');
+      });
+
+      it('should return null for a missing absolute path without a warning', async () => {
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+        mockFsPromises.readFile.mockRejectedValue(Object.assign(new Error('missing'), { code: 'ENOENT' }));
+        expect(await readImportedFile(mockApp, '/home/me/ignore')).toBeNull();
+        expect(warn).not.toHaveBeenCalled();
+        warn.mockRestore();
+      });
+
+      it('should return null and warn for an absolute path that cannot be read', async () => {
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+        const error = Object.assign(new Error('is a folder'), { code: 'EISDIR' });
+        mockFsPromises.readFile.mockRejectedValue(error);
+        expect(await readImportedFile(mockApp, '/home/me')).toBeNull();
+        expect(warn).toHaveBeenCalledWith('Could not read `/home/me`, imported with `@import file:`.', error);
+        warn.mockRestore();
+      });
+    });
+
     describe('writeSafe', () => {
       it('should write content to file', async () => {
         mockFsPromises.writeFile.mockResolvedValue(undefined);
@@ -148,6 +181,13 @@ describe('data-adapter-safe', () => {
       });
       mockGetDataAdapterEx.mockReturnValue(adapter.asOriginalType__());
       mockApp = strictProxy<AppOriginal>({ vault: { adapter: adapter.asOriginalType__() } });
+    });
+
+    describe('readImportedFile', () => {
+      it('should read nothing for an absolute path', async () => {
+        expect(await readImportedFile(mockApp, 'C:/Users/me/AllVaultsIgnore')).toBeNull();
+        expect(mockFs.read).not.toHaveBeenCalled();
+      });
     });
 
     describe('readSafe', () => {
