@@ -17,7 +17,9 @@ import {
   duplicateProfile,
   findProfileByName,
   isFileImportName,
+  isOutsideVaultImportPath,
   MAX_IMPORT_DEPTH,
+  normalizeOutsideVaultPath,
   renameProfileImports,
   resolveProfile,
   saveProfile
@@ -33,7 +35,7 @@ function profile(name: string, patterns: string, overrides?: Partial<SettingsPro
 
 describe('resolveProfile', () => {
   it('should expand an imported file at its line, taking its lines literally', () => {
-    const settings = createSettings({ profiles: [profile('Work', 'a/\n@import file:/ignores//work.txt \n!a/keep.md')] });
+    const settings = createSettings({ profiles: [profile('Work', 'a/\n@import file:ignores//work.txt \n!a/keep.md')] });
     const importedFileContents = new Map([['ignores/work.txt', '@literal\r\nb/']]);
 
     const result = resolveProfile({ activeProfileId: 'work', importedFileContents, settings });
@@ -64,10 +66,42 @@ describe('resolveProfile', () => {
     const result = resolveProfile({ activeProfileId: 'work', importedFileContents: new Map([['gone.txt', null]]), settings });
 
     expect(result.errors).toStrictEqual([
-      { lineNumber: 2, message: '`@import file:` needs a vault path.', profileName: 'Work' }
+      { lineNumber: 2, message: '`@import file:` needs a path.', profileName: 'Work' }
     ]);
     expect(result.importedFilePaths).toStrictEqual(['gone.txt']);
     expect(result.lines).toStrictEqual([]);
+  });
+
+  it('should import a file outside the vault by its absolute path on desktop', () => {
+    const settings = createSettings({
+      profiles: [profile('Work', [String.raw`@import file:C:\Users\me\\AllVaultsIgnore`, '@import file:/home/me/ignore', '@import file:Vault1Ignore'].join('\n'))]
+    });
+    const importedFileContents = new Map([['/home/me/ignore', null], ['C:/Users/me/AllVaultsIgnore', 'shared/'], ['Vault1Ignore', 'local/']]);
+
+    const result = resolveProfile({ activeProfileId: 'work', canImportOutsideVault: true, importedFileContents, settings });
+
+    expect(result.errors).toStrictEqual([]);
+    expect(result.importedFilePaths).toStrictEqual(['C:/Users/me/AllVaultsIgnore', '/home/me/ignore', 'Vault1Ignore']);
+    expect(result.lines).toStrictEqual([
+      { filePath: 'C:/Users/me/AllVaultsIgnore', profileName: 'Work', text: 'shared/' },
+      { filePath: 'Vault1Ignore', profileName: 'Work', text: 'local/' }
+    ]);
+  });
+
+  it('should report an absolute path as an error and import nothing where files outside the vault cannot be read', () => {
+    const settings = createSettings({ profiles: [profile('Work', '@import file:C:/Users/me/AllVaultsIgnore\n@import file:Vault1Ignore')] });
+
+    const result = resolveProfile({ activeProfileId: 'work', importedFileContents: new Map([['Vault1Ignore', 'local/']]), settings });
+
+    expect(result.errors).toStrictEqual([
+      {
+        lineNumber: 1,
+        message: '`@import file:` of an absolute path works on desktop only, since the mobile apps cannot read a file outside the vault, so `C:/Users/me/AllVaultsIgnore` imports nothing here.',
+        profileName: 'Work'
+      }
+    ]);
+    expect(result.importedFilePaths).toStrictEqual(['Vault1Ignore']);
+    expect(result.lines).toStrictEqual([{ filePath: 'Vault1Ignore', profileName: 'Work', text: 'local/' }]);
   });
 
   it('should name the profile that first imports each file', () => {
@@ -332,5 +366,34 @@ describe('isFileImportName', () => {
   it('should tell a file import from a profile name, ignoring case and surrounding spaces', () => {
     expect(isFileImportName(' File:x')).toBe(true);
     expect(isFileImportName('files')).toBe(false);
+  });
+});
+
+describe('isOutsideVaultImportPath', () => {
+  it.each([
+    ['C:/Users/me/ignore', true],
+    [String.raw`c:\Users\me\ignore`, true],
+    [String.raw`\\server\share\ignore`, true],
+    ['//server/share/ignore', true],
+    ['/home/me/ignore', true],
+    ['ignore.txt', false],
+    ['.gitignore', false],
+    ['C:relative', false],
+    ['folder/C:/x', false]
+  ])('should tell whether %s is outside the vault', (path, expected) => {
+    expect(isOutsideVaultImportPath(path)).toBe(expected);
+  });
+});
+
+describe('normalizeOutsideVaultPath', () => {
+  it.each([
+    [String.raw`C:\Users\\me\ignore`, 'C:/Users/me/ignore'],
+    [String.raw`\\server\share\ignore`, '//server/share/ignore'],
+    ['//server//share/', '//server/share'],
+    ['/home//me/ignore/', '/home/me/ignore'],
+    ['C:/', 'C:/'],
+    ['/', '/']
+  ])('should normalize %s to %s', (path, expected) => {
+    expect(normalizeOutsideVaultPath(path)).toBe(expected);
   });
 });

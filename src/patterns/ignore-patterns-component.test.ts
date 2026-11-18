@@ -36,6 +36,7 @@ import type { PluginSettingsComponent } from '../settings/plugin-settings-compon
 
 import {
   readIfExists,
+  readImportedFile,
   readSafe,
   statSafe,
   writeSafe
@@ -59,12 +60,17 @@ vi.mock('./verdict-record-store.ts', async (importOriginal) => ({
   }
 }));
 
-vi.mock('../data-adapter-safe.ts', () => ({
-  readIfExists: vi.fn().mockResolvedValue(null),
-  readSafe: vi.fn().mockResolvedValue(''),
-  statSafe: vi.fn().mockResolvedValue(null),
-  writeSafe: vi.fn().mockResolvedValue(undefined)
-}));
+// An imported file is read through the same mock as `.obsidianignore`, whether it lies in the vault or outside it.
+vi.mock('../data-adapter-safe.ts', () => {
+  const readIfExistsMock = vi.fn().mockResolvedValue(null);
+  return {
+    readIfExists: readIfExistsMock,
+    readImportedFile: vi.fn((app: unknown, path: string): unknown => readIfExistsMock(app, path)),
+    readSafe: vi.fn().mockResolvedValue(''),
+    statSafe: vi.fn().mockResolvedValue(null),
+    writeSafe: vi.fn().mockResolvedValue(undefined)
+  };
+});
 
 vi.mock('@mnaoumov/obsidian-lib/metadata-cache', () => ({
   ensureMetadataCacheReady: vi.fn().mockResolvedValue(undefined)
@@ -236,7 +242,7 @@ function createPluginSettingsComponent(settings?: Partial<PluginSettings>, profi
       // Not a plain object: strictProxy caches a plain object a getter returns, which would freeze the first answer.
       return Object.assign(
         Object.create(null) as EffectiveSettings,
-        resolveProfile({ activeProfileId: profileState?.activeProfileId ?? null, importedFileContents, settings: effectiveSettings })
+        resolveProfile({ activeProfileId: profileState?.activeProfileId ?? null, canImportOutsideVault: true, importedFileContents, settings: effectiveSettings })
       );
     },
     get importedFileContents(): ImportedFileContents {
@@ -1180,6 +1186,48 @@ describe('IgnorePatternsComponent', () => {
       await vi.runAllTimersAsync();
 
       expect(onUpdateFileTree).toHaveBeenCalledOnce();
+    });
+
+    it('should re-read a file imported from outside the vault when the window regains focus, and apply it when it changed', async () => {
+      mockImportedFileContent('shared/');
+      setupIndexedDatabase();
+      const onUpdateFileTree = vi.fn().mockResolvedValue(undefined);
+      const component = createComponent({
+        onUpdateFileTree,
+        pluginSettingsComponent: createPluginSettingsComponent(
+          { profiles: [{ id: 'work', name: 'Work', patterns: '@import file:C:/Users/me/AllVaultsIgnore' }] },
+          { activeProfileId: 'work' }
+        )
+      });
+      // The handlers are called directly: an event dispatched on `window` would also reach the components earlier tests left loaded.
+      const registerDomEventSpy = vi.spyOn(component, 'registerDomEvent');
+      await component.loadWithPromises();
+      expect(readImportedFile).toHaveBeenCalledWith(expect.anything(), 'C:/Users/me/AllVaultsIgnore');
+      expect(component.isIgnored({ isFolder: false, normalizedPath: 'shared/a.md' })).toBe(true);
+      const focusHandler = registerDomEventSpy.mock.calls.find(([, eventType]) => eventType === 'focus')?.[2] as () => void;
+
+      focusHandler();
+      await vi.runAllTimersAsync();
+      expect(onUpdateFileTree).not.toHaveBeenCalled();
+
+      mockImportedFileContent('changed/');
+      focusHandler();
+      await vi.runAllTimersAsync();
+      expect(onUpdateFileTree).toHaveBeenCalledOnce();
+      expect(component.isIgnored({ isFolder: false, normalizedPath: 'changed/a.md' })).toBe(true);
+      expect(component.isIgnored({ isFolder: false, normalizedPath: 'shared/a.md' })).toBe(false);
+    });
+
+    it('should not re-read vault imports on focus, since their own events cover them', async () => {
+      mockImportedFileContent('from-file/');
+      setupIndexedDatabase();
+      const component = createComponent({ pluginSettingsComponent: createPluginSettingsComponent(IMPORT_SETTINGS, { activeProfileId: 'work' }) });
+      await component.loadWithPromises();
+      vi.mocked(readImportedFile).mockClear();
+
+      await component.refreshOutsideVaultImports();
+
+      expect(readImportedFile).not.toHaveBeenCalled();
     });
 
     it('should report a missing imported file once per device, and again only after it existed in between', async () => {

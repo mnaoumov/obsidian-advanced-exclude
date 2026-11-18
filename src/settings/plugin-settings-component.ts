@@ -4,6 +4,7 @@ import type { App } from 'obsidian';
 import type { Promisable } from 'type-fest';
 
 import { PluginSettingsComponentBase } from '@mnaoumov/obsidian-lib/components/plugin-settings-component';
+import { Platform } from 'obsidian';
 
 import type {
   EffectiveSettings,
@@ -56,7 +57,12 @@ export class PluginSettingsComponent extends PluginSettingsComponentBase<PluginS
       return cache.effectiveSettings;
     }
 
-    const effectiveSettings = resolveProfile({ activeProfileId: this._activeProfileId, importedFileContents: this._importedFileContents, settings });
+    const effectiveSettings = resolveProfile({
+      activeProfileId: this._activeProfileId,
+      canImportOutsideVault: Platform.isDesktopApp,
+      importedFileContents: this._importedFileContents,
+      settings
+    });
     this.effectiveSettingsCache = {
       activeProfileId: this._activeProfileId,
       effectiveSettings,
@@ -68,7 +74,7 @@ export class PluginSettingsComponent extends PluginSettingsComponentBase<PluginS
   }
 
   /**
-   * The contents of the vault files the active profile imports with `@import file:`, as last read by
+   * The contents of the files the active profile imports with `@import file:`, as last read by
    * `IgnorePatternsComponent`.
    */
   public get importedFileContents(): ImportedFileContents {

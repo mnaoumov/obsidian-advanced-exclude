@@ -11,10 +11,16 @@ import { PluginSettings } from '../settings/plugin-settings.ts';
 export const MAX_IMPORT_DEPTH = 10;
 
 /**
- * The prefix that makes an `@import` line import a vault file rather than a profile, so no profile may be named
- * with it.
+ * The prefix that makes an `@import` line import a file rather than a profile, so no profile may be named with it.
  */
 export const FILE_IMPORT_PREFIX = 'file:';
+
+/**
+ * An absolute filesystem path: a Windows drive path (`C:/` or `C:\`), a UNC path (`\\server` or `//server`), or a
+ * POSIX path starting with `/`.
+ */
+const OUTSIDE_VAULT_PATH_REG_EXP = /^(?:[A-Za-z]:[\\/]|[\\/])/;
+const UNC_PATH_PREFIX = '//';
 
 const IMPORT_DIRECTIVE = '@import';
 const IMPORT_DIRECTIVE_REG_EXP = /^@import\s+(?<name>.*\S)\s*$/;
@@ -35,8 +41,9 @@ export interface EffectiveSettings extends ProfileScalarSettings {
   */
   readonly ignorePatterns: string;
   /**
-  The normalized vault paths the expansion imports with `@import file:`, each once, in first-import order. They
-  depend on the profiles alone, never on the files' contents, so reading them all once is enough to resolve.
+  The normalized paths the expansion imports with `@import file:`, each once, in first-import order: vault paths, and
+  on desktop absolute paths outside the vault (see {@link isOutsideVaultImportPath}). They depend on the profiles
+  alone, never on the files' contents, so reading them all once is enough to resolve.
   */
   readonly importedFilePaths: readonly string[];
   /**
@@ -50,7 +57,7 @@ export interface EffectiveSettings extends ProfileScalarSettings {
 }
 
 /**
- * The contents of the vault files an `@import file:` line names, by normalized path: `null` for a file that does not
+ * The contents of the files an `@import file:` line names, by normalized path: `null` for a file that does not
  * exist. A path missing from the map has not been read yet and expands to nothing, without an error.
  */
 export type ImportedFileContents = ReadonlyMap<string, null | string>;
@@ -61,6 +68,7 @@ export interface ResolveProfileSettings extends Readonly<ProfileScalarSettings> 
 }
 
 interface ExpansionState {
+  readonly canImportOutsideVault: boolean;
   readonly errors: ProfileError[];
   readonly importedFileContents: ImportedFileContents;
   // Its keys, in insertion order, are the imported paths.
@@ -87,7 +95,7 @@ type ProfileScalarSettings = Pick<PluginSettings, ProfileScalarSettingName>;
 
 interface ResolvedPatternLine {
   /**
-  The vault file the line came from, when {@link profileName} imported it with `@import file:`.
+  The file the line came from, when {@link profileName} imported it with `@import file:`.
   */
   readonly filePath?: string;
   /**
@@ -99,6 +107,11 @@ interface ResolvedPatternLine {
 
 interface ResolveProfileParams {
   readonly activeProfileId: null | string;
+  /**
+  Whether `@import file:` may name an absolute path outside the vault: on desktop only, since the mobile apps cannot
+  read such a file. Defaults to `false`.
+  */
+  readonly canImportOutsideVault?: boolean;
   readonly importedFileContents?: ImportedFileContents;
   readonly settings: ResolveProfileSettings;
 }
@@ -157,6 +170,27 @@ export function isFileImportName(name: string): boolean {
 }
 
 /**
+ * Whether an `@import file:` path names a file outside the vault by an absolute path, rather than a vault path.
+ */
+export function isOutsideVaultImportPath(path: string): boolean {
+  return OUTSIDE_VAULT_PATH_REG_EXP.test(path);
+}
+
+/**
+ * Normalizes an absolute path outside the vault, so two spellings of one file are read once: backslashes become `/`,
+ * repeated slashes collapse (a UNC path keeps its leading `//`), and a trailing slash is dropped.
+ */
+export function normalizeOutsideVaultPath(path: string): string {
+  const slashedPath = path.replaceAll('\\', '/');
+  const isUncPath = slashedPath.startsWith(UNC_PATH_PREFIX);
+  const collapsedPath = slashedPath.replaceAll(/\/{2,}/g, '/');
+  const normalizedPath = isUncPath ? `/${collapsedPath}` : collapsedPath;
+  return normalizedPath.length > 1 && normalizedPath.endsWith('/') && !/^[A-Za-z]:\/$/.test(normalizedPath)
+    ? normalizedPath.slice(0, -1)
+    : normalizedPath;
+}
+
+/**
  * Rewrites every `@import` line naming {@link oldName} to name {@link newName}, so a rename does not break the
  * profiles that import the renamed one.
  */
@@ -178,13 +212,14 @@ export function renameProfileImports(patterns: string, oldName: string, newName:
  * line in the profile that imports it. `@reset` drops every line collected so far, the base settings' included,
  * and returns every scalar to its default.
  *
- * `@import file:<vault path>` pastes the lines of a vault file, read from `importedFileContents`, the same way. They
- * are taken literally, as in a `.gitignore`: a file cannot import anything.
+ * `@import file:<path>` pastes the lines of a file, read from `importedFileContents`, the same way. The path is a vault
+ * path, or on desktop an absolute path outside the vault. The lines are taken literally, as in a `.gitignore`: a file
+ * cannot import anything.
  *
  * Errors never stop the resolution: the offending line is skipped and reported.
  */
 export function resolveProfile(params: ResolveProfileParams): EffectiveSettings {
-  const { activeProfileId, importedFileContents = new Map<string, null | string>(), settings } = params;
+  const { activeProfileId, canImportOutsideVault = false, importedFileContents = new Map<string, null | string>(), settings } = params;
   const activeProfile = activeProfileId === null ? undefined : settings.profiles.find((profile) => profile.id === activeProfileId);
   const baseScalars = pickScalars(settings);
 
@@ -201,6 +236,7 @@ export function resolveProfile(params: ResolveProfileParams): EffectiveSettings 
   }
 
   const state: ExpansionState = {
+    canImportOutsideVault,
     errors: [],
     importedFileContents,
     importingProfileNames: new Map(),
@@ -249,10 +285,18 @@ export function saveProfile(profiles: readonly Readonly<SettingsProfile>[], edit
 function expandFileImport(state: ExpansionState, profile: Readonly<SettingsProfile>, rawPath: string): null | string {
   const trimmedPath = rawPath.trim();
   if (trimmedPath === '') {
-    return '`@import file:` needs a vault path.';
+    return '`@import file:` needs a path.';
   }
 
-  const filePath = normalizePath(trimmedPath);
+  let filePath: string;
+  if (isOutsideVaultImportPath(trimmedPath)) {
+    if (!state.canImportOutsideVault) {
+      return `\`@import file:\` of an absolute path works on desktop only, since the mobile apps cannot read a file outside the vault, so \`${trimmedPath}\` imports nothing here.`;
+    }
+    filePath = normalizeOutsideVaultPath(trimmedPath);
+  } else {
+    filePath = normalizePath(trimmedPath);
+  }
   if (!state.importingProfileNames.has(filePath)) {
     state.importingProfileNames.set(filePath, profile.name);
   }

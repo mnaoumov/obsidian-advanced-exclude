@@ -10,6 +10,7 @@ import {
 } from '@mnaoumov/typescript-lib/async';
 import {
   Modal,
+  Platform,
   Setting
 } from 'obsidian';
 
@@ -23,7 +24,7 @@ import type {
   ResolveProfileSettings
 } from './profiles.ts';
 
-import { readIfExists } from '../data-adapter-safe.ts';
+import { readImportedFile } from '../data-adapter-safe.ts';
 import { renderPatternFindings } from '../patterns/pattern-findings-view.ts';
 import {
   PatternFindingSeverity,
@@ -112,8 +113,8 @@ export class ProfileEditModal extends Modal {
         f.appendText('gitignore syntax, one pattern per line. ');
         appendCodeBlock(f, '@import <profile>');
         f.appendText(' inserts another profile\'s patterns at that line, ');
-        appendCodeBlock(f, '@import file:<vault path>');
-        f.appendText(' inserts a file\'s patterns, ');
+        appendCodeBlock(f, '@import file:<path>');
+        f.appendText(' inserts the patterns of a vault file, or on desktop of a file outside the vault by its absolute path, ');
         appendCodeBlock(f, '@reset');
         f.appendText(' drops everything collected before it, and ');
         appendCodeBlock(f, String.raw`\@`);
@@ -195,7 +196,7 @@ export class ProfileEditModal extends Modal {
    */
   private async readFiles(paths: readonly string[]): Promise<void> {
     for (const path of paths) {
-      this.importedFileContents.set(path, await readIfExists(this.app, path));
+      this.importedFileContents.set(path, await readImportedFile(this.app, path));
     }
     this.renderResolution();
   }
@@ -205,6 +206,7 @@ export class ProfileEditModal extends Modal {
     const otherProfiles = this.settings.profiles.filter((profile) => profile.id !== this.draft.id);
     const effectiveSettings = resolveProfile({
       activeProfileId: this.draft.id,
+      canImportOutsideVault: Platform.isDesktopApp,
       importedFileContents: this.importedFileContents,
       settings: { ...this.settings, profiles: [...otherProfiles, this.draft] }
     });

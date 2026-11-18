@@ -66,11 +66,13 @@ drafts/*
 
 ## Import a file with `@import file:`
 
-A line `@import file:<vault path>` pastes the patterns of a file in the vault at that line, the same way. `@import file:.gitignore` puts the vault's `.gitignore` exactly where you want it in a profile, which the **Include .gitignore patterns** setting cannot: that one always adds it after every other line.
+A line `@import file:<path>` pastes the patterns of a file at that line, the same way. `@import file:.gitignore` puts the vault's `.gitignore` exactly where you want it in a profile, which the **Include .gitignore patterns** setting cannot: that one always adds it after every other line.
 
-- The path is relative to the vault root, and the file may be one the plugin hides, or a dot file such as `.gitignore`.
+- A relative path is relative to the vault root, and the file may be one the plugin hides, or a dot file such as `.gitignore`.
+- On desktop, an absolute path imports a file outside the vault, so several vaults can share one ignore file: `@import file:C:/Users/me/AllVaultsIgnore` (or `\\server\share\ignore`, or `/home/me/ignore` on macOS and Linux). A path that starts with `/` is always an absolute path, not a vault path. The mobile apps cannot read a file outside the vault, so there such a line is reported as an error and imports nothing.
+- Obsidian Sync does not carry a file outside the vault. Each device that uses the profile needs its own copy at the same path; a device without one imports nothing from it.
 - The file's lines are taken literally, as in a `.gitignore`: a line starting with `@` in it is a pattern, not a directive, so a file cannot import anything.
-- Editing the file applies at once, while the plugin runs.
+- Editing a vault file applies at once, while the plugin runs. Nothing can watch a file outside the vault, so an edit to one applies when you come back to the Obsidian window.
 - A file that does not exist imports nothing. That is not an error, so a profile can import a file only some devices have; the profile editor notes it as `(file not found, nothing imported)` in case the path is mistyped.
 - The local patterns of `.obsidianignore` apply after the whole profile, whichever profile is active, so a profile does not need to import them.
 - A profile cannot be named starting with `file:`, since `@import file:...` would read as a file.

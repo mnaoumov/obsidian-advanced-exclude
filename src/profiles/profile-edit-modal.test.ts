@@ -11,7 +11,7 @@ import {
 
 import type { SettingsProfile } from '../settings/plugin-settings.ts';
 
-import { readIfExists } from '../data-adapter-safe.ts';
+import { readImportedFile } from '../data-adapter-safe.ts';
 import {
   ExcludeMode,
   PluginSettings
@@ -19,7 +19,7 @@ import {
 import { ProfileEditModal } from './profile-edit-modal.ts';
 
 vi.mock('../data-adapter-safe.ts', () => ({
-  readIfExists: vi.fn()
+  readImportedFile: vi.fn()
 }));
 
 interface OpenModalResult {
@@ -56,7 +56,7 @@ describe('ProfileEditModal', () => {
 
     const codeEls = [...modal.contentEl.querySelectorAll('code')];
 
-    expect(codeEls.map((codeEl) => codeEl.textContent)).toStrictEqual(['@import <profile>', '@import file:<vault path>', '@reset', String.raw`\@`, '@']);
+    expect(codeEls.map((codeEl) => codeEl.textContent)).toStrictEqual(['@import <profile>', '@import file:<path>', '@reset', String.raw`\@`, '@']);
     for (const codeEl of codeEls) {
       expect(codeEl.parentElement?.matches('.markdown-rendered.code')).toBe(true);
     }
@@ -131,11 +131,11 @@ describe('ProfileEditModal', () => {
     const { modal } = openModal({ id: 'work', name: 'Work', patterns: '@import file:.gitignore' }, new Map([['.gitignore', 'node_modules/']]));
 
     expect(getText(modal, '.advanced-exclude-profile-expansion')).toContain('Work (.gitignore): node_modules/');
-    expect(readIfExists).not.toHaveBeenCalled();
+    expect(readImportedFile).not.toHaveBeenCalled();
   });
 
   it('should read a file the draft newly imports and show it, or hint that it is missing without an error', async () => {
-    vi.mocked(readIfExists).mockImplementation((_app, path) => Promise.resolve(path === 'work.txt' ? 'from-file/' : null));
+    vi.mocked(readImportedFile).mockImplementation((_app, path) => Promise.resolve(path === 'work.txt' ? 'from-file/' : null));
     const { modal } = openModal({ id: 'work', name: 'Work', patterns: '' });
 
     typeInto(getTextArea(modal), '@import file:work.txt\n@import file:gone.txt');

@@ -9,6 +9,8 @@ import {
   FileSystemAdapter
 } from 'obsidian';
 
+import { isOutsideVaultImportPath } from './profiles/profiles.ts';
+
 interface WriteSafeParams {
   readonly app: App;
   readonly content: string;
@@ -34,6 +36,33 @@ export async function readIfExists(app: App, path: string): Promise<null | strin
   }
 
   throw new Error('Unknown adapter');
+}
+
+/**
+ * Reads a file an `@import file:` line names: a vault path through the vault adapter, an absolute path outside the
+ * vault through the desktop file system. Returns `null` when the file does not exist or cannot be read, and on mobile
+ * for an absolute path, which `resolveProfile` reports there as an error before anything reads it.
+ */
+export async function readImportedFile(app: App, path: string): Promise<null | string> {
+  if (!isOutsideVaultImportPath(path)) {
+    return await readIfExists(app, path);
+  }
+
+  const adapter = getDataAdapterEx(app);
+  if (!(adapter instanceof FileSystemAdapter)) {
+    return null;
+  }
+
+  try {
+    return await adapter.fsPromises.readFile(path, 'utf-8');
+  } catch (error) {
+    // A missing file is reported by the caller like a missing vault file; anything else (a folder, no permission) is
+    // logged too, since it imports nothing in the same way.
+    if (!isMissingFileError(error)) {
+      console.warn(`Could not read \`${path}\`, imported with \`@import file:\`.`, error);
+    }
+    return null;
+  }
 }
 
 export async function readSafe(app: App, path: string): Promise<string> {
@@ -108,4 +137,8 @@ async function doesExistSafe(app: App, path: string): Promise<boolean> {
   }
 
   throw new Error('Unknown adapter');
+}
+
+function isMissingFileError(error: unknown): boolean {
+  return error instanceof Error && 'code' in error && (error.code === 'ENOENT' || error.code === 'ENOTDIR');
 }

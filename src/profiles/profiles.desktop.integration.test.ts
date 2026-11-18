@@ -192,4 +192,65 @@ describe('Profiles', () => {
     expect(result.edited).toStrictEqual(['work/a.md', 'work/keep.md']);
     expect(result.removed).toStrictEqual(TEST_FILES);
   });
+  it('imports a file outside the vault by its absolute path and re-applies it when the window regains focus', async () => {
+    const result = await evalInObsidian({
+      async callback({ app, PLUGIN_ID: pluginId, SETTLE_DELAY_IN_MS: settleDelay, TEST_FILES: files }) {
+        const plugin = app.plugins.getPlugin(pluginId) as null | ProfilesTestPlugin;
+        if (!plugin) {
+          return { error: 'Plugin not loaded' };
+        }
+        const settingsComponent = plugin.pluginSettingsComponent;
+        const adapter = app.vault.adapter as FileSystemAdapter;
+        // A sibling of the vault folder, so outside the vault, and named after it so parallel vaults never share it.
+        const outsidePath = `${adapter.getBasePath().replaceAll('\\', '/')}.outside-ignore`;
+
+        function loaded(): string[] {
+          return files.filter((path) => app.vault.getAbstractFileByPath(path) !== null);
+        }
+
+        try {
+          await app.vault.adapter.write('.obsidianignore', '');
+          await app.vault.adapter.mkdir('work');
+          await app.vault.adapter.mkdir('home');
+          for (const path of files) {
+            await app.vault.adapter.write(path, path);
+          }
+          await adapter.fsPromises.writeFile(outsidePath, 'work/*');
+          await sleep(settleDelay);
+
+          await settingsComponent.editAndSave((settings) => {
+            settings.profiles = [{ id: 'outside-id', name: 'Outside', patterns: `@import file:${outsidePath}\n!work/keep.md` }];
+          });
+          await settingsComponent.setActiveProfileId('outside-id');
+          await sleep(settleDelay);
+          const imported = loaded();
+
+          // Nothing watches a file outside the vault, so the edit applies when the user comes back to Obsidian.
+          await adapter.fsPromises.writeFile(outsidePath, 'home/');
+          await sleep(settleDelay);
+          const beforeFocus = loaded();
+          window.dispatchEvent(new Event('focus'));
+          await sleep(settleDelay);
+          const afterFocus = loaded();
+
+          await adapter.fsPromises.unlink(outsidePath);
+          window.dispatchEvent(new Event('focus'));
+          await sleep(settleDelay);
+          const removed = loaded();
+
+          return { afterFocus, beforeFocus, error: null, imported, removed };
+        } finally {
+          await adapter.fsPromises.rm(outsidePath, { force: true });
+        }
+      },
+      input: { PLUGIN_ID, SETTLE_DELAY_IN_MS, TEST_FILES },
+      vaultPath: getTemporaryVault().path
+    });
+
+    expect(result.error).toBeNull();
+    expect(result.imported).toStrictEqual(['work/keep.md', 'home/b.md']);
+    expect(result.beforeFocus).toStrictEqual(['work/keep.md', 'home/b.md']);
+    expect(result.afterFocus).toStrictEqual(['work/a.md', 'work/keep.md']);
+    expect(result.removed).toStrictEqual(TEST_FILES);
+  });
 });
