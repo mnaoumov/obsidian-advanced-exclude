@@ -53,9 +53,9 @@ export class FileExplorerViewOnCreatePatchComponent extends MonkeyAroundComponen
     this.addChild(new CallbackLayoutReadyComponent(this.app, this.onLayoutReady.bind(this)));
   }
 
-  private getFileExplorerView(): FileExplorerView | undefined {
+  private getFileExplorerView(): FileExplorerView | null {
     const view = this.app.workspace.getLeavesOfType(ViewType.FileExplorer)[0]?.view;
-    return view && 'fileItems' in view ? view : undefined;
+    return view && 'fileItems' in view ? view : null;
   }
 
   private onCreate(originalFunction: OnCreateFunction, view: FileExplorerView, file: TAbstractFile): void {

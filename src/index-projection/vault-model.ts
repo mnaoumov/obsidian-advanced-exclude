@@ -186,18 +186,18 @@ export class VaultModel {
    * Returns whether the parent of `normalizedPath` is currently visible. A hidden
    * node whose parent is visible is a hide-root: in `Full` mode removing it via
    * `reconcileDeletion` cascades its whole subtree, so descendants need no
-   * separate removal. Returns `undefined` if the path is unknown.
+   * separate removal. Returns `null` if the path is unknown.
    */
-  public isParentVisible(normalizedPath: string): boolean | undefined {
+  public isParentVisible(normalizedPath: string): boolean | null {
     const node = this.nodes.get(normalizedPath);
-    return node ? node.parent?.isVisible ?? true : undefined;
+    return node ? node.parent?.isVisible ?? true : null;
   }
 
   /**
-   * Returns the current visibility of a path, or `undefined` if unknown.
+   * Returns the current visibility of a path, or `null` if unknown.
    */
-  public isVisible(normalizedPath: string): boolean | undefined {
-    return this.nodes.get(normalizedPath)?.isVisible;
+  public isVisible(normalizedPath: string): boolean | null {
+    return this.nodes.get(normalizedPath)?.isVisible ?? null;
   }
 
   /**

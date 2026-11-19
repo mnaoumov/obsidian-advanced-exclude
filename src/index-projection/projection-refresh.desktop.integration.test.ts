@@ -62,14 +62,14 @@ it('refreshes open graphs and backlinks for snapshot and snapshot-free restores 
       app.workspace.setActiveLeaf(noteLeaf, { focus: true });
       const backlink = (backlinkLeaf.view as BacklinkView).backlink;
       const plugin = app.plugins.getPlugin('advanced-exclude') as null | PluginWithSettings;
-      function findHider(children: readonly ProjectionChild[]): ManualIndexHider | undefined {
+      function findHider(children: readonly ProjectionChild[]): ManualIndexHider | null {
         for (const child of children) {
           const hider = child.manualIndexHider ?? findHider(child._children ?? []);
           if (hider) {
             return hider;
           }
         }
-        return undefined;
+        return null;
       }
       const hider = findHider(plugin?._children ?? []);
       if (!plugin || !hider) {

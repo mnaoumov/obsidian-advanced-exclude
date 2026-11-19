@@ -46,9 +46,9 @@ describe('Pattern validation', () => {
         app.setting.open();
         app.setting.openTabById(pluginId);
 
-        function getItem(): Element | undefined {
+        function getItem(): Element | null {
           const items = [...(settingTab?.containerEl.querySelectorAll('.setting-item') ?? [])];
-          return items.find((el) => el.querySelector('.setting-item-name')?.textContent === 'Local patterns');
+          return items.find((el) => el.querySelector('.setting-item-name')?.textContent === 'Local patterns') ?? null;
         }
 
         await waitUntil({

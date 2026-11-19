@@ -185,12 +185,12 @@ async function runStep(action: StepAction): Promise<null | string> {
           }
         }
 
-        return undefined;
+        return null;
       }
 
-      function getSettingsComponent(): PluginSettingsComponent | undefined {
+      function getSettingsComponent(): null | PluginSettingsComponent {
         const plugin = app.plugins.getPlugin(pluginId);
-        return plugin ? (findComponent(plugin, 'PluginSettingsComponent') as PluginSettingsComponent | undefined) : undefined;
+        return plugin ? (findComponent(plugin, 'PluginSettingsComponent') as null | PluginSettingsComponent) : null;
       }
     },
     input: {

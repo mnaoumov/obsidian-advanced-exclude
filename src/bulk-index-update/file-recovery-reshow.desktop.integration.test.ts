@@ -125,9 +125,9 @@ describe('re-showing notes hidden by an earlier session', () => {
         const pendingCount = notePaths.filter((notePath) => fileRecovery.pendingFiles.has(notePath)).length;
         return { backupCount, error: null, pendingCount, visibleAfterReShow, visibleWhileHidden };
 
-        function findManualIndexHider(root: unknown): ManualIndexHiderInternals | undefined {
+        function findManualIndexHider(root: unknown): ManualIndexHiderInternals | null {
           if (typeof root !== 'object' || root === null) {
-            return undefined;
+            return null;
           }
           const component = root as TraversableComponent;
           if (component.manualIndexHider) {
@@ -139,7 +139,7 @@ describe('re-showing notes hidden by an earlier session', () => {
               return found;
             }
           }
-          return undefined;
+          return null;
         }
       },
       input: {

@@ -21,14 +21,14 @@ interface ProjectionChild {
 it('keeps resolving links after hiding notes whose parse is still in flight', async () => {
   const result = await evalInObsidian({
     async callback({ app, lib: { waitUntil } }) {
-      function findHider(children: readonly ProjectionChild[]): ManualIndexHider | undefined {
+      function findHider(children: readonly ProjectionChild[]): ManualIndexHider | null {
         for (const child of children) {
           const found = child.manualIndexHider ?? findHider(child._children ?? []);
           if (found) {
             return found;
           }
         }
-        return undefined;
+        return null;
       }
       const plugin = app.plugins.getPlugin('advanced-exclude') as null | ProjectionChild;
       const hider = findHider(plugin?._children ?? []);

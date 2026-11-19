@@ -12,7 +12,7 @@ import { defineConfig } from 'eslint/config';
 const DESKTOP_PERFORMANCE_CAP_IN_MILLISECONDS = 600_000;
 
 export const configs: Linter.Config[] = defineEslintConfigs({
-  customConfigs() {
+  customConfigs(context) {
     return defineConfig([
       {
         rules: {
@@ -22,6 +22,14 @@ export const configs: Linter.Config[] = defineEslintConfigs({
               brands: ['gitignore']
             }
           ]
+        }
+      },
+      // A function that can return "no value" returns `T | null`; the shared config leaves this rule off until its
+      // Consumers migrate.
+      {
+        files: context.allFiles(),
+        rules: {
+          'typescript-dev-toolkit/no-undefined-return-type': 'error'
         }
       },
       {

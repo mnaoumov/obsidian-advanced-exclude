@@ -66,8 +66,8 @@ describe('`Show all file types` does not bring ignored files back (discussion #9
         VISIBLE_NOTE: visibleNote,
         VISIBLE_UNSUPPORTED_FILE: visibleUnsupportedFile
       }) {
-        function getView(): FileExplorerView | undefined {
-          return app.workspace.getLeavesOfType('file-explorer')[0]?.view as FileExplorerView | undefined;
+        function getView(): FileExplorerView | null {
+          return (app.workspace.getLeavesOfType('file-explorer')[0]?.view as FileExplorerView | undefined) ?? null;
         }
 
         // The paths the explorer lists AND displays: an item for an unsupported file exists either way, and

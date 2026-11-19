@@ -284,7 +284,7 @@ describe('findProfileByName', () => {
     const profiles = [profile('Work', '')];
 
     expect(findProfileByName(profiles, '  work ')).toBe(profiles[0]);
-    expect(findProfileByName(profiles, 'home')).toBeUndefined();
+    expect(findProfileByName(profiles, 'home')).toBeNull();
   });
 });
 
