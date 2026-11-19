@@ -45,7 +45,7 @@ Built on `@mnaoumov/obsidian-lib` with tooling from `@mnaoumov/obsidian-dev-tool
 - **`scripts/`** — all `npm` script entry points (`jiti scripts/<name>.ts`)
 - **`src/`** — plugin source:
   - `main.ts` — Obsidian entry point (default export of `Plugin`)
-  - `plugin.ts` — `Plugin` class, wires up child components
+  - `plugin.ts` — `Plugin` class, wires up child components. Obsidian registers an instance before it awaits `load()`, so an update or a quick disable/enable can unload it mid-`onloadImpl`; `@mnaoumov/obsidian-lib` 11 makes that load end quietly instead of reporting `Plugin failure`. Guard: `src/plugin-reload-race.desktop.integration.test.ts`, red on `obsidian-lib` 10.5
   - `data-adapter-safe.ts` — read/write/stat wrappers that survive missing files; `readImportedFile` reads an `@import file:` path, a vault path through the adapter or an absolute one through the desktop adapter's `fsPromises`
   - `indexed-database-utils.ts` — legacy IndexedDB request → promise helper
   - `local-record-store.ts` — LocalDataStore import marker and serialized operations, scoped by app id/plugin id/schema. Web Locks order accepted writes across plugin instances; close drains accepted operations before closing, including pending opens. `legacy-database.ts` reads old databases without deleting them. See `docs/local-storage.md`.
