@@ -103,7 +103,6 @@ export class LocalRecordStore {
     }
     // Request synchronously: a fresh plugin instance must queue behind accepted writes
     // from an unloading one, even when they use different bundled library copies.
-    // eslint-disable-next-line n/no-unsupported-features/node-builtins -- Web Locks run in Obsidian's renderer, not Node.
     const operation = window.navigator.locks.request(
       `advanced-exclude:${JSON.stringify([this.vaultId, this.storeId])}`,
       async () => await action(await this.open())
