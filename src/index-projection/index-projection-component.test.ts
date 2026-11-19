@@ -82,6 +82,19 @@ const mockSuspendRelatedLinksUpdates = vi.mocked(suspendRelatedLinksUpdates);
 // both return this by default, so the staleness check finds the snapshot up to date.
 const FRESH_STAT = { mtime: 1000, size: 50 };
 
+/*
+ * A case that projects thousands of files does real work per file, so on a loaded machine it
+ * outruns vitest's 5 s default. Size its timeout from the file count, as the scale suites do.
+ */
+const BASE_TIMEOUT_IN_MS = 5000;
+const PER_FILE_TIMEOUT_IN_MS = 5;
+
+function timeoutForFileCount(fileCount: number): number {
+  return BASE_TIMEOUT_IN_MS + fileCount * PER_FILE_TIMEOUT_IN_MS;
+}
+
+const LINK_VIEW_REFRESH_FILE_COUNT = 5000;
+
 interface IsIgnoredParams {
   readonly normalizedPath: string;
 }
@@ -598,9 +611,9 @@ describe('IndexProjectionComponent', () => {
   });
 
   describe('link view refresh (Full mode)', () => {
-    it('redraws each open graph once for a projection hiding 5000 files', async () => {
+    it(`redraws each open graph once for a projection hiding ${String(LINK_VIEW_REFRESH_FILE_COUNT)} files`, async () => {
       const { app, component } = setup({
-        entries: Array.from({ length: 5000 }, (_, index) => ({ isFolderFlag: false, path: `hidden-${String(index)}.md` })),
+        entries: Array.from({ length: LINK_VIEW_REFRESH_FILE_COUNT }, (_, index) => ({ isFolderFlag: false, path: `hidden-${String(index)}.md` })),
         isIgnored: () => true
       });
       const graph = strictProxy<GraphView>({ dataEngine: strictProxy<GraphView['dataEngine']>({}), update: vi.fn() });
@@ -616,7 +629,7 @@ describe('IndexProjectionComponent', () => {
 
       expect(graph.update).toHaveBeenCalledExactlyOnceWith();
       expect(localGraph.update).toHaveBeenCalledExactlyOnceWith();
-    });
+    }, timeoutForFileCount(LINK_VIEW_REFRESH_FILE_COUNT));
 
     function backlinkLeaf(backlink: BacklinkView['backlink']): WorkspaceLeaf {
       return strictProxy<WorkspaceLeaf>({ view: strictProxy<BacklinkView>({ backlink }) });
