@@ -317,7 +317,7 @@ describe('IndexProjectionComponent', () => {
 
       expect(hiddenPaths(manualIndexHider)).toEqual(['a', 'a/x.md', 'a/y.md']);
       expect(deleteFromFilesPane.mock.calls.map((call) => call[0]).sort()).toEqual(['a', 'a/x.md', 'a/y.md']);
-      expect(castTo<TestableIndexProjectionComponent>(component).vaultModel.isVisible('a/x.md')).not.toBeUndefined();
+      expect(castTo<TestableIndexProjectionComponent>(component).vaultModel.isVisible('a/x.md')).not.toBeNull();
     });
 
     it('removes an individually-ignored file from a visible folder', async () => {
@@ -1340,7 +1340,7 @@ describe('IndexProjectionComponent', () => {
       // The fast path seeds only the hidden set, so the model never holds the whole vault…
       const model = castTo<TestableIndexProjectionComponent>(component).vaultModel;
       expect(model.getPathsByVisibility(false)).toEqual([{ isFolder: false, path: 'junk.tmp' }]);
-      expect(model.isVisible('a.md')).toBeUndefined();
+      expect(model.isVisible('a.md')).toBeNull();
       // …and it does not persist (nothing was recomputed).
       expect(save).not.toHaveBeenCalled();
     });
@@ -1646,10 +1646,10 @@ describe('IndexProjectionComponent', () => {
       });
 
       component.recordCreate({ isFolderPath: false, normalizedPath: 'new/file.md' });
-      expect(castTo<TestableIndexProjectionComponent>(component).vaultModel.isVisible('new/file.md')).not.toBeUndefined();
+      expect(castTo<TestableIndexProjectionComponent>(component).vaultModel.isVisible('new/file.md')).not.toBeNull();
 
       component.recordDelete('new/file.md');
-      expect(castTo<TestableIndexProjectionComponent>(component).vaultModel.isVisible('new/file.md')).toBeUndefined();
+      expect(castTo<TestableIndexProjectionComponent>(component).vaultModel.isVisible('new/file.md')).toBeNull();
     });
   });
 });

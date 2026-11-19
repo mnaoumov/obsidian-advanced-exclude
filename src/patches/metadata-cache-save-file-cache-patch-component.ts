@@ -19,6 +19,7 @@ export interface MetadataCacheSaveFileCachePatchComponentConstructorParams {
 type FileCacheValue = MetadataCache['fileCache'][string];
 
 interface MetadataCacheWithSaveFileCache {
+  // eslint-disable-next-line typescript-dev-toolkit/no-undefined-return-type -- Mirrors Obsidian's internal `MetadataCache.saveFileCache`.
   readonly saveFileCache: (path: string, fileCache: FileCacheValue | null) => Promise<void> | undefined;
 }
 

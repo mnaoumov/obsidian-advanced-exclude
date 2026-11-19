@@ -157,9 +157,9 @@ export function duplicateProfile(profiles: readonly Readonly<SettingsProfile>[],
 /**
  * Finds a profile by the name an `@import` line uses: trimmed and case-insensitive.
  */
-export function findProfileByName<Profile extends Readonly<SettingsProfile>>(profiles: readonly Profile[], name: string): Profile | undefined {
+export function findProfileByName<Profile extends Readonly<SettingsProfile>>(profiles: readonly Profile[], name: string): null | Profile {
   const normalizedName = normalizeProfileName(name);
-  return profiles.find((profile) => normalizeProfileName(profile.name) === normalizedName);
+  return profiles.find((profile) => normalizeProfileName(profile.name) === normalizedName) ?? null;
 }
 
 /**

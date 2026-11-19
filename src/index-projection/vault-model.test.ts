@@ -234,7 +234,7 @@ describe('VaultModel', () => {
       expect(model.isVisible('a/b')).toBe(false);
 
       const changes = model.setPath({ isFolder: false, normalizedPath: 'a/b/new.md' });
-      expect(model.isVisible('a/b/new.md')).not.toBeUndefined();
+      expect(model.isVisible('a/b/new.md')).not.toBeNull();
       expect(changes).toEqual([
         { isFolder: false, isVisible: true, path: 'a/b/new.md' },
         { isFolder: true, isVisible: true, path: 'a/b' },
@@ -258,7 +258,7 @@ describe('VaultModel', () => {
       expect(model.isVisible('a/b')).toBe(true);
 
       const changes = model.deletePath('a/b/only.md');
-      expect(model.isVisible('a/b/only.md')).toBeUndefined();
+      expect(model.isVisible('a/b/only.md')).toBeNull();
       expect(changes).toEqual([
         { isFolder: true, isVisible: false, path: 'a/b' },
         { isFolder: true, isVisible: false, path: 'a' }
@@ -276,9 +276,9 @@ describe('VaultModel', () => {
       );
 
       model.deletePath('a');
-      expect(model.isVisible('a')).toBeUndefined();
-      expect(model.isVisible('a/x.md')).toBeUndefined();
-      expect(model.isVisible('a/y.md')).toBeUndefined();
+      expect(model.isVisible('a')).toBeNull();
+      expect(model.isVisible('a/x.md')).toBeNull();
+      expect(model.isVisible('a/y.md')).toBeNull();
     });
 
     it('ignores deletion of an unknown path', () => {
@@ -362,7 +362,7 @@ describe('VaultModel', () => {
     it('returns undefined for an unknown path', () => {
       const model = build([{ isFolder: false, path: 'a.md' }], matcher([]));
 
-      expect(model.isParentVisible('nope.md')).toBeUndefined();
+      expect(model.isParentVisible('nope.md')).toBeNull();
     });
 
     it('treats the root (which has no parent) as visible', () => {
