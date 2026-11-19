@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## 5.1.1
+
+This release has 1 fix. 2 maintenance commits (tests, build, CI, refactoring, dependencies) are not listed.
+
+### Fixed
+
+- load cleanly when disabled and re-enabled during its own load
+
 ## 5.1.0
 
 This release has 1 new feature and 3 documentation changes. 5 maintenance commits (tests, build, CI, refactoring, dependencies) are not listed.
