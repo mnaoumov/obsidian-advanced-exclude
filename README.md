@@ -60,18 +60,22 @@ A copy of the vault ships with every release. You can access it via any of the f
 
 | Plugin | Features | How `Advanced Exclude` differs |
 | --- | --- | --- |
+| [`Discrete`](https://community.obsidian.md/plugins/discrete) | Files pane filtering by frontmatter; comparison operators; AND/OR; show-only mode | Covers part of the same goal: property rules in the `Soft` mode only, by value; adds pattern-based index exclusion |
 | [`Explorer Hider`](https://community.obsidian.md/plugins/explorer-hider) | Explorer and bookmark hiding through CSS; context-menu selection | Broader exclusion: index filtering rather than CSS alone |
 | [`File Explorer++`](https://community.obsidian.md/plugins/file-explorer-plus) | Explorer hiding and pinning; wildcard and regex filters | Broader exclusion: can remove files from the index; no pinning |
 | [`File Hider`](https://community.obsidian.md/plugins/OA-file-hider) | Explorer context-menu hiding; visibility toggle command | Broader exclusion: pattern-based index filtering |
 | [`File Ignore`](https://community.obsidian.md/plugins/file-ignore) | Leading-dot renames; exclusion travels with the file | Same exclusion goal; keeps file names unchanged |
+| [`Graph Exclusions`](https://community.obsidian.md/plugins/graph-exclusions) | Graph-only exclusion rules by path, file name or tag; a toggle per rule | Broader exclusion: graph among other features; no tag rules or per-rule toggles |
+| [`Hide Excluded Files MORE`](https://community.obsidian.md/plugins/hide-excluded-files-more) | Removes native Excluded files from the quick switcher and link suggestions | Same goal in the `Full` mode; the `Soft` mode only ranks them lower there, as Obsidian does |
 | [`Hide Folders`](https://community.obsidian.md/plugins/hide-folders) | Explorer visibility toggle by folder name | Broader exclusion: patterns across paths; index exclusion as well |
+| [`Hide Folders and Files`](https://community.obsidian.md/plugins/hide-folders-and-files) | Explorer hiding by exact name, prefix or suffix; ribbon toggle; optional native Excluded files entries | Broader exclusion: `gitignore` patterns; index exclusion; no ribbon toggle |
 | [`Ignore`](https://community.obsidian.md/plugins/ignore) | `.obsidianignore`; native Excluded files list | Same exclusion goal; removes files from the index too; synced patterns, profiles, validation |
 | [`Ignore Filters Boost`](https://community.obsidian.md/plugins/ignore-filters-boost) | Explorer actions editing native Excluded files; exclude-all-except-one | Broader exclusion: pattern rules rather than editing the native list |
 | [`Shadow Tree`](https://community.obsidian.md/plugins/shadow-tree) | Explorer-only filtering; folder pins; optional Sync exclusion | Broader exclusion: can remove files from the index; no folder pinning |
 | [`Sieve`](https://community.obsidian.md/plugins/sieve) | Scan-time exclusion; Syncthing-style first-match rules; vault display name | Same exclusion goal; uses `gitignore` syntax; no vault renaming |
 | [`Toggle Excluded Folders`](https://community.obsidian.md/plugins/toggle-excluded-folders) | One-click toggle of native Excluded files | Broader exclusion: maintained patterns and profiles; index filtering |
 
-Last searched for similar plugins on 2026-10-26.
+Last searched for similar plugins on 2026-11-23.
 
 ## Installation
 
