@@ -1,6 +1,6 @@
 {
   "name": "advanced-exclude",
-  "version": "5.1.1",
+  "version": "5.2.0",
   "description": "Enhances the Excluded files setting bringing gitignore syntax.",
   "keywords": [],
   "homepage": "https://github.com/mnaoumov/obsidian-advanced-exclude#readme",

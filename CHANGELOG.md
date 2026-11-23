@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## 5.2.0
+
+This release has 1 new feature. 2 maintenance commits (tests, build, CI, refactoring, dependencies) are not listed.
+
+### New
+
+- Soft mode to just some patterns (#19)
+
 ## 5.1.1
 
 This release has 1 fix. 2 maintenance commits (tests, build, CI, refactoring, dependencies) are not listed.
