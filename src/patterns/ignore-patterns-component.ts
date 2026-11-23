@@ -336,7 +336,9 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
       invokeAsyncSafely(() => this.refreshOnReturn());
     });
     // The main window's own document, the pair of the `window` focus listener above: a pop-out window's document comes and goes.
+    // eslint-disable-next-line obsidian-dev-toolkit/prefer-active-window -- deliberately the main window's document, see above.
     this.registerDomEvent(window.document, 'visibilitychange', () => {
+      // eslint-disable-next-line obsidian-dev-toolkit/prefer-active-window -- the same main-window document the listener is on.
       if (window.document.visibilityState === 'visible') {
         invokeAsyncSafely(() => this.refreshOnReturn());
       }

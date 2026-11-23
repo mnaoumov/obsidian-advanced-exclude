@@ -103,6 +103,7 @@ export class LocalRecordStore {
     }
     // Request synchronously: a fresh plugin instance must queue behind accepted writes
     // from an unloading one, even when they use different bundled library copies.
+    // eslint-disable-next-line obsidian-dev-toolkit/prefer-active-window -- Web Locks are per origin; the main window outlives every pop-out the lock could otherwise be tied to.
     const operation = window.navigator.locks.request(
       `advanced-exclude:${JSON.stringify([this.vaultId, this.storeId])}`,
       async () => await action(await this.open())
