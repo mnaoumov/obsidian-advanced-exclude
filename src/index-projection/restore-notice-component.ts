@@ -45,6 +45,7 @@ export class RestoreNoticeComponent extends ComponentEx {
   }
 
   private reloadApp(): void {
+    // eslint-disable-next-line obsidian-dev-toolkit/prefer-active-window -- reloading the app means reloading the main window; a pop-out's reload would leave the file tree as it is.
     window.location.reload();
   }
 }

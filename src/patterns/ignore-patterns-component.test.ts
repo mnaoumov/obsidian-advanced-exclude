@@ -51,7 +51,7 @@ import { LOCAL_PATTERNS_HEADER } from './local-patterns.ts';
 
 const storeState = vi.hoisted(() => ({ current: undefined as LocalRecordStore | undefined }));
 vi.mock('./verdict-record-store.ts', async (importOriginal) => ({
-  ...await importOriginal<typeof import('./verdict-record-store.ts')>(),
+  ...(await importOriginal<typeof import('./verdict-record-store.ts')>()),
   createVerdictRecordStore: (): LocalRecordStore => {
     if (!storeState.current) {
       throw new Error('Store not configured');
@@ -92,7 +92,7 @@ vi.mock('@mnaoumov/typescript-lib/async', async (importOriginal) => {
 });
 
 vi.mock('@mnaoumov/typescript-lib/object-utils', async (importOriginal) => ({
-  ...await importOriginal<typeof import('@mnaoumov/typescript-lib/object-utils')>(),
+  ...(await importOriginal<typeof import('@mnaoumov/typescript-lib/object-utils')>()),
   isDeepEqual: vi.fn().mockReturnValue(true)
 }));
 
@@ -102,6 +102,11 @@ interface CreateComponentOverrides {
   readonly onUpdateFileTree?: () => Promise<void>;
   readonly pluginNoticeComponent?: PluginNoticeComponent;
   readonly pluginSettingsComponent?: PluginSettingsComponent;
+}
+
+interface CreatePluginSettingsComponentOptions {
+  readonly profileState?: ProfileState;
+  readonly settings?: Partial<PluginSettings>;
 }
 
 interface FileIgnoreEntry {
@@ -171,7 +176,6 @@ class TestIgnorePatternsComponent extends IgnorePatternsComponent {
     return this.onLayoutReady();
   }
 }
-
 function createApp(): AppOriginal {
   const app = App.createConfigured__({ appId: 'test-app' });
   const appWithConfig = app.asOriginalType__();
@@ -180,6 +184,7 @@ function createApp(): AppOriginal {
   Object.defineProperty(appWithConfig.vault, 'getConfig', { value: vi.fn().mockReturnValue([]), writable: true });
   return appWithConfig;
 }
+
 function createComponent(overrides?: CreateComponentOverrides): TestIgnorePatternsComponent {
   return new TestIgnorePatternsComponent({
     app: overrides?.app ?? createApp(),
@@ -229,7 +234,8 @@ function createPluginNoticeComponent(): PluginNoticeComponent {
   });
 }
 
-function createPluginSettingsComponent(settings?: Partial<PluginSettings>, profileState?: ProfileState): PluginSettingsComponent {
+function createPluginSettingsComponent(options: CreatePluginSettingsComponentOptions = {}): PluginSettingsComponent {
+  const { profileState, settings } = options;
   const effectiveSettings = new PluginSettings();
   if (settings) {
     Object.assign(effectiveSettings, settings);
@@ -475,7 +481,9 @@ describe('IgnorePatternsComponent', () => {
       const app = createApp();
       vi.mocked(app.vault.getConfig as ReturnType<typeof vi.fn<(...$arguments: unknown[]) => unknown>>).mockReturnValue(['secret']);
       const pluginSettingsComponent = createPluginSettingsComponent({
-        shouldIgnoreExcludedFiles: true
+        settings: {
+          shouldIgnoreExcludedFiles: true
+        }
       });
       const component = createComponent({ app, pluginSettingsComponent });
       await component.loadWithPromises();
@@ -488,7 +496,9 @@ describe('IgnorePatternsComponent', () => {
       const app = createApp();
       vi.mocked(app.vault.getConfig as ReturnType<typeof vi.fn<(...$arguments: unknown[]) => unknown>>).mockReturnValue([String.raw`/\.tmp$/`]);
       const pluginSettingsComponent = createPluginSettingsComponent({
-        shouldIgnoreExcludedFiles: true
+        settings: {
+          shouldIgnoreExcludedFiles: true
+        }
       });
       const component = createComponent({ app, pluginSettingsComponent });
       await component.loadWithPromises();
@@ -502,7 +512,9 @@ describe('IgnorePatternsComponent', () => {
       const app = createApp();
       vi.mocked(app.vault.getConfig as ReturnType<typeof vi.fn<(...$arguments: unknown[]) => unknown>>).mockReturnValue(['/[invalid/']);
       const pluginSettingsComponent = createPluginSettingsComponent({
-        shouldIgnoreExcludedFiles: true
+        settings: {
+          shouldIgnoreExcludedFiles: true
+        }
       });
       const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
       const component = createComponent({ app, pluginSettingsComponent });
@@ -517,7 +529,9 @@ describe('IgnorePatternsComponent', () => {
       const app = createApp();
       vi.mocked(app.vault.getConfig as ReturnType<typeof vi.fn<(...$arguments: unknown[]) => unknown>>).mockReturnValue(['secret']);
       const pluginSettingsComponent = createPluginSettingsComponent({
-        shouldIgnoreExcludedFiles: false
+        settings: {
+          shouldIgnoreExcludedFiles: false
+        }
       });
       const component = createComponent({ app, pluginSettingsComponent });
       await component.loadWithPromises();
@@ -531,7 +545,9 @@ describe('IgnorePatternsComponent', () => {
       const getConfigMock = vi.mocked(app.vault.getConfig as ReturnType<typeof vi.fn<(...$arguments: unknown[]) => unknown>>);
       getConfigMock.mockReturnValue(['secret']);
       const pluginSettingsComponent = createPluginSettingsComponent({
-        shouldIgnoreExcludedFiles: true
+        settings: {
+          shouldIgnoreExcludedFiles: true
+        }
       });
       const component = createComponent({ app, pluginSettingsComponent });
       await component.loadWithPromises();
@@ -550,7 +566,9 @@ describe('IgnorePatternsComponent', () => {
       const app = createApp();
       vi.mocked(app.vault.getConfig as ReturnType<typeof vi.fn<(...$arguments: unknown[]) => unknown>>).mockReturnValue(['/']);
       const pluginSettingsComponent = createPluginSettingsComponent({
-        shouldIgnoreExcludedFiles: true
+        settings: {
+          shouldIgnoreExcludedFiles: true
+        }
       });
       const component = createComponent({ app, pluginSettingsComponent });
       await component.loadWithPromises();
@@ -697,7 +715,9 @@ describe('IgnorePatternsComponent', () => {
     it('should clear cached regexps', async () => {
       setupIndexedDatabase();
       const pluginSettingsComponent = createPluginSettingsComponent({
-        shouldIgnoreExcludedFiles: false
+        settings: {
+          shouldIgnoreExcludedFiles: false
+        }
       });
       const component = createComponent({ pluginSettingsComponent });
       await component.loadWithPromises();
@@ -710,7 +730,9 @@ describe('IgnorePatternsComponent', () => {
     it('should clear fileIgnoreMap and trigger processConfigChanges when shouldIgnoreExcludedFiles is true', async () => {
       setupIndexedDatabase();
       const pluginSettingsComponent = createPluginSettingsComponent({
-        shouldIgnoreExcludedFiles: true
+        settings: {
+          shouldIgnoreExcludedFiles: true
+        }
       });
       const component = createComponent({ pluginSettingsComponent });
       await component.loadWithPromises();
@@ -766,7 +788,9 @@ describe('IgnorePatternsComponent', () => {
     it('should re-read git ignore when path matches', async () => {
       setupIndexedDatabase();
       const pluginSettingsComponent = createPluginSettingsComponent({
-        shouldIncludeGitIgnorePatterns: true
+        settings: {
+          shouldIncludeGitIgnorePatterns: true
+        }
       });
       vi.mocked(readSafe).mockResolvedValue('');
       const component = createComponent({ pluginSettingsComponent });
@@ -896,7 +920,9 @@ describe('IgnorePatternsComponent', () => {
       const app = createApp();
       const vaultOnSpy = vi.spyOn(app.vault, 'on');
       const pluginSettingsComponent = createPluginSettingsComponent({
-        shouldIgnoreExcludedFiles: true
+        settings: {
+          shouldIgnoreExcludedFiles: true
+        }
       });
       const component = createComponent({ app, pluginSettingsComponent });
       await component.loadWithPromises();
@@ -1060,7 +1086,7 @@ describe('IgnorePatternsComponent', () => {
 
     it('should match against the expanded patterns of the active profile', async () => {
       setupIndexedDatabase();
-      const pluginSettingsComponent = createPluginSettingsComponent(PROFILE_SETTINGS, { activeProfileId: 'work' });
+      const pluginSettingsComponent = createPluginSettingsComponent({ profileState: { activeProfileId: 'work' }, settings: PROFILE_SETTINGS });
       const component = createComponent({ pluginSettingsComponent });
       await component.loadWithPromises();
 
@@ -1072,14 +1098,14 @@ describe('IgnorePatternsComponent', () => {
     it('should put the active profile into the verdict fingerprint, and leave it out with none active', async () => {
       vi.mocked(isDeepEqual).mockReturnValue(false);
       const withProfile = setupIndexedDatabase();
-      await createComponent({ pluginSettingsComponent: createPluginSettingsComponent(PROFILE_SETTINGS, { activeProfileId: 'work' }) })
+      await createComponent({ pluginSettingsComponent: createPluginSettingsComponent({ profileState: { activeProfileId: 'work' }, settings: PROFILE_SETTINGS }) })
         .loadWithPromises();
       expect(getMtimeEntries(withProfile.mtimeStore)).toStrictEqual([
         expect.objectContaining({ settingsFingerprint: JSON.stringify(['base/*\nwork/\n!base/keep.md', 'Full', false, false, false]) })
       ]);
 
       const withoutProfile = setupIndexedDatabase();
-      await createComponent({ pluginSettingsComponent: createPluginSettingsComponent(PROFILE_SETTINGS) }).loadWithPromises();
+      await createComponent({ pluginSettingsComponent: createPluginSettingsComponent({ settings: PROFILE_SETTINGS }) }).loadWithPromises();
       expect(getMtimeEntries(withoutProfile.mtimeStore)).toStrictEqual([
         expect.objectContaining({ settingsFingerprint: JSON.stringify(['base/*', 'Full', false, false, false]) })
       ]);
@@ -1088,7 +1114,7 @@ describe('IgnorePatternsComponent', () => {
     it('should re-apply through the config-change path when the active profile changes', async () => {
       setupIndexedDatabase();
       const profileState: ProfileState = { activeProfileId: null };
-      const pluginSettingsComponent = createPluginSettingsComponent(PROFILE_SETTINGS, profileState);
+      const pluginSettingsComponent = createPluginSettingsComponent({ profileState, settings: PROFILE_SETTINGS });
       const onUpdateFileTree = vi.fn().mockResolvedValue(undefined);
       const component = createComponent({ onUpdateFileTree, pluginSettingsComponent });
       await component.loadWithPromises();
@@ -1106,7 +1132,7 @@ describe('IgnorePatternsComponent', () => {
       setupIndexedDatabase();
       const settings = { ...PROFILE_SETTINGS };
       const profileState: ProfileState = { activeProfileId: 'work' };
-      const pluginSettingsComponent = createPluginSettingsComponent(settings, profileState);
+      const pluginSettingsComponent = createPluginSettingsComponent({ profileState, settings });
       const onUpdateFileTree = vi.fn().mockResolvedValue(undefined);
       const component = createComponent({ onUpdateFileTree, pluginSettingsComponent });
       await component.loadWithPromises();
@@ -1140,7 +1166,7 @@ describe('IgnorePatternsComponent', () => {
       vi.mocked(isDeepEqual).mockReturnValue(false);
       mockImportedFileContent('from-file/');
       const { mtimeStore } = setupIndexedDatabase();
-      const component = createComponent({ pluginSettingsComponent: createPluginSettingsComponent(IMPORT_SETTINGS, { activeProfileId: 'work' }) });
+      const component = createComponent({ pluginSettingsComponent: createPluginSettingsComponent({ profileState: { activeProfileId: 'work' }, settings: IMPORT_SETTINGS }) });
       await component.loadWithPromises();
 
       expect(readIfExists).toHaveBeenCalledWith(expect.anything(), 'ignores/work.txt');
@@ -1154,7 +1180,7 @@ describe('IgnorePatternsComponent', () => {
       const app = createApp();
       const vaultOnSpy = vi.spyOn(app.vault, 'on');
       const onUpdateFileTree = vi.fn().mockResolvedValue(undefined);
-      const component = createComponent({ app, onUpdateFileTree, pluginSettingsComponent: createPluginSettingsComponent(IMPORT_SETTINGS, { activeProfileId: 'work' }) });
+      const component = createComponent({ app, onUpdateFileTree, pluginSettingsComponent: createPluginSettingsComponent({ profileState: { activeProfileId: 'work' }, settings: IMPORT_SETTINGS }) });
       await component.loadWithPromises();
       const rawListener = getRawListener(vaultOnSpy.mock.calls);
 
@@ -1178,7 +1204,7 @@ describe('IgnorePatternsComponent', () => {
       const app = createApp();
       const vaultOnSpy = vi.spyOn(app.vault, 'on');
       const onUpdateFileTree = vi.fn().mockResolvedValue(undefined);
-      const component = createComponent({ app, onUpdateFileTree, pluginSettingsComponent: createPluginSettingsComponent(IMPORT_SETTINGS, { activeProfileId: 'work' }) });
+      const component = createComponent({ app, onUpdateFileTree, pluginSettingsComponent: createPluginSettingsComponent({ profileState: { activeProfileId: 'work' }, settings: IMPORT_SETTINGS }) });
       await component.loadWithPromises();
 
       mockImportedFileContent('');
@@ -1194,10 +1220,7 @@ describe('IgnorePatternsComponent', () => {
       const onUpdateFileTree = vi.fn().mockResolvedValue(undefined);
       const component = createComponent({
         onUpdateFileTree,
-        pluginSettingsComponent: createPluginSettingsComponent(
-          { profiles: [{ id: 'work', name: 'Work', patterns: '@import file:C:/Users/me/AllVaultsIgnore' }] },
-          { activeProfileId: 'work' }
-        )
+        pluginSettingsComponent: createPluginSettingsComponent({ profileState: { activeProfileId: 'work' }, settings: { profiles: [{ id: 'work', name: 'Work', patterns: '@import file:C:/Users/me/AllVaultsIgnore' }] } })
       });
       // The handlers are called directly: an event dispatched on `window` would also reach the components earlier tests left loaded.
       const registerDomEventSpy = vi.spyOn(component, 'registerDomEvent');
@@ -1221,7 +1244,7 @@ describe('IgnorePatternsComponent', () => {
     it('should not re-read vault imports on focus, since their own events cover them', async () => {
       mockImportedFileContent('from-file/');
       setupIndexedDatabase();
-      const component = createComponent({ pluginSettingsComponent: createPluginSettingsComponent(IMPORT_SETTINGS, { activeProfileId: 'work' }) });
+      const component = createComponent({ pluginSettingsComponent: createPluginSettingsComponent({ profileState: { activeProfileId: 'work' }, settings: IMPORT_SETTINGS }) });
       await component.loadWithPromises();
       vi.mocked(readImportedFile).mockClear();
 
@@ -1239,7 +1262,7 @@ describe('IgnorePatternsComponent', () => {
       app.saveLocalStorage(REPORTED_MISSING_IMPORTS_LOCAL_STORAGE_KEY, null);
       const vaultOnSpy = vi.spyOn(app.vault, 'on');
       const pluginNoticeComponent = createPluginNoticeComponent();
-      const component = createComponent({ app, pluginNoticeComponent, pluginSettingsComponent: createPluginSettingsComponent(IMPORT_SETTINGS, { activeProfileId: 'work' }) });
+      const component = createComponent({ app, pluginNoticeComponent, pluginSettingsComponent: createPluginSettingsComponent({ profileState: { activeProfileId: 'work' }, settings: IMPORT_SETTINGS }) });
       await component.loadWithPromises();
 
       expect(consoleWarnSpy).toHaveBeenCalledExactlyOnceWith(expectedMessage);
@@ -1248,7 +1271,7 @@ describe('IgnorePatternsComponent', () => {
       expect(app.loadLocalStorage(REPORTED_MISSING_IMPORTS_LOCAL_STORAGE_KEY)).toStrictEqual(['ignores/work.txt']);
 
       // A new load on the same device, as after an app restart: already reported.
-      await createComponent({ app, pluginNoticeComponent, pluginSettingsComponent: createPluginSettingsComponent(IMPORT_SETTINGS, { activeProfileId: 'work' }) }).loadWithPromises();
+      await createComponent({ app, pluginNoticeComponent, pluginSettingsComponent: createPluginSettingsComponent({ profileState: { activeProfileId: 'work' }, settings: IMPORT_SETTINGS }) }).loadWithPromises();
       expect(consoleWarnSpy).toHaveBeenCalledOnce();
 
       const rawListener = getRawListener(vaultOnSpy.mock.calls);
@@ -1270,11 +1293,11 @@ describe('IgnorePatternsComponent', () => {
       const app = createApp();
       app.saveLocalStorage(REPORTED_MISSING_IMPORTS_LOCAL_STORAGE_KEY, ['ignores/work.txt', 1]);
       const pluginNoticeComponent = createPluginNoticeComponent();
-      await createComponent({ app, pluginNoticeComponent, pluginSettingsComponent: createPluginSettingsComponent(IMPORT_SETTINGS, { activeProfileId: 'work' }) }).loadWithPromises();
+      await createComponent({ app, pluginNoticeComponent, pluginSettingsComponent: createPluginSettingsComponent({ profileState: { activeProfileId: 'work' }, settings: IMPORT_SETTINGS }) }).loadWithPromises();
       expect(pluginNoticeComponent.showNotice).not.toHaveBeenCalled();
 
       app.saveLocalStorage(REPORTED_MISSING_IMPORTS_LOCAL_STORAGE_KEY, 'ignores/work.txt');
-      await createComponent({ app, pluginNoticeComponent, pluginSettingsComponent: createPluginSettingsComponent(IMPORT_SETTINGS, { activeProfileId: 'work' }) }).loadWithPromises();
+      await createComponent({ app, pluginNoticeComponent, pluginSettingsComponent: createPluginSettingsComponent({ profileState: { activeProfileId: 'work' }, settings: IMPORT_SETTINGS }) }).loadWithPromises();
       expect(pluginNoticeComponent.showNotice).toHaveBeenCalledOnce();
     });
   });
@@ -1342,7 +1365,9 @@ describe('IgnorePatternsComponent', () => {
     it('should not read git ignore when shouldIncludeGitIgnorePatterns is false', async () => {
       setupIndexedDatabase();
       const pluginSettingsComponent = createPluginSettingsComponent({
-        shouldIncludeGitIgnorePatterns: false
+        settings: {
+          shouldIncludeGitIgnorePatterns: false
+        }
       });
       const component = createComponent({ pluginSettingsComponent });
       vi.mocked(readSafe).mockClear();
@@ -1357,7 +1382,9 @@ describe('IgnorePatternsComponent', () => {
     it('should read git ignore when shouldIncludeGitIgnorePatterns is true', async () => {
       setupIndexedDatabase();
       const pluginSettingsComponent = createPluginSettingsComponent({
-        shouldIncludeGitIgnorePatterns: true
+        settings: {
+          shouldIncludeGitIgnorePatterns: true
+        }
       });
       vi.mocked(readSafe).mockResolvedValue('');
       const component = createComponent({ pluginSettingsComponent });
@@ -1369,7 +1396,9 @@ describe('IgnorePatternsComponent', () => {
     it('should detect git ignore content changes', async () => {
       setupIndexedDatabase();
       const pluginSettingsComponent = createPluginSettingsComponent({
-        shouldIncludeGitIgnorePatterns: true
+        settings: {
+          shouldIncludeGitIgnorePatterns: true
+        }
       });
       vi.mocked(readSafe).mockResolvedValue('');
       const component = createComponent({ pluginSettingsComponent });
@@ -1386,7 +1415,7 @@ describe('IgnorePatternsComponent', () => {
   describe('readObsidianIgnore', () => {
     it('should match the file patterns after the settings patterns, and never write them into the settings', async () => {
       setupIndexedDatabase();
-      const pluginSettingsComponent = createPluginSettingsComponent({ ignorePatterns: 'notes/*' });
+      const pluginSettingsComponent = createPluginSettingsComponent({ settings: { ignorePatterns: 'notes/*' } });
       vi.mocked(readIfExists).mockResolvedValueOnce('!notes/keep.md');
       const component = createComponent({ pluginSettingsComponent });
       await component.loadWithPromises();
@@ -1776,7 +1805,9 @@ describe('IgnorePatternsComponent', () => {
       vi.mocked(isDeepEqual).mockReturnValue(false);
       vi.mocked(statSafe).mockResolvedValue({ ctime: 0, mtime: 12_345, size: 10, type: 'file' });
       const pluginSettingsComponent = createPluginSettingsComponent({
-        shouldIncludeGitIgnorePatterns: true
+        settings: {
+          shouldIncludeGitIgnorePatterns: true
+        }
       });
       setupIndexedDatabase();
       const component = createComponent({ pluginSettingsComponent });
@@ -1789,7 +1820,9 @@ describe('IgnorePatternsComponent', () => {
     it('should set gitIgnoreMtime to 0 when shouldIncludeGitIgnorePatterns is false', async () => {
       vi.mocked(isDeepEqual).mockReturnValue(false);
       const pluginSettingsComponent = createPluginSettingsComponent({
-        shouldIncludeGitIgnorePatterns: false
+        settings: {
+          shouldIncludeGitIgnorePatterns: false
+        }
       });
       const { mtimeStore } = setupIndexedDatabase();
       const component = createComponent({ pluginSettingsComponent });
@@ -1825,7 +1858,9 @@ describe('IgnorePatternsComponent', () => {
       const app = createApp();
       vi.mocked(app.vault.getConfig as ReturnType<typeof vi.fn<(...$arguments: unknown[]) => unknown>>).mockReturnValue(['filter1', 'filter2']);
       const pluginSettingsComponent = createPluginSettingsComponent({
-        shouldIgnoreExcludedFiles: true
+        settings: {
+          shouldIgnoreExcludedFiles: true
+        }
       });
       const { mtimeStore } = setupIndexedDatabase();
       const component = createComponent({ app, pluginSettingsComponent });
@@ -1843,7 +1878,9 @@ describe('IgnorePatternsComponent', () => {
     it('should return empty userIgnoreFilters when shouldIgnoreExcludedFiles is false', async () => {
       vi.mocked(isDeepEqual).mockReturnValue(false);
       const pluginSettingsComponent = createPluginSettingsComponent({
-        shouldIgnoreExcludedFiles: false
+        settings: {
+          shouldIgnoreExcludedFiles: false
+        }
       });
       const { mtimeStore } = setupIndexedDatabase();
       const component = createComponent({ pluginSettingsComponent });
@@ -1863,7 +1900,9 @@ describe('IgnorePatternsComponent', () => {
       const app = createApp();
       vi.mocked(app.vault.getConfig as ReturnType<typeof vi.fn<(...$arguments: unknown[]) => unknown>>).mockReturnValue(null);
       const pluginSettingsComponent = createPluginSettingsComponent({
-        shouldIgnoreExcludedFiles: true
+        settings: {
+          shouldIgnoreExcludedFiles: true
+        }
       });
       const { mtimeStore } = setupIndexedDatabase();
       const component = createComponent({ app, pluginSettingsComponent });
@@ -1885,7 +1924,9 @@ describe('IgnorePatternsComponent', () => {
       vi.mocked(readIfExists).mockResolvedValueOnce('*.log'); // Obsidian ignore
       vi.mocked(readSafe).mockResolvedValueOnce('node_modules'); // Git ignore
       const pluginSettingsComponent = createPluginSettingsComponent({
-        shouldIncludeGitIgnorePatterns: true
+        settings: {
+          shouldIncludeGitIgnorePatterns: true
+        }
       });
       const component = createComponent({ pluginSettingsComponent });
       await component.loadWithPromises();
@@ -1940,7 +1981,9 @@ describe('IgnorePatternsComponent', () => {
       const app = createApp();
       vi.mocked(app.vault.getConfig as ReturnType<typeof vi.fn<(...$arguments: unknown[]) => unknown>>).mockReturnValue(['/test.*/']);
       const pluginSettingsComponent = createPluginSettingsComponent({
-        shouldIgnoreExcludedFiles: true
+        settings: {
+          shouldIgnoreExcludedFiles: true
+        }
       });
       const component = createComponent({ app, pluginSettingsComponent });
       await component.loadWithPromises();
@@ -1953,7 +1996,9 @@ describe('IgnorePatternsComponent', () => {
       const app = createApp();
       vi.mocked(app.vault.getConfig as ReturnType<typeof vi.fn<(...$arguments: unknown[]) => unknown>>).mockReturnValue(['docs']);
       const pluginSettingsComponent = createPluginSettingsComponent({
-        shouldIgnoreExcludedFiles: true
+        settings: {
+          shouldIgnoreExcludedFiles: true
+        }
       });
       const component = createComponent({ app, pluginSettingsComponent });
       await component.loadWithPromises();

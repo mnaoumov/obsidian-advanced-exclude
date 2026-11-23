@@ -413,7 +413,7 @@ async function runStep(vaultPath: string, step: LifecycleStep, excludeMode: Excl
         const projection = enabledPlugin && findComponent(enabledPlugin, 'IndexProjectionComponent') as ProjectionLike | undefined;
         const explorerView = app.workspace.getLeavesOfType('file-explorer')[0]?.view as ExplorerViewLike | undefined;
         return {
-          ...disableMs !== undefined && { disableMs: Math.round(disableMs) },
+          ...(disableMs !== undefined && { disableMs: Math.round(disableMs) }),
           error: null,
           explorerFolderItems: Object.keys(explorerView?.fileItems ?? {}).filter((path) => path.startsWith(folderPrefix)).length,
           fastEnableApplied: projection?.fastEnableApplied ?? false,

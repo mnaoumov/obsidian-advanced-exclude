@@ -228,6 +228,7 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginSettings> {
                   /* v8 ignore start -- Deep Obsidian UI integration; covered by integration tests. */
                   button.onClick(() => {
                     const tab = this.app.setting.openTabById('file');
+                    // eslint-disable-next-line obsidian-dev-toolkit/prefer-active-window -- Obsidian sets up i18next on the main window only.
                     const manageButtonCaption = window.i18next.t('interface.button-manage');
                     [...tab.containerEl.querySelectorAll('button')]
                       .find((tabButton) => tabButton.textContent === manageButtonCaption)

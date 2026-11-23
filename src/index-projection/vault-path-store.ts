@@ -42,9 +42,11 @@ export class IndexedDatabaseVaultPathStore implements VaultPathStore {
 
   public constructor(appId: string) {
     this.store = new LocalRecordStore({
+      // eslint-disable-next-line obsidian-dev-toolkit/prefer-active-window -- a long-lived store must not belong to a pop-out window that can close; IndexedDB is per origin anyway.
       factory: window.indexedDB,
       importLegacy: async (): Promise<readonly (readonly [string, unknown])[]> =>
         await readLegacyDatabase({
+          // eslint-disable-next-line obsidian-dev-toolkit/prefer-active-window -- the legacy database is read through the same main-window factory as the store.
           factory: window.indexedDB,
           name: `${appId}/advanced-exclude-vault-paths`,
           async read(database): Promise<[string, unknown][]> {

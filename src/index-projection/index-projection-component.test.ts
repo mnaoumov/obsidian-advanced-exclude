@@ -60,7 +60,7 @@ vi.mock('../bulk-index-update/related-links-batch.ts', () => ({
 }));
 
 vi.mock('@obsidian-typings/obsidian-public-latest/implementations', async (importOriginal) => ({
-  ...await importOriginal<typeof import('@obsidian-typings/obsidian-public-latest/implementations')>(),
+  ...(await importOriginal<typeof import('@obsidian-typings/obsidian-public-latest/implementations')>()),
   getDataAdapterEx: vi.fn()
 }));
 
