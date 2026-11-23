@@ -14,11 +14,11 @@ import {
   refreshLinkViews,
   refreshSearchViews
 } from '../index-projection/refresh-link-views.ts';
-import { ExcludeMode } from '../settings/plugin-settings.ts';
 import {
   callWithScopedApp,
   SoftExcludeFeature
 } from './feature-scoped-app.ts';
+import { isSoftExcludeActive } from './soft-patterns.ts';
 
 interface FeatureEntryPatchComponentConstructorParams {
   readonly app: App;
@@ -107,7 +107,8 @@ export class FeatureEntryPatchComponent extends MonkeyAroundComponent {
       settings.shouldSoftExcludeFromGraph,
       settings.shouldSoftExcludeFromOtherFeatures,
       settings.shouldSoftExcludeFromSearch,
-      settings.shouldSoftExcludeFromUnlinkedMentions
+      settings.shouldSoftExcludeFromUnlinkedMentions,
+      settings.softIgnorePatterns
     ]);
   }
 
@@ -140,7 +141,7 @@ export class FeatureEntryPatchComponent extends MonkeyAroundComponent {
       $object: prototype,
       methodName,
       patchHandler: ({ fallback, originalThis }) => {
-        return this.pluginSettingsComponent.effectiveSettings.excludeMode === ExcludeMode.Soft
+        return isSoftExcludeActive(this.pluginSettingsComponent)
           ? callWithScopedApp(originalThis, this.getFeatureScopedApp(feature), fallback)
           : fallback();
       }
@@ -160,7 +161,7 @@ export class FeatureEntryPatchComponent extends MonkeyAroundComponent {
   }
 
   private refreshViewsInSoftMode(): void {
-    if (this.pluginSettingsComponent.effectiveSettings.excludeMode !== ExcludeMode.Soft) {
+    if (!isSoftExcludeActive(this.pluginSettingsComponent)) {
       return;
     }
     refreshLinkViews(this.app);

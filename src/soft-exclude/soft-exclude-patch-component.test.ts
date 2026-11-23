@@ -91,6 +91,53 @@ describe('SoftExcludePatchComponent', () => {
     expect(fixture.isIgnored).not.toHaveBeenCalled();
   });
 
+  it('ignores a soft pattern match outside the soft mode, without the main patterns or property rules', () => {
+    fixture = createFixture({ cache: { frontmatter: { visibility: 'gm-only' } }, isIgnored: true });
+    fixture.settings.excludeMode = ExcludeMode.Full;
+    fixture.settings.propertyRules = 'visibility: gm-only';
+    fixture.settings.softIgnorePatterns = 'scripts/';
+
+    expect(fixture.app.metadataCache.isUserIgnored('scripts/delete.md')).toBe(true);
+    expect(fixture.app.metadataCache.isUserIgnored('notes/a.md')).toBe(false);
+    expect(fixture.isIgnored).not.toHaveBeenCalled();
+    expect(fixture.app.metadataCache.getCache).not.toHaveBeenCalled();
+  });
+
+  it('tests a folder against the soft patterns in its folder form', () => {
+    fixture = createFixture({ file: FOLDER });
+    fixture.settings.excludeMode = ExcludeMode.FilesPane;
+    fixture.settings.softIgnorePatterns = 'scripts/';
+
+    expect(fixture.app.metadataCache.isUserIgnored('scripts')).toBe(true);
+  });
+
+  it('adds the soft patterns to the main patterns in the soft mode', () => {
+    fixture.settings.softIgnorePatterns = 'scripts/';
+
+    expect(fixture.app.metadataCache.isUserIgnored('scripts/a.md')).toBe(true);
+    expect(fixture.isIgnored).not.toHaveBeenCalled();
+    expect(fixture.app.metadataCache.isUserIgnored('notes/a.md')).toBe(false);
+    expect(fixture.isIgnored).toHaveBeenCalledWith({ isFolder: false, normalizedPath: 'notes/a.md' });
+  });
+
+  it('applies the soft patterns by the feature toggles', () => {
+    fixture.settings.excludeMode = ExcludeMode.Full;
+    fixture.settings.softIgnorePatterns = 'scripts/';
+
+    expect(fixture.component.getFeatureScopedApp(SoftExcludeFeature.Search).metadataCache.isUserIgnored('scripts/a.md')).toBe(true);
+    fixture.settings.shouldSoftExcludeFromSearch = false;
+    expect(fixture.component.getFeatureScopedApp(SoftExcludeFeature.Search).metadataCache.isUserIgnored('scripts/a.md')).toBe(false);
+  });
+
+  it('rebuilds the soft pattern tester when its text changes', () => {
+    fixture.settings.excludeMode = ExcludeMode.Full;
+    fixture.settings.softIgnorePatterns = 'scripts/';
+    expect(fixture.app.metadataCache.isUserIgnored('other/a.md')).toBe(false);
+
+    fixture.settings.softIgnorePatterns = 'other/';
+    expect(fixture.app.metadataCache.isUserIgnored('other/a.md')).toBe(true);
+  });
+
   it('ignores a file the patterns ignore', () => {
     fixture = createFixture({ isIgnored: true });
 

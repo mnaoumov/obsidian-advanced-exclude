@@ -255,4 +255,20 @@ describe('FeatureEntryPatchComponent', () => {
     expect(refreshLinkViews).not.toHaveBeenCalled();
     expect(refreshSearchViews).not.toHaveBeenCalled();
   });
+
+  it('scopes the entry methods outside the soft mode while soft patterns are set, and refreshes on their change', () => {
+    const graphEngine = new FakeEngine(app);
+    leavesByType.set(ViewType.Graph, [{ dataEngine: graphEngine }]);
+    settings.excludeMode = ExcludeMode.Full;
+    loadAndFireLayoutReady();
+    expect(refreshLinkViews).not.toHaveBeenCalled();
+
+    settings.softIgnorePatterns = 'scripts/';
+    settingsListeners.get('saveSettings')?.();
+    expect(refreshLinkViews).toHaveBeenCalledWith(app);
+    expect(refreshSearchViews).toHaveBeenCalledWith(app);
+
+    graphEngine.render();
+    expect(graphEngine.seenApps).toEqual([scopedApps.get(SoftExcludeFeature.Graph)]);
+  });
 });

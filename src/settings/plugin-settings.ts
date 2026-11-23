@@ -36,4 +36,8 @@ export class PluginSettings {
   public shouldSoftExcludeFromOtherFeatures = true;
   public shouldSoftExcludeFromSearch = true;
   public shouldSoftExcludeFromUnlinkedMentions = true;
+  /**
+   * Patterns soft-excluded in every exclude mode, so one vault can hide some files fully and only soft-exclude others.
+   */
+  public softIgnorePatterns = '';
 }

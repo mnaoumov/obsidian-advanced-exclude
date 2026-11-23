@@ -184,7 +184,7 @@ describe('PluginSettingsTab', () => {
       settingsState: {
         effectiveValues: settings,
         inputValues: settings,
-        validationMessages: { excludeMode: '', ignorePatterns: '', profiles: '', propertyRules: '', shouldHideEmptyFolders: '', shouldIgnoreExcludedFiles: '', shouldIncludeGitIgnorePatterns: '', shouldSoftExcludeFromGraph: '', shouldSoftExcludeFromOtherFeatures: '', shouldSoftExcludeFromSearch: '', shouldSoftExcludeFromUnlinkedMentions: '' }
+        validationMessages: { excludeMode: '', ignorePatterns: '', profiles: '', propertyRules: '', shouldHideEmptyFolders: '', shouldIgnoreExcludedFiles: '', shouldIncludeGitIgnorePatterns: '', shouldSoftExcludeFromGraph: '', shouldSoftExcludeFromOtherFeatures: '', shouldSoftExcludeFromSearch: '', shouldSoftExcludeFromUnlinkedMentions: '', softIgnorePatterns: '' }
       }
     });
 
@@ -218,13 +218,15 @@ describe('PluginSettingsTab', () => {
         'Profiles'
       ]);
       expect(names).toContain('Global patterns');
+      expect(names).toContain('Soft patterns');
       expect(names).toContain('Local patterns');
       expect(names).toContain('Hide empty folders');
       expect(names).not.toContain('Include .obsidianignore patterns');
     });
 
-    it('should show the findings of the global and local patterns under their boxes, taking directives literally', () => {
+    it('should show the findings of the global, soft and local patterns under their boxes, taking directives literally', () => {
       settings.ignorePatterns = 'ok/\n@import Work';
+      settings.softIgnorePatterns = 'scripts/\n!';
       ignorePatternsComponent = strictProxy<IgnorePatternsComponent>({
         getLocalPatternsText: () => '# header\nbroken[',
         processConfigChanges,
@@ -239,6 +241,7 @@ describe('PluginSettingsTab', () => {
       expect(findingsEls.map((el) => el.textContent))
         .toStrictEqual([
           'Line 2: @import and @reset work only in a profile. Here this line is a pattern for a name that starts with @.',
+          'Line 2: ! needs a pattern after it.',
           String.raw`Line 2: The [ at column 7 is never closed, so this line matches nothing. Write \[ for a bracket.`
         ]);
     });
