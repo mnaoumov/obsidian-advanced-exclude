@@ -122,6 +122,37 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginSettings> {
                 });
               this.addApplyButton(setting);
             }
+          }),
+          this.settingEx({
+            desc: createFragment((f) => {
+              f.appendText('Patterns to soft-exclude on every device, whatever the exclude mode: the files stay in the Files Pane, backlinks and links, and are left out of what the ');
+              appendCodeBlock(f, 'Soft: exclude from ...');
+              f.appendText(' toggles below cover.');
+              f.createEl('br');
+              f.appendText('Use them to hide some files fully with the patterns above, in the ');
+              appendCodeBlock(f, 'Full');
+              f.appendText(' or ');
+              appendCodeBlock(f, 'Files Pane');
+              f.appendText(' mode, and only keep others out of search. In the ');
+              appendCodeBlock(f, 'Soft');
+              f.appendText(' mode they simply add to the other patterns.');
+              f.createEl('br');
+              f.appendText('Uses ');
+              f.createEl('a', { href: GITIGNORE_SYNTAX_URL, text: 'gitignore' });
+              f.appendText(' syntax.');
+            }),
+            name: 'Soft patterns',
+            render: (setting) => {
+              setting.addTextArea((textArea) => {
+                textArea.setPlaceholder('scripts/');
+                textArea.inputEl.addClass('ignore-patterns-control');
+                this.bind({
+                  propertyName: 'softIgnorePatterns',
+                  valueComponent: textArea
+                });
+                addPatternFindings(setting, textArea.inputEl);
+              });
+            }
           })
         ]
       }),
@@ -257,9 +288,9 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginSettings> {
               desc: createFragment((f) => {
                 f.appendText(toggleDefinition.description);
                 f.createEl('br');
-                f.appendText('Applies in the ');
+                f.appendText('Applies to every pattern in the ');
                 appendCodeBlock(f, 'Soft');
-                f.appendText(' exclude mode only. Obsidian\'s own ');
+                f.appendText(' exclude mode, and to the soft patterns in every mode. Obsidian\'s own ');
                 appendCodeBlock(f, 'Excluded files');
                 f.appendText(' still apply everywhere.');
               }),

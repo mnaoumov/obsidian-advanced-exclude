@@ -108,6 +108,26 @@ await require('/demoSetup.ts').changeSettings(app, {
 
 Manual equivalent: pick **Soft** in the **Exclude mode** dropdown, then turn off every **Soft: exclude from ...** toggle except **unlinked mentions**. A search for `Draft` then finds the archived note again.
 
+## Soft-exclude some files in any mode
+
+The exclude mode covers every pattern at once. To hide some files entirely and only keep others out of search, put the second set in **Soft patterns**. They soft-exclude their matches in every mode, by the same **Soft: exclude from ...** toggles, while the other patterns keep the mode you picked. In the **Soft** mode they simply add to the other patterns.
+
+```code-button
+---
+caption: Full mode, and soft-exclude Shared/Spoilers.md
+---
+await require('/demoSetup.ts').changeSettings(app, { excludeMode: 'Full', softIgnorePatterns: 'Shared/Spoilers.md' });
+```
+
+```code-button
+---
+caption: Clear the soft patterns
+---
+await require('/demoSetup.ts').changeSettings(app, { softIgnorePatterns: '' });
+```
+
+Manual equivalent: pick **Full** in the **Exclude mode** dropdown and type `Shared/Spoilers.md` into **Soft patterns**. [Shared/Spoilers](<./Shared/Spoilers.md>) stays in the Files pane, a search for `dragon` finds nothing, and `Archive/` is still hidden everywhere.
+
 ## Reuse Obsidian's excluded files
 
 **Ignore excluded files** (a toggle) pulls in whatever you have configured under Obsidian's core **Files and links > Excluded files** setting and treats those entries as ignore patterns too. The **Go to settings** button next to it jumps straight to that core setting. Turn it on if you want your existing excluded-files list to get the full `Advanced Exclude` treatment.

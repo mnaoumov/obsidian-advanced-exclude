@@ -16,6 +16,7 @@ import {
   doesMatchPropertyRules,
   parsePropertyRules
 } from './property-rules.ts';
+import { SoftPatternsTester } from './soft-patterns.ts';
 
 /**
  * The `Soft: exclude from ...` toggle of each feature.
@@ -47,6 +48,9 @@ interface SoftExcludePatchComponentConstructorParams {
  * patterns, then the `Exclude notes by property` rules. Nothing is removed from the index, so no file-system call is
  * touched. The property rules need the file's metadata, which is why they work in this mode only.
  *
+ * The `Soft patterns` setting is matched the same way in every exclude mode, so a vault can hide some files in `Full`
+ * or `Files pane` mode and only soft-exclude others. In the `Soft` mode it simply adds to the main patterns.
+ *
  * The verdict applies per feature, by the `Soft: exclude from ...` toggles. A call through
  * {@link SoftExcludePatchComponent.getFeatureScopedApp}'s app is the feature it was made for; every other call is
  * {@link SoftExcludeFeature.Other}.
@@ -58,6 +62,7 @@ export class SoftExcludePatchComponent extends MonkeyAroundComponent {
   private readonly ignorePatternsComponent: IgnorePatternsComponent;
   private parsedPropertyRules: null | ParsedPropertyRules = null;
   private readonly pluginSettingsComponent: PluginSettingsComponent;
+  private softPatternsTester: null | SoftPatternsTester = null;
 
   public constructor(params: SoftExcludePatchComponentConstructorParams) {
     super();
@@ -106,16 +111,35 @@ export class SoftExcludePatchComponent extends MonkeyAroundComponent {
     return this.parsedPropertyRules.rules;
   }
 
+  private getSoftPatternsTester(): SoftPatternsTester {
+    const text = this.pluginSettingsComponent.settings.softIgnorePatterns;
+    if (this.softPatternsTester?.text !== text) {
+      this.softPatternsTester = new SoftPatternsTester(text);
+    }
+    return this.softPatternsTester;
+  }
+
   private isFeatureExcluded(feature: SoftExcludeFeature): boolean {
     return this.pluginSettingsComponent.settings[FEATURE_SETTING_NAMES[feature]];
   }
 
   private isSoftIgnored(path: string, feature: SoftExcludeFeature): boolean {
-    if (this.pluginSettingsComponent.effectiveSettings.excludeMode !== ExcludeMode.Soft || !this.isFeatureExcluded(feature)) {
+    if (!this.isFeatureExcluded(feature)) {
+      return false;
+    }
+    const isSoftMode = this.pluginSettingsComponent.effectiveSettings.excludeMode === ExcludeMode.Soft;
+    const softPatternsTester = this.getSoftPatternsTester();
+    if (!isSoftMode && !softPatternsTester.hasPatterns) {
       return false;
     }
     const file = this.app.vault.getAbstractFileByPath(path);
     const isFolderPath = file !== null && isFolder(file);
+    if (softPatternsTester.isIgnored(path, isFolderPath)) {
+      return true;
+    }
+    if (!isSoftMode) {
+      return false;
+    }
     if (this.ignorePatternsComponent.isIgnored({ isFolder: isFolderPath, normalizedPath: path })) {
       return true;
     }
