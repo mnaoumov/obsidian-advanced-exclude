@@ -49,6 +49,13 @@ import {
 } from './ignore-patterns-component.ts';
 import { LOCAL_PATTERNS_HEADER } from './local-patterns.ts';
 
+/**
+ * The chunked-flush cases judge 2,500 paths to fill more than one flush transaction. That takes
+ * ~30 ms alone and ~200 ms under coverage, but timed out at vitest's 5 s default in a full gate on a
+ * loaded 2-processor machine, so they get more room.
+ */
+const CHUNKED_FLUSH_TIMEOUT_IN_MILLISECONDS = 30_000;
+
 const storeState = vi.hoisted(() => ({ current: undefined as LocalRecordStore | undefined }));
 vi.mock('./verdict-record-store.ts', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./verdict-record-store.ts')>()),
@@ -640,7 +647,7 @@ describe('IgnorePatternsComponent', () => {
       expect(mockDatabase.close).toHaveBeenCalledOnce();
     });
 
-    it('flushes a large verdict queue in several transactions, yielding between them', async () => {
+    it('flushes a large verdict queue in several transactions, yielding between them', { timeout: CHUNKED_FLUSH_TIMEOUT_IN_MILLISECONDS }, async () => {
       const { filesStore, mockDatabase } = setupIndexedDatabase();
       const component = createComponent();
       await component.loadWithPromises();
@@ -655,7 +662,7 @@ describe('IgnorePatternsComponent', () => {
       expect(vi.mocked(mockDatabase.transaction).mock.calls.length - transactionCallsBefore).toBe(2);
     });
 
-    it('stops a chunked flush when the store is reset part-way through it', async () => {
+    it('stops a chunked flush when the store is reset part-way through it', { timeout: CHUNKED_FLUSH_TIMEOUT_IN_MILLISECONDS }, async () => {
       const { filesStore } = setupIndexedDatabase();
       const component = createComponent();
       await component.loadWithPromises();
