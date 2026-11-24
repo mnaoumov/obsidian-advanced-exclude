@@ -24,6 +24,7 @@ interface DemoProfile {
 }
 
 interface DemoSettingsPatch {
+  readonly excludeMenuLayer?: string;
   readonly excludeMode?: string;
   readonly ignorePatterns?: string;
   readonly propertyRules?: string;

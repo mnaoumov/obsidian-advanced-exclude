@@ -30,7 +30,10 @@ import {
   duplicateProfile,
   saveProfile
 } from '../profiles/profiles.ts';
-import { ExcludeMode } from './plugin-settings.ts';
+import {
+  ExcludeMenuLayer,
+  ExcludeMode
+} from './plugin-settings.ts';
 
 const README_URL = 'https://github.com/mnaoumov/obsidian-advanced-exclude';
 const GITIGNORE_SYNTAX_URL = 'https://git-scm.com/docs/gitignore#_pattern_format';
@@ -279,6 +282,34 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginSettings> {
                 dropdown.addOption(ExcludeMode.Soft, 'Soft');
                 this.bind({
                   propertyName: 'excludeMode',
+                  valueComponent: dropdown
+                });
+              });
+            }
+          }),
+          this.settingEx({
+            desc: createFragment((f) => {
+              f.appendText('Where the ');
+              appendCodeBlock(f, 'Exclude');
+              f.appendText(' and ');
+              appendCodeBlock(f, 'Exclude everything else in this folder');
+              f.appendText(' items of the Files pane menu write their lines.');
+              f.createEl('br');
+              appendCodeBlock(f, 'Global patterns');
+              f.appendText(' - The global patterns of the base settings, on every device. While a profile is active, it builds on them.');
+              f.createEl('br');
+              appendCodeBlock(f, 'Local patterns');
+              f.appendText(' - ');
+              appendCodeBlock(f, OBSIDIAN_IGNORE_FILE);
+              f.appendText(', on this device only, whichever profile is active.');
+            }),
+            name: 'Files pane menu writes to',
+            render: (setting) => {
+              setting.addDropdown((dropdown) => {
+                dropdown.addOption(ExcludeMenuLayer.Global, 'Global patterns');
+                dropdown.addOption(ExcludeMenuLayer.Local, 'Local patterns');
+                this.bind({
+                  propertyName: 'excludeMenuLayer',
                   valueComponent: dropdown
                 });
               });
