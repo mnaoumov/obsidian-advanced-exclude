@@ -5,6 +5,7 @@ import {
 } from 'vitest';
 
 import {
+  ExcludeMenuLayer,
   ExcludeMode,
   PluginSettings
 } from './plugin-settings.ts';
@@ -22,6 +23,7 @@ describe('ExcludeMode', () => {
 describe('PluginSettings', () => {
   it('should have correct default values', () => {
     const settings = new PluginSettings();
+    expect(settings.excludeMenuLayer).toBe(ExcludeMenuLayer.Global);
     expect(settings.excludeMode).toBe(ExcludeMode.Full);
     expect(settings.ignorePatterns).toBe('');
     expect(settings.shouldHideEmptyFolders).toBe(false);

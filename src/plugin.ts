@@ -6,6 +6,7 @@ import { PluginDataHandler } from '@mnaoumov/obsidian-lib/data-handler';
 import { PluginBase } from '@mnaoumov/obsidian-lib/plugin/plugin';
 import { PluginEventSourceImpl } from '@mnaoumov/obsidian-lib/plugin/plugin-event-source';
 
+import { ExcludeMenuComponent } from './files-pane/exclude-menu-component.ts';
 import { FileTreeComponent } from './files-pane/file-tree-component.ts';
 import { IndexProjectionComponent } from './index-projection/index-projection-component.ts';
 import { ManualIndexHider } from './index-projection/manual-index-hider.ts';
@@ -161,6 +162,15 @@ export class Plugin extends PluginBase {
         app: this.app,
         ignorePatternsComponent,
         pluginId: this.manifest.id,
+        pluginNoticeComponent: this.pluginNoticeComponent,
+        pluginSettingsComponent
+      })
+    );
+
+    this.addChild(
+      new ExcludeMenuComponent({
+        app: this.app,
+        ignorePatternsComponent,
         pluginNoticeComponent: this.pluginNoticeComponent,
         pluginSettingsComponent
       })

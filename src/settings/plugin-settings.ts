@@ -1,3 +1,17 @@
+/**
+ * Where the Files pane menu's `Exclude` actions write their lines.
+ */
+export enum ExcludeMenuLayer {
+  /**
+   * The global patterns of the base settings, which sync.
+   */
+  Global = 'Global',
+  /**
+   * `.obsidianignore`, on this device only.
+   */
+  Local = 'Local'
+}
+
 export enum ExcludeMode {
   FilesPane = 'FilesPane',
   Full = 'Full',
@@ -25,6 +39,7 @@ export interface SettingsProfile {
 }
 
 export class PluginSettings {
+  public excludeMenuLayer: ExcludeMenuLayer = ExcludeMenuLayer.Global;
   public excludeMode: ExcludeMode = ExcludeMode.Full;
   public ignorePatterns = '';
   public profiles: SettingsProfile[] = [];

@@ -7,6 +7,8 @@ Open **Settings -> Community plugins -> `Advanced Exclude`** to configure the pl
 - `ignorePatterns`
   - the list of [`gitignore`](https://git-scm.com/docs/gitignore) patterns that decide which files and folders are ignored on every device, one per line. This is the **Global patterns** text area used in [01 Exclude a folder](<./01 Exclude a folder.md>) and [02 Whitelist with negation](<./02 Whitelist with negation.md>). Stored here, it syncs with [Obsidian Sync](https://help.obsidian.md/sync) like every other setting.
 - The **Local patterns** text area has no key here: it edits the `.obsidianignore` file at the vault root, which applies after the global patterns on this device only. See [03 Exclude mode and sources](<./03 Exclude mode and sources.md>).
+- `excludeMenuLayer`
+  - where the Files pane menu's **Exclude** items write their lines: `Global` (the default) for `ignorePatterns`, `Local` for `.obsidianignore`. This is the **Files pane menu writes to** dropdown. See [06 Exclude from the Files pane menu](<./06 Exclude from the Files pane menu.md>).
 
 ## Sources
 

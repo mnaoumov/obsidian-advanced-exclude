@@ -36,6 +36,10 @@ export function createFakeSettings(): FakeSettings {
     return noopAsync();
   });
   const pluginSettingsComponent = strictProxy<PluginSettingsComponent>({
+    editAndSave: vi.fn((editor: (editedSettings: PluginSettings) => void) => {
+      editor(settings);
+      return noopAsync();
+    }),
     get effectiveSettings(): EffectiveSettings {
       // Not a plain object: strictProxy caches a plain object a getter returns, which would freeze the first answer.
       return Object.assign(Object.create(null) as EffectiveSettings, resolveProfile({ activeProfileId, settings }));
