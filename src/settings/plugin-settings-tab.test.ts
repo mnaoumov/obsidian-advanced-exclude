@@ -186,7 +186,7 @@ describe('PluginSettingsTab', () => {
       settingsState: {
         effectiveValues: settings,
         inputValues: settings,
-        validationMessages: { excludeMenuLayer: '', excludeMode: '', ignorePatterns: '', profiles: '', propertyRules: '', shouldHideEmptyFolders: '', shouldIgnoreExcludedFiles: '', shouldIncludeGitIgnorePatterns: '', shouldSoftExcludeFromGraph: '', shouldSoftExcludeFromOtherFeatures: '', shouldSoftExcludeFromSearch: '', shouldSoftExcludeFromUnlinkedMentions: '', softIgnorePatterns: '' }
+        validationMessages: { excludeMenuLayer: '', excludeMode: '', ignorePatterns: '', profiles: '', propertyRules: '', shouldHideEmptyFolders: '', shouldIgnoreExcludedFiles: '', shouldIncludeGitIgnorePatterns: '', shouldRemoveFromLinkSuggestions: '', shouldRemoveFromQuickSwitcher: '', shouldSoftExcludeFromGraph: '', shouldSoftExcludeFromOtherFeatures: '', shouldSoftExcludeFromSearch: '', shouldSoftExcludeFromUnlinkedMentions: '', softIgnorePatterns: '' }
       }
     });
 

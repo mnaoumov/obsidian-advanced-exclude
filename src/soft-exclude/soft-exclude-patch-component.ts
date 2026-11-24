@@ -144,6 +144,16 @@ export class SoftExcludePatchComponent extends MonkeyAroundComponent {
     return scopedApp;
   }
 
+  /**
+   * Whether the plugin soft-excludes {@link path} from the features that have no toggle of their own, such as the quick
+   * switcher and link suggestions. Obsidian's own `Excluded files` are not part of this verdict.
+   *
+   * @returns The verdict.
+   */
+  public isSoftExcluded(path: string): boolean {
+    return this.isSoftIgnored(path, SoftExcludeFeature.Other);
+  }
+
   public override onload(): void {
     super.onload();
     this.registerMethodPatch({

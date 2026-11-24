@@ -108,6 +108,36 @@ await require('/demoSetup.ts').changeSettings(app, {
 
 Manual equivalent: pick **Soft** in the **Exclude mode** dropdown, then turn off every **Soft: exclude from ...** toggle except **unlinked mentions**. A search for `Draft` then finds the archived note again.
 
+## Remove soft-excluded files from the quick switcher and link suggestions
+
+In the quick switcher and in link suggestions, Obsidian does not leave an excluded file out: it ranks it lower, under every file that matches as well. The **Soft** mode does the same. Two toggles, off by default, take soft-excluded files out of those two lists entirely:
+
+- **Soft: remove from the quick switcher**
+- **Soft: remove from link suggestions**: the suggestions the editor offers after `[[`.
+
+The files stay in the Files pane and in links either way. The toggles act on what this plugin soft-excludes, so they need **Soft: exclude from other features** on, and Obsidian's own **Excluded files** keep their lower rank.
+
+```code-button
+---
+caption: Soft mode, Archive removed from the quick switcher and link suggestions
+---
+await require('/demoSetup.ts').changeSettings(app, {
+  excludeMode: 'Soft',
+  shouldRemoveFromLinkSuggestions: true,
+  shouldRemoveFromQuickSwitcher: true,
+  shouldSoftExcludeFromOtherFeatures: true
+});
+```
+
+```code-button
+---
+caption: Only rank them lower again (the default)
+---
+await require('/demoSetup.ts').changeSettings(app, { shouldRemoveFromLinkSuggestions: false, shouldRemoveFromQuickSwitcher: false });
+```
+
+Manual equivalent: pick **Soft** in the **Exclude mode** dropdown and turn on both **Soft: remove from ...** toggles. Open the quick switcher and type `Draft`: the archived note is no longer offered. Type `[[Draft` in a note: it is not suggested either. Turn the toggles off, and both lists offer it again, at the bottom.
+
 ## Soft-exclude some files in any mode
 
 The exclude mode covers every pattern at once. To hide some files entirely and only keep others out of search, put the second set in **Soft patterns**. They soft-exclude their matches in every mode, by the same **Soft: exclude from ...** toggles, while the other patterns keep the mode you picked. In the **Soft** mode they simply add to the other patterns.
