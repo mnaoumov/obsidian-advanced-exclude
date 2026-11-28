@@ -225,6 +225,19 @@ describe('SoftExcludePatchComponent', () => {
     expect(fixture.app.metadataCache.isUserIgnored('a.md')).toBe(true);
   });
 
+  it('gives its own verdict for the other features, without Obsidian\'s', () => {
+    fixture = createFixture({ isIgnored: true, isUserIgnored: true });
+    expect(fixture.component.isSoftExcluded('a.md')).toBe(true);
+    expect(fixture.originalIsUserIgnored).not.toHaveBeenCalled();
+
+    fixture = createFixture({ isUserIgnored: true });
+    expect(fixture.component.isSoftExcluded('a.md')).toBe(false);
+
+    fixture = createFixture({ isIgnored: true });
+    fixture.settings.shouldSoftExcludeFromOtherFeatures = false;
+    expect(fixture.component.isSoftExcluded('a.md')).toBe(false);
+  });
+
   it('applies the verdict to the other features by their toggle', () => {
     fixture = createFixture({ isIgnored: true });
     fixture.settings.shouldSoftExcludeFromOtherFeatures = false;

@@ -25,6 +25,8 @@ Open **Settings -> Community plugins -> `Advanced Exclude`** to configure the pl
   - notes to exclude by their properties, one rule per line: `key: value`, or `key` alone for any value. Applies in the `Soft` mode only. See [03 Exclude mode and sources](<./03 Exclude mode and sources.md>).
 - `shouldSoftExcludeFromSearch`, `shouldSoftExcludeFromGraph`, `shouldSoftExcludeFromUnlinkedMentions`, `shouldSoftExcludeFromOtherFeatures`
   - which features the `Soft` mode leaves ignored files out of: the search view, the graph and local graph, unlinked mentions, and everything else Obsidian's **Excluded files** covers. All on by default. See [03 Exclude mode and sources](<./03 Exclude mode and sources.md>).
+- `shouldRemoveFromQuickSwitcher`, `shouldRemoveFromLinkSuggestions`
+  - when on, soft-excluded files are taken out of the quick switcher, or out of the editor's link suggestions, instead of being ranked lower there as Obsidian ranks its own **Excluded files**. Both off by default. See [03 Exclude mode and sources](<./03 Exclude mode and sources.md>).
 - `shouldHideEmptyFolders`
   - when on, also hide folders left empty because every file inside them is excluded. This cascades to parent folders: when a folder and all of its subfolders become empty, the whole chain is hidden. Genuinely empty folders (with no files at all) stay visible.
 

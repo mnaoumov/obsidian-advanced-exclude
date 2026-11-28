@@ -47,6 +47,14 @@ export class PluginSettings {
   public shouldHideEmptyFolders = false;
   public shouldIgnoreExcludedFiles = false;
   public shouldIncludeGitIgnorePatterns = false;
+  /**
+   * Whether soft-excluded files are left out of link suggestions entirely, rather than ranked lower.
+   */
+  public shouldRemoveFromLinkSuggestions = false;
+  /**
+   * Whether soft-excluded files are left out of the quick switcher entirely, rather than ranked lower.
+   */
+  public shouldRemoveFromQuickSwitcher = false;
   public shouldSoftExcludeFromGraph = true;
   public shouldSoftExcludeFromOtherFeatures = true;
   public shouldSoftExcludeFromSearch = true;

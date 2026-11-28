@@ -72,6 +72,25 @@ const SOFT_EXCLUDE_FEATURE_TOGGLES: readonly SoftExcludeFeatureToggle[] = [
   }
 ];
 
+interface SuggestionRemovalToggle {
+  readonly description: string;
+  readonly name: string;
+  readonly propertyName: 'shouldRemoveFromLinkSuggestions' | 'shouldRemoveFromQuickSwitcher';
+}
+
+const SUGGESTION_REMOVAL_TOGGLES: readonly SuggestionRemovalToggle[] = [
+  {
+    description: 'Whether soft-excluded files are removed from the quick switcher entirely.',
+    name: 'Soft: remove from the quick switcher',
+    propertyName: 'shouldRemoveFromQuickSwitcher'
+  },
+  {
+    description: 'Whether soft-excluded files are removed from the link suggestions of the editor entirely.',
+    name: 'Soft: remove from link suggestions',
+    propertyName: 'shouldRemoveFromLinkSuggestions'
+  }
+];
+
 interface PluginSettingsTabConstructorParams extends PluginSettingsTabBaseConstructorParams<PluginSettings> {
   readonly explainTypedPath: (this: void, typedPath: string) => Promise<null | PathExplanation>;
   readonly ignorePatternsComponent: IgnorePatternsComponent;
@@ -332,6 +351,28 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginSettings> {
                 f.appendText(' exclude mode, and to the soft patterns in every mode. Obsidian\'s own ');
                 appendCodeBlock(f, 'Excluded files');
                 f.appendText(' still apply everywhere.');
+              }),
+              name: toggleDefinition.name,
+              render: (setting) => {
+                setting.addToggle((toggle) => {
+                  this.bind({
+                    propertyName: toggleDefinition.propertyName,
+                    valueComponent: toggle
+                  });
+                });
+              }
+            })
+          ),
+          ...SUGGESTION_REMOVAL_TOGGLES.map((toggleDefinition) =>
+            this.settingEx({
+              desc: createFragment((f) => {
+                f.appendText(toggleDefinition.description);
+                f.createEl('br');
+                f.appendText('Off: they stay there, ranked lower, as Obsidian ranks its own ');
+                appendCodeBlock(f, 'Excluded files');
+                f.appendText('. They stay in the Files Pane and in links either way. Needs ');
+                appendCodeBlock(f, 'Soft: exclude from other features');
+                f.appendText('.');
               }),
               name: toggleDefinition.name,
               render: (setting) => {

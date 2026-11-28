@@ -12,7 +12,7 @@ import type { PathExplainer } from '../explain/path-explainer.ts';
 
 import { renderPathExplanation } from '../explain/path-explanation.ts';
 
-export interface ExplainMenuComponentConstructorParams {
+interface ExplainMenuComponentConstructorParams {
   readonly app: App;
   readonly pathExplainer: PathExplainer;
   readonly pluginNoticeComponent: PluginNoticeComponent;

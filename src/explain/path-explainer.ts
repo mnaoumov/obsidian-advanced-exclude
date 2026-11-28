@@ -10,7 +10,7 @@ import type { PathExplanation } from './path-explanation.ts';
 
 import { ROOT_PATH } from '../constants.ts';
 
-export interface PathExplainerConstructorParams {
+interface PathExplainerConstructorParams {
   readonly app: App;
   readonly ignorePatternsComponent: IgnorePatternsComponent;
   readonly pluginSettingsComponent: PluginSettingsComponent;

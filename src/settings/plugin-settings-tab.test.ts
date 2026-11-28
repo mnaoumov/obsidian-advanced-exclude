@@ -40,6 +40,13 @@ import {
 
 type ProfileEditModalConstructorParams = ConstructorParameters<typeof ProfileEditModal>[0];
 
+/**
+ * Each case renders the whole settings tab into a DOM. That takes well under a second alone, but a
+ * case took 25 s in a full gate on a loaded 2-processor machine and timed out at vitest's 5 s
+ * default, so the cases get more room.
+ */
+const SETTINGS_TAB_TIMEOUT_IN_MILLISECONDS = 30_000;
+
 const mocks = vi.hoisted(() => ({
   confirm: vi.fn<() => Promise<boolean>>(),
   openedEditors: [] as ProfileEditModalConstructorParams[]
@@ -116,7 +123,7 @@ function renderRows(tab: PluginSettingsTab): void {
   }
 }
 
-describe('PluginSettingsTab', () => {
+describe('PluginSettingsTab', { timeout: SETTINGS_TAB_TIMEOUT_IN_MILLISECONDS }, () => {
   let app: App;
   let explainTypedPath: ReturnType<typeof vi.fn<(typedPath: string) => Promise<null | PathExplanation>>>;
   let ignorePatternsComponent: IgnorePatternsComponent;
@@ -186,7 +193,7 @@ describe('PluginSettingsTab', () => {
       settingsState: {
         effectiveValues: settings,
         inputValues: settings,
-        validationMessages: { excludeMenuLayer: '', excludeMode: '', ignorePatterns: '', profiles: '', propertyRules: '', shouldHideEmptyFolders: '', shouldIgnoreExcludedFiles: '', shouldIncludeGitIgnorePatterns: '', shouldSoftExcludeFromGraph: '', shouldSoftExcludeFromOtherFeatures: '', shouldSoftExcludeFromSearch: '', shouldSoftExcludeFromUnlinkedMentions: '', softIgnorePatterns: '' }
+        validationMessages: { excludeMenuLayer: '', excludeMode: '', ignorePatterns: '', profiles: '', propertyRules: '', shouldHideEmptyFolders: '', shouldIgnoreExcludedFiles: '', shouldIncludeGitIgnorePatterns: '', shouldRemoveFromLinkSuggestions: '', shouldRemoveFromQuickSwitcher: '', shouldSoftExcludeFromGraph: '', shouldSoftExcludeFromOtherFeatures: '', shouldSoftExcludeFromSearch: '', shouldSoftExcludeFromUnlinkedMentions: '', softIgnorePatterns: '' }
       }
     });
 

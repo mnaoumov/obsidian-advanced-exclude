@@ -59,7 +59,7 @@ export interface PatternVerdictExplanation {
  * same tester decides the verdict and explains it, so the explanation can never disagree with it.
  */
 export class MarkedPatternTester {
-  public readonly lines: readonly PatternLineOrigin[];
+  private readonly lines: readonly PatternLineOrigin[];
   private readonly tester: ignore.Ignore;
 
   public constructor(lines: readonly PatternLineOrigin[]) {
@@ -113,13 +113,13 @@ export class MarkedPatternTester {
   }
 
   private findLastMatchingNegativeLineIndex(testedPath: string): number {
-    for (let index = this.lines.length - 1; index >= 0; index--) {
-      const lineText = this.lines[index]?.text ?? '';
-      if (isNegativeLine(lineText) && doesLineMatch(lineText, testedPath)) {
-        return index;
+    let lastIndex = -1;
+    for (const [index, line] of this.lines.entries()) {
+      if (isNegativeLine(line.text) && doesLineMatch(line.text, testedPath)) {
+        lastIndex = index;
       }
     }
-    return -1;
+    return lastIndex;
   }
 }
 

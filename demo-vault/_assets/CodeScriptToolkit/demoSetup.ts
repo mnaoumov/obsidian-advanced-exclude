@@ -31,6 +31,8 @@ interface DemoSettingsPatch {
   readonly shouldHideEmptyFolders?: boolean;
   readonly shouldIgnoreExcludedFiles?: boolean;
   readonly shouldIncludeGitIgnorePatterns?: boolean;
+  readonly shouldRemoveFromLinkSuggestions?: boolean;
+  readonly shouldRemoveFromQuickSwitcher?: boolean;
   readonly shouldSoftExcludeFromGraph?: boolean;
   readonly shouldSoftExcludeFromOtherFeatures?: boolean;
   readonly shouldSoftExcludeFromSearch?: boolean;

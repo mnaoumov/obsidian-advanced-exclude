@@ -22,7 +22,7 @@ import {
   createExcludeLine
 } from './exclude-menu-patterns.ts';
 
-export interface ExcludeMenuComponentConstructorParams {
+interface ExcludeMenuComponentConstructorParams {
   readonly app: App;
   readonly ignorePatternsComponent: IgnorePatternsComponent;
   readonly pluginNoticeComponent: PluginNoticeComponent;

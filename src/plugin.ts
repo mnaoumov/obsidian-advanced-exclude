@@ -31,6 +31,7 @@ import { PluginSettingsComponent } from './settings/plugin-settings-component.ts
 import { PluginSettingsTab } from './settings/plugin-settings-tab.ts';
 import { FeatureEntryPatchComponent } from './soft-exclude/feature-entry-patch-component.ts';
 import { SoftExcludePatchComponent } from './soft-exclude/soft-exclude-patch-component.ts';
+import { SuggestionRemovalComponent } from './soft-exclude/suggestion-removal-component.ts';
 
 export class Plugin extends PluginBase {
   protected override async onloadImpl(): Promise<void> {
@@ -152,6 +153,14 @@ export class Plugin extends PluginBase {
       new FeatureEntryPatchComponent({
         app: this.app,
         getFeatureScopedApp: softExcludePatchComponent.getFeatureScopedApp.bind(softExcludePatchComponent),
+        pluginSettingsComponent
+      })
+    );
+
+    this.addChild(
+      new SuggestionRemovalComponent({
+        app: this.app,
+        isSoftExcluded: softExcludePatchComponent.isSoftExcluded.bind(softExcludePatchComponent),
         pluginSettingsComponent
       })
     );
