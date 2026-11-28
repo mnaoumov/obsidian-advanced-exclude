@@ -59,7 +59,7 @@ export interface PatternVerdictExplanation {
  * same tester decides the verdict and explains it, so the explanation can never disagree with it.
  */
 export class MarkedPatternTester {
-  public readonly lines: readonly PatternLineOrigin[];
+  private readonly lines: readonly PatternLineOrigin[];
   private readonly tester: ignore.Ignore;
 
   public constructor(lines: readonly PatternLineOrigin[]) {
