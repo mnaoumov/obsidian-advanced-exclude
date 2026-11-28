@@ -8,6 +8,14 @@ export interface PropertyRule {
    */
   readonly key: string;
   /**
+   * 1-based line number in the setting.
+   */
+  readonly lineNumber: number;
+  /**
+   * The line as the user wrote it.
+   */
+  readonly text: string;
+  /**
    * The value to match, lower-cased, or `null` for any non-empty value.
    */
   readonly value: null | string;
@@ -18,8 +26,16 @@ export interface PropertyRule {
  * are compared as text, case-insensitively, so `draft: true` matches both `true` and `"True"`.
  */
 export function doesMatchPropertyRules(frontmatter: Readonly<Record<string, unknown>> | undefined, rules: readonly PropertyRule[]): boolean {
+  return findMatchingPropertyRule(frontmatter, rules) !== null;
+}
+
+/**
+ * @returns The first of {@link rules} that {@link frontmatter} matches, by the test {@link doesMatchPropertyRules} makes, or
+ * `null`.
+ */
+export function findMatchingPropertyRule(frontmatter: Readonly<Record<string, unknown>> | undefined, rules: readonly PropertyRule[]): null | PropertyRule {
   if (!frontmatter || rules.length === 0) {
-    return false;
+    return null;
   }
 
   const valuesByKey = new Map<string>();
@@ -27,13 +43,13 @@ export function doesMatchPropertyRules(frontmatter: Readonly<Record<string, unkn
     valuesByKey.set(key.toLowerCase(), value);
   }
 
-  return rules.some((rule) => {
+  return rules.find((rule) => {
     if (!valuesByKey.has(rule.key)) {
       return false;
     }
     const items = toItems(valuesByKey.get(rule.key));
     return rule.value === null ? items.length > 0 : items.includes(rule.value);
-  });
+  }) ?? null;
 }
 
 /**
@@ -42,7 +58,7 @@ export function doesMatchPropertyRules(frontmatter: Readonly<Record<string, unkn
  */
 export function parsePropertyRules(text: string): PropertyRule[] {
   const rules: PropertyRule[] = [];
-  for (const rawLine of text.split(/\r?\n/)) {
+  for (const [index, rawLine] of text.split(/\r?\n/).entries()) {
     const line = rawLine.trim();
     if (line === '' || line.startsWith('#')) {
       continue;
@@ -53,7 +69,7 @@ export function parsePropertyRules(text: string): PropertyRule[] {
       continue;
     }
     const value = colonIndex === -1 ? '' : unquote(line.slice(colonIndex + 1).trim());
-    rules.push({ key, value: value === '' ? null : value.toLowerCase() });
+    rules.push({ key, lineNumber: index + 1, text: rawLine, value: value === '' ? null : value.toLowerCase() });
   }
   return rules;
 }

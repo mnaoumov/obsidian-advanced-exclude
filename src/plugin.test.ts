@@ -156,11 +156,32 @@ vi.mock('./settings/plugin-settings-component.ts', () => ({
   })
 }));
 
+vi.mock('./files-pane/explain-menu-component.ts', () => ({
+  // eslint-disable-next-line prefer-arrow-callback, func-names -- mock must be constructable with `new` and return a real loadable Component.
+  ExplainMenuComponent: vi.fn(function () {
+    return new Component();
+  })
+}));
+
+const mockExplainTypedPath = vi.fn().mockResolvedValue(null);
+vi.mock('./explain/path-explainer.ts', () => ({
+  // eslint-disable-next-line prefer-arrow-callback, func-names -- mock must be constructable with `new`.
+  PathExplainer: vi.fn(function () {
+    return { explainTypedPath: mockExplainTypedPath };
+  })
+}));
+
+interface MockSettingsTabParams {
+  readonly explainTypedPath: (typedPath: string) => Promise<unknown>;
+}
+
+let capturedExplainTypedPath: ((typedPath: string) => Promise<unknown>) | undefined;
 let isMockSettingsTabOpen = false;
 const mockSettingsTabRefresh = vi.fn();
 vi.mock('./settings/plugin-settings-tab.ts', () => ({
   // eslint-disable-next-line prefer-arrow-callback, func-names -- mock must be constructable with `new`.
-  PluginSettingsTab: vi.fn(function () {
+  PluginSettingsTab: vi.fn(function (params: MockSettingsTabParams) {
+    capturedExplainTypedPath = params.explainTypedPath;
     return {
       get isOpen(): boolean {
         return isMockSettingsTabOpen;
@@ -248,7 +269,7 @@ describe('Plugin', () => {
      * `onloadImpl` children, which the override routes into the gated
      * feature-surface tier.
      */
-    const EXPECTED_ADD_CHILD_CALLS = 17;
+    const EXPECTED_ADD_CHILD_CALLS = 18;
     const appOriginal = app.asOriginalType__();
 
     // Spy on the real addChild (calls through) so the real children still load.
@@ -311,6 +332,15 @@ describe('Plugin', () => {
       capturedOnUpdateFileTree().catch(() => undefined);
     }
     expect(mockUpdate).toHaveBeenCalled();
+  });
+
+  it('should wire the settings tab Explain box to the path explainer', async () => {
+    const plugin = new Plugin(app.asOriginalType__(), manifest);
+    await plugin.onload();
+
+    await capturedExplainTypedPath?.('a.md');
+
+    expect(mockExplainTypedPath).toHaveBeenCalledWith('a.md');
   });
 
   it('should wire isSettingsTabOpen to the settings tab', async () => {

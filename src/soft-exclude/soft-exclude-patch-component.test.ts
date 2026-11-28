@@ -17,6 +17,7 @@ import {
 import type { IgnorePatternsComponent } from '../patterns/ignore-patterns-component.ts';
 import type { PluginSettingsComponent } from '../settings/plugin-settings-component.ts';
 
+import { PatternLayer } from '../explain/marked-pattern-tester.ts';
 import {
   ExcludeMode,
   PluginSettings
@@ -74,6 +75,36 @@ describe('SoftExcludePatchComponent', () => {
 
   beforeEach(() => {
     fixture = createFixture();
+  });
+
+  describe('explain', () => {
+    it('names the soft pattern line, the property rule and the features covered', () => {
+      fixture = createFixture({ cache: { frontmatter: { draft: true } } });
+      fixture.settings.propertyRules = '# rules\ndraft: true';
+      fixture.settings.softIgnorePatterns = 'scripts/';
+      fixture.settings.shouldSoftExcludeFromGraph = false;
+
+      expect(fixture.component.explain('scripts/a.md', false)).toStrictEqual({
+        excludedFeatures: [SoftExcludeFeature.Search, SoftExcludeFeature.UnlinkedMentions, SoftExcludeFeature.Other],
+        isSoftMode: true,
+        propertyRule: { key: 'draft', lineNumber: 2, text: 'draft: true', value: 'true' },
+        softPatterns: {
+          decidingLine: { layer: PatternLayer.SoftPatterns, lineNumber: 1, text: 'scripts/' },
+          excludedFolderPath: 'scripts',
+          isIgnored: true,
+          overriddenLines: []
+        }
+      });
+    });
+
+    it('reports no property rule for a folder or outside the soft mode, and no soft verdict without soft patterns', () => {
+      fixture = createFixture({ cache: { frontmatter: { draft: true } } });
+      fixture.settings.propertyRules = 'draft';
+
+      expect(fixture.component.explain('notes', true)).toMatchObject({ propertyRule: null, softPatterns: null });
+      fixture.settings.excludeMode = ExcludeMode.Full;
+      expect(fixture.component.explain('a.md', false)).toMatchObject({ isSoftMode: false, propertyRule: null });
+    });
   });
 
   it('keeps what Obsidian already ignores', () => {

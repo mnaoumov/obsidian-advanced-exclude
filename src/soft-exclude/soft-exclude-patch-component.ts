@@ -2,6 +2,7 @@ import { MonkeyAroundComponent } from '@mnaoumov/obsidian-lib/components/monkey-
 import { isFolder } from '@mnaoumov/obsidian-lib/file-system';
 import { App } from 'obsidian';
 
+import type { PatternVerdictExplanation } from '../explain/marked-pattern-tester.ts';
 import type { IgnorePatternsComponent } from '../patterns/ignore-patterns-component.ts';
 import type { PluginSettingsComponent } from '../settings/plugin-settings-component.ts';
 import type { PluginSettings } from '../settings/plugin-settings.ts';
@@ -14,6 +15,7 @@ import {
 } from './feature-scoped-app.ts';
 import {
   doesMatchPropertyRules,
+  findMatchingPropertyRule,
   parsePropertyRules
 } from './property-rules.ts';
 import { SoftPatternsTester } from './soft-patterns.ts';
@@ -27,6 +29,35 @@ const FEATURE_SETTING_NAMES = {
   [SoftExcludeFeature.Search]: 'shouldSoftExcludeFromSearch',
   [SoftExcludeFeature.UnlinkedMentions]: 'shouldSoftExcludeFromUnlinkedMentions'
 } as const satisfies Record<SoftExcludeFeature, keyof PluginSettings>;
+
+const SOFT_EXCLUDE_FEATURES: readonly SoftExcludeFeature[] = [
+  SoftExcludeFeature.Search,
+  SoftExcludeFeature.Graph,
+  SoftExcludeFeature.UnlinkedMentions,
+  SoftExcludeFeature.Other
+];
+
+/**
+ * What soft-excludes one path, besides the main patterns.
+ */
+export interface SoftVerdictExplanation {
+  /**
+   * The features whose `Soft: exclude from ...` toggle is on, which soft exclusion leaves the path out of.
+   */
+  readonly excludedFeatures: readonly SoftExcludeFeature[];
+  /**
+   * Whether the exclude mode is `Soft`, where the main patterns and the property rules soft-exclude too.
+   */
+  readonly isSoftMode: boolean;
+  /**
+   * The first `Exclude notes by property` rule the note matches, in the `Soft` mode only.
+   */
+  readonly propertyRule: null | PropertyRule;
+  /**
+   * The `Soft patterns` verdict, or `null` while the setting holds no pattern.
+   */
+  readonly softPatterns: null | PatternVerdictExplanation;
+}
 
 interface ParsedPropertyRules {
   readonly rules: readonly PropertyRule[];
@@ -69,6 +100,25 @@ export class SoftExcludePatchComponent extends MonkeyAroundComponent {
     this.app = params.app;
     this.ignorePatternsComponent = params.ignorePatternsComponent;
     this.pluginSettingsComponent = params.pluginSettingsComponent;
+  }
+
+  /**
+   * Explains what soft-excludes {@link normalizedPath}, from the same matchers the `isUserIgnored` patch asks. The main
+   * patterns, which also soft-exclude in the `Soft` mode, are explained by {@link IgnorePatternsComponent.explain}.
+   *
+   * @returns The soft patterns' verdict, the property rule the note matches, and the features soft exclusion covers.
+   */
+  public explain(normalizedPath: string, isFolderPath: boolean): SoftVerdictExplanation {
+    const isSoftMode = this.pluginSettingsComponent.effectiveSettings.excludeMode === ExcludeMode.Soft;
+    const softPatternsTester = this.getSoftPatternsTester();
+    return {
+      excludedFeatures: SOFT_EXCLUDE_FEATURES.filter((feature) => this.isFeatureExcluded(feature)),
+      isSoftMode,
+      propertyRule: isSoftMode && !isFolderPath
+        ? findMatchingPropertyRule(this.app.metadataCache.getCache(normalizedPath)?.frontmatter, this.getPropertyRules())
+        : null,
+      softPatterns: softPatternsTester.hasPatterns ? softPatternsTester.explain(normalizedPath, isFolderPath) : null
+    };
   }
 
   /**

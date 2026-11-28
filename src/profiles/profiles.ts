@@ -62,6 +62,22 @@ export interface EffectiveSettings extends ProfileScalarSettings {
  */
 export type ImportedFileContents = ReadonlyMap<string, null | string>;
 
+export interface ResolvedPatternLine {
+  /**
+  The file the line came from, when {@link profileName} imported it with `@import file:`.
+  */
+  readonly filePath?: string;
+  /**
+  1-based line number in the text the line came from: the base settings' patterns, the profile, or the imported file.
+  */
+  readonly lineNumber: number;
+  /**
+  The profile the line came from, or `null` for the base settings.
+  */
+  readonly profileName: null | string;
+  readonly text: string;
+}
+
 export interface ResolveProfileSettings extends Readonly<ProfileScalarSettings> {
   readonly ignorePatterns: string;
   readonly profiles: readonly Readonly<SettingsProfile>[];
@@ -92,18 +108,6 @@ interface ProfileError {
 type ProfileScalarSettingName = 'excludeMode' | 'shouldHideEmptyFolders' | 'shouldIgnoreExcludedFiles' | 'shouldIncludeGitIgnorePatterns';
 
 type ProfileScalarSettings = Pick<PluginSettings, ProfileScalarSettingName>;
-
-interface ResolvedPatternLine {
-  /**
-  The file the line came from, when {@link profileName} imported it with `@import file:`.
-  */
-  readonly filePath?: string;
-  /**
-  The profile the line came from, or `null` for the base settings.
-  */
-  readonly profileName: null | string;
-  readonly text: string;
-}
 
 interface ResolveProfileParams {
   readonly activeProfileId: null | string;
@@ -231,7 +235,7 @@ export function resolveProfile(params: ResolveProfileParams): EffectiveSettings 
       ignorePatterns: settings.ignorePatterns,
       importedFilePaths: [],
       importingProfileNames: new Map(),
-      lines: splitLines(settings.ignorePatterns).map((text) => ({ profileName: null, text }))
+      lines: splitLines(settings.ignorePatterns).map((text, index) => ({ lineNumber: index + 1, profileName: null, text }))
     };
   }
 
@@ -240,7 +244,7 @@ export function resolveProfile(params: ResolveProfileParams): EffectiveSettings 
     errors: [],
     importedFileContents,
     importingProfileNames: new Map(),
-    lines: splitLines(settings.ignorePatterns).map((text) => ({ profileName: null, text })),
+    lines: splitLines(settings.ignorePatterns).map((text, index) => ({ lineNumber: index + 1, profileName: null, text })),
     profiles: settings.profiles,
     scalars: baseScalars
   };
@@ -302,8 +306,8 @@ function expandFileImport(state: ExpansionState, profile: Readonly<SettingsProfi
   }
   // A missing file imports nothing, without an error: an optional per-device file is a normal thing to import.
   const content = state.importedFileContents.get(filePath) ?? '';
-  for (const text of splitLines(content)) {
-    state.lines.push({ filePath, profileName: profile.name, text });
+  for (const [index, text] of splitLines(content).entries()) {
+    state.lines.push({ filePath, lineNumber: index + 1, profileName: profile.name, text });
   }
   return null;
 }
@@ -313,14 +317,14 @@ function expandFileImport(state: ExpansionState, profile: Readonly<SettingsProfi
  *
  * @returns The error to report for the line, or `null` when it expanded cleanly.
  */
-function expandLine(state: ExpansionState, profile: Readonly<SettingsProfile>, chain: readonly Readonly<SettingsProfile>[], line: string): null | string {
+function expandLine(state: ExpansionState, profile: Readonly<SettingsProfile>, chain: readonly Readonly<SettingsProfile>[], line: string, lineNumber: number): null | string {
   if (line.startsWith(String.raw`\@`)) {
-    state.lines.push({ profileName: profile.name, text: line.slice(1) });
+    state.lines.push({ lineNumber, profileName: profile.name, text: line.slice(1) });
     return null;
   }
 
   if (!line.startsWith('@')) {
-    state.lines.push({ profileName: profile.name, text: line });
+    state.lines.push({ lineNumber, profileName: profile.name, text: line });
     return null;
   }
 
@@ -362,7 +366,7 @@ function expandLine(state: ExpansionState, profile: Readonly<SettingsProfile>, c
 
 function expandProfile(state: ExpansionState, profile: Readonly<SettingsProfile>, chain: readonly Readonly<SettingsProfile>[]): void {
   for (const [index, line] of splitLines(profile.patterns).entries()) {
-    const errorMessage = expandLine(state, profile, chain, line);
+    const errorMessage = expandLine(state, profile, chain, line, index + 1);
     if (errorMessage !== null) {
       state.errors.push({ lineNumber: index + 1, message: errorMessage, profileName: profile.name });
     }

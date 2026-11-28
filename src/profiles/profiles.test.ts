@@ -43,10 +43,10 @@ describe('resolveProfile', () => {
     expect(result.errors).toStrictEqual([]);
     expect(result.importedFilePaths).toStrictEqual(['ignores/work.txt']);
     expect(result.lines).toStrictEqual([
-      { profileName: 'Work', text: 'a/' },
-      { filePath: 'ignores/work.txt', profileName: 'Work', text: '@literal' },
-      { filePath: 'ignores/work.txt', profileName: 'Work', text: 'b/' },
-      { profileName: 'Work', text: '!a/keep.md' }
+      { lineNumber: 1, profileName: 'Work', text: 'a/' },
+      { filePath: 'ignores/work.txt', lineNumber: 1, profileName: 'Work', text: '@literal' },
+      { filePath: 'ignores/work.txt', lineNumber: 2, profileName: 'Work', text: 'b/' },
+      { lineNumber: 3, profileName: 'Work', text: '!a/keep.md' }
     ]);
   });
 
@@ -83,8 +83,8 @@ describe('resolveProfile', () => {
     expect(result.errors).toStrictEqual([]);
     expect(result.importedFilePaths).toStrictEqual(['C:/Users/me/AllVaultsIgnore', '/home/me/ignore', 'Vault1Ignore']);
     expect(result.lines).toStrictEqual([
-      { filePath: 'C:/Users/me/AllVaultsIgnore', profileName: 'Work', text: 'shared/' },
-      { filePath: 'Vault1Ignore', profileName: 'Work', text: 'local/' }
+      { filePath: 'C:/Users/me/AllVaultsIgnore', lineNumber: 1, profileName: 'Work', text: 'shared/' },
+      { filePath: 'Vault1Ignore', lineNumber: 1, profileName: 'Work', text: 'local/' }
     ]);
   });
 
@@ -101,7 +101,7 @@ describe('resolveProfile', () => {
       }
     ]);
     expect(result.importedFilePaths).toStrictEqual(['Vault1Ignore']);
-    expect(result.lines).toStrictEqual([{ filePath: 'Vault1Ignore', profileName: 'Work', text: 'local/' }]);
+    expect(result.lines).toStrictEqual([{ filePath: 'Vault1Ignore', lineNumber: 1, profileName: 'Work', text: 'local/' }]);
   });
 
   it('should name the profile that first imports each file', () => {
@@ -127,7 +127,7 @@ describe('resolveProfile', () => {
     expect(result.ignorePatterns).toBe('a/\nb/');
     expect(result.excludeMode).toBe(ExcludeMode.FilesPane);
     expect(result.errors).toStrictEqual([]);
-    expect(result.lines).toStrictEqual([{ profileName: null, text: 'a/' }, { profileName: null, text: 'b/' }]);
+    expect(result.lines).toStrictEqual([{ lineNumber: 1, profileName: null, text: 'a/' }, { lineNumber: 2, profileName: null, text: 'b/' }]);
   });
 
   it('should fall back to the base settings when the active profile no longer exists', () => {
@@ -151,9 +151,9 @@ describe('resolveProfile', () => {
     expect(result.activeProfile?.name).toBe('Work');
     expect(result.ignorePatterns).toBe('base/\nwork/\n!work/keep.md');
     expect(result.lines).toStrictEqual([
-      { profileName: null, text: 'base/' },
-      { profileName: 'Work', text: 'work/' },
-      { profileName: 'Work', text: '!work/keep.md' }
+      { lineNumber: 1, profileName: null, text: 'base/' },
+      { lineNumber: 1, profileName: 'Work', text: 'work/' },
+      { lineNumber: 2, profileName: 'Work', text: '!work/keep.md' }
     ]);
   });
 
@@ -170,10 +170,10 @@ describe('resolveProfile', () => {
     const result = resolveProfile({ activeProfileId: 'combined', settings });
 
     expect(result.lines).toStrictEqual([
-      { profileName: 'Alpha', text: 'alpha/' },
-      { profileName: 'Beta', text: 'beta/' },
-      { profileName: 'Combined', text: 'own/' },
-      { profileName: 'Gamma', text: '!alpha/keep.md' }
+      { lineNumber: 1, profileName: 'Alpha', text: 'alpha/' },
+      { lineNumber: 1, profileName: 'Beta', text: 'beta/' },
+      { lineNumber: 3, profileName: 'Combined', text: 'own/' },
+      { lineNumber: 1, profileName: 'Gamma', text: '!alpha/keep.md' }
     ]);
     expect(result.errors).toStrictEqual([]);
   });
@@ -222,7 +222,7 @@ describe('resolveProfile', () => {
 
     const result = resolveProfile({ activeProfileId: 'clean', settings });
 
-    expect(result.lines).toStrictEqual([{ profileName: 'Clean', text: 'after/' }]);
+    expect(result.lines).toStrictEqual([{ lineNumber: 3, profileName: 'Clean', text: 'after/' }]);
     expect(result.excludeMode).toBe(ExcludeMode.Full);
     expect(result.shouldHideEmptyFolders).toBe(false);
   });
@@ -236,7 +236,7 @@ describe('resolveProfile', () => {
   it(String.raw`should read \@ as a literal pattern that starts with @`, () => {
     const settings = createSettings({ profiles: [profile('Work', String.raw`\@import Alpha`)] });
 
-    expect(resolveProfile({ activeProfileId: 'work', settings }).lines).toStrictEqual([{ profileName: 'Work', text: '@import Alpha' }]);
+    expect(resolveProfile({ activeProfileId: 'work', settings }).lines).toStrictEqual([{ lineNumber: 1, profileName: 'Work', text: '@import Alpha' }]);
   });
 
   it('should report an unknown profile, a missing name and an unknown directive, and skip those lines', () => {

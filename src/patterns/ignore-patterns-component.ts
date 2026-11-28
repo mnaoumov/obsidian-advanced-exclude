@@ -10,16 +10,22 @@ import {
 } from '@mnaoumov/typescript-lib/async';
 import { noopAsync } from '@mnaoumov/typescript-lib/function';
 import { isDeepEqual } from '@mnaoumov/typescript-lib/object-utils';
-import { escapeRegExp } from '@mnaoumov/typescript-lib/reg-exp';
-import ignore from 'ignore';
 import {
   App,
   debounce,
   Platform
 } from 'obsidian';
 
+import type { ExcludedFilesMatcher } from '../explain/excluded-files.ts';
+import type {
+  PatternLineOrigin,
+  PatternVerdictExplanation
+} from '../explain/marked-pattern-tester.ts';
 import type { LocalRecordStore } from '../local-record-store.ts';
-import type { ImportedFileContents } from '../profiles/profiles.ts';
+import type {
+  ImportedFileContents,
+  ResolvedPatternLine
+} from '../profiles/profiles.ts';
 import type { PluginSettingsComponent } from '../settings/plugin-settings-component.ts';
 
 import {
@@ -34,6 +40,15 @@ import {
   statSafe,
   writeSafe
 } from '../data-adapter-safe.ts';
+import {
+  createExcludedFilesMatchers,
+  findExcludedFilesMatch
+} from '../explain/excluded-files.ts';
+import {
+  MarkedPatternTester,
+  PatternLayer,
+  toPatternLineOrigins
+} from '../explain/marked-pattern-tester.ts';
 import { isOutsideVaultImportPath } from '../profiles/profiles.ts';
 import {
   formatLocalPatternsFile,
@@ -90,12 +105,32 @@ const DEFAULT_MTIME_ENTRY: DatabaseMtimeEntry = {
  */
 export const REPORTED_MISSING_IMPORTS_LOCAL_STORAGE_KEY = 'advanced-exclude:reported-missing-imports';
 
+/**
+ * Why the main patterns and Obsidian's `Excluded files` give one path its verdict.
+ */
+export interface IgnoreVerdictExplanation {
+  /**
+   * The `Excluded files` entry that excludes the path, while `Ignore excluded files` is on.
+   */
+  readonly excludedFilesEntry: null | PatternLineOrigin;
+  /**
+   * The verdict {@link IgnorePatternsComponent.isIgnored} gives, from the patterns applied now.
+   */
+  readonly isIgnored: boolean;
+  readonly patterns: PatternVerdictExplanation;
+}
+
 interface IgnorePatternsComponentConstructorParams {
   readonly app: App;
   readonly isSettingsTabOpen: (this: void) => boolean;
   readonly onUpdateFileTree: (this: void) => Promise<void>;
   readonly pluginNoticeComponent: PluginNoticeComponent;
   readonly pluginSettingsComponent: PluginSettingsComponent;
+}
+
+interface IgnorePatternsComponentExplainParams {
+  readonly isFolder: boolean;
+  readonly normalizedPath: string;
 }
 
 interface IgnorePatternsComponentIsIgnoredParams {
@@ -118,9 +153,9 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
   // The settings fingerprint the verdict store was last reset under; see the `loadSettings` handler.
   private appliedSettingsFingerprint: null | string = null;
   private cachedEffectivePatterns = '';
-  private cachedExcludeRegExps: null | RegExp[] = null;
+  private cachedExcludedFilesMatchers: ExcludedFilesMatcher[] | null = null;
   private cachedGitIgnoreContent = '';
-  private cachedIgnoreTester: ignore.Ignore | null = null;
+  private cachedIgnoreTester: MarkedPatternTester | null = null;
   // The patterns of `.obsidianignore`, normalized: no byte order mark, LF line endings, `''` for a missing file.
   private cachedLocalPatterns = '';
   // Whether the config fingerprint matched the persisted one at load (see
@@ -199,7 +234,7 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
    */
   public async applySettingsChange(): Promise<void> {
     this.cachedIgnoreTester = null;
-    this.cachedExcludeRegExps = null;
+    this.cachedExcludedFilesMatchers = null;
     await this.reload();
     this.fileIgnoreMap.clear();
     this.hadConfigChanges = true;
@@ -220,6 +255,23 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
     for (const entry of databaseFileEntries) {
       this.fileIgnoreMap.set(entry.path, entry.isIgnored);
     }
+  }
+
+  /**
+   * Explains the verdict of {@link isIgnored} for one path from the patterns applied now, through the same tester, so
+   * the two always agree. It bypasses the verdict cache, which only ever holds what this tester said.
+   *
+   * @returns Which line decided the verdict, and which lines it overrode.
+   */
+  public explain(params: IgnorePatternsComponentExplainParams): IgnoreVerdictExplanation {
+    const { isFolder, normalizedPath } = params;
+    const patterns = this.getIgnoreTester().explain(normalizedPath, isFolder);
+    const excludedFilesEntry = normalizedPath === ROOT_PATH ? null : findExcludedFilesMatch(this.getExcludedFilesMatchers(), normalizedPath, isFolder);
+    return {
+      excludedFilesEntry,
+      isIgnored: patterns.isIgnored || excludedFilesEntry !== null,
+      patterns
+    };
   }
 
   /**
@@ -304,19 +356,14 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
       return isIgnoredResult;
     }
 
-    const ignoreTester = this.getIgnoreTester();
-    const excludeRegExps = this.getExcludeRegExps();
-
     // A folder is tested against the trailing-slash (directory) form only: that is the
     // form gitignore negation re-includes via `!*/`, so a whitelist idiom (`*` + `!*/` +
     // `!*.md`) leaves folders traversable instead of the slash-less `foo` being caught by
     // `*`. Dir-only (`build/`) and plain (`node_modules`) patterns still match the slash
-    // form, so this is stricter only where negation intends it. The exclude regexps
-    // (Obsidian's `userIgnoreFilters`) keep testing both forms, unchanged.
-    const gitignorePath = isFolder ? `${normalizedPath}/` : normalizedPath;
-    const excludePaths = isFolder ? [normalizedPath, `${normalizedPath}/`] : [normalizedPath];
-    isIgnoredResult = ignoreTester.ignores(gitignorePath)
-      || excludePaths.some((path) => excludeRegExps.some((regExp) => regExp.test(path)));
+    // form, so this is stricter only where negation intends it. Obsidian's `userIgnoreFilters`
+    // keep testing both forms. `explain` answers from the same two matchers.
+    isIgnoredResult = this.getIgnoreTester().ignores(normalizedPath, isFolder)
+      || findExcludedFilesMatch(this.getExcludedFilesMatchers(), normalizedPath, isFolder) !== null;
     this.fileIgnoreMap.set(normalizedPath, isIgnoredResult);
     this.addStoreAction(normalizedPath, isIgnoredResult);
 
@@ -541,7 +588,7 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
   }
 
   private clearCachedExcludeRegExps(): void {
-    this.cachedExcludeRegExps = null;
+    this.cachedExcludedFilesMatchers = null;
     if (!this.pluginSettingsComponent.effectiveSettings.shouldIgnoreExcludedFiles) {
       return;
     }
@@ -597,32 +644,16 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
     return this.pluginSettingsComponent.effectiveSettings.ignorePatterns;
   }
 
-  private getExcludeRegExps(): RegExp[] {
+  private getExcludedFilesMatchers(): ExcludedFilesMatcher[] {
     if (!this.pluginSettingsComponent.effectiveSettings.shouldIgnoreExcludedFiles) {
       return [];
     }
 
-    if (this.cachedExcludeRegExps) {
-      return this.cachedExcludeRegExps;
-    }
-
-    const filters = this.getUserIgnoreFilters();
-    const excludeRegExps = filters.map((filter) => {
-      if (filter.length > 1 && filter.startsWith('/') && filter.endsWith('/')) {
-        try {
-          return new RegExp(filter.slice(1, -1), 'i');
-        } catch {
-          console.error(`Invalid exclude filter: ${filter}`);
-          return null;
-        }
-      }
-      return new RegExp(`^${escapeRegExp(filter)}`, 'i');
-    }).filter((regExp) => !!regExp);
-    this.cachedExcludeRegExps = excludeRegExps;
-    return excludeRegExps;
+    this.cachedExcludedFilesMatchers ??= createExcludedFilesMatchers(this.getUserIgnoreFilters());
+    return this.cachedExcludedFilesMatchers;
   }
 
-  private getIgnoreTester(): ignore.Ignore {
+  private getIgnoreTester(): MarkedPatternTester {
     return this.cachedIgnoreTester ?? this.rebuildIgnoreTester();
   }
 
@@ -754,12 +785,13 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
    * Builds the tester from the patterns as they are now. Built eagerly wherever patterns apply, so an edit in the
    * settings tab, which changes the patterns without applying them, never reaches it.
    */
-  private rebuildIgnoreTester(): ignore.Ignore {
-    const ignorePatternsString = `${this.getEffectivePatterns()}\n${this.cachedLocalPatterns}\n${this.cachedGitIgnoreContent}`;
-
-    this.cachedIgnoreTester = ignore({
-      ignoreCase: true
-    }).add(ignorePatternsString.split('\n'));
+  private rebuildIgnoreTester(): MarkedPatternTester {
+    // In the order they apply: the global patterns or the active profile's expansion, `.obsidianignore`, `.gitignore`.
+    this.cachedIgnoreTester = new MarkedPatternTester([
+      ...this.pluginSettingsComponent.effectiveSettings.lines.map((line) => toEffectiveLineOrigin(line)),
+      ...toPatternLineOrigins(this.cachedLocalPatterns, { layer: PatternLayer.LocalPatterns }),
+      ...toPatternLineOrigins(this.cachedGitIgnoreContent, { layer: PatternLayer.GitIgnore })
+    ]);
     return this.cachedIgnoreTester;
   }
 
@@ -869,4 +901,18 @@ export class IgnorePatternsComponent extends LayoutReadyComponent {
 
 function isSameImportedFileContents(a: ImportedFileContents, b: ImportedFileContents): boolean {
   return a.size === b.size && [...a].every(([path, content]) => b.has(path) && b.get(path) === content);
+}
+
+/**
+ * @returns The layer a line of the effective patterns belongs to: the global patterns, a profile, or a file a profile
+ * imports.
+ */
+function toEffectiveLineOrigin(line: ResolvedPatternLine): PatternLineOrigin {
+  if (line.profileName === null) {
+    return { layer: PatternLayer.GlobalPatterns, lineNumber: line.lineNumber, text: line.text };
+  }
+  if (line.filePath === undefined) {
+    return { layer: PatternLayer.Profile, lineNumber: line.lineNumber, profileName: line.profileName, text: line.text };
+  }
+  return { filePath: line.filePath, layer: PatternLayer.ImportedFile, lineNumber: line.lineNumber, profileName: line.profileName, text: line.text };
 }

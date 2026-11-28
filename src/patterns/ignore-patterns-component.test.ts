@@ -24,6 +24,7 @@ import {
   describe,
   expect,
   it,
+  onTestFinished,
   vi
 } from 'vitest';
 
@@ -41,6 +42,7 @@ import {
   statSafe,
   writeSafe
 } from '../data-adapter-safe.ts';
+import { PatternLayer } from '../explain/marked-pattern-tester.ts';
 import { resolveProfile } from '../profiles/profiles.ts';
 import { PluginSettings } from '../settings/plugin-settings.ts';
 import {
@@ -428,6 +430,70 @@ describe('IgnorePatternsComponent', () => {
       setupIndexedDatabase();
       const component = createComponent();
       expect(component).toBeInstanceOf(IgnorePatternsComponent);
+    });
+  });
+
+  describe('explain', () => {
+    it('should name the deciding line by layer, and agree with isIgnored for every path', async () => {
+      setupIndexedDatabase();
+      const app = createApp();
+      vi.mocked(app.vault.getConfig as ReturnType<typeof vi.fn<(...$arguments: unknown[]) => unknown>>).mockReturnValue(['Templates/']);
+      const pluginSettingsComponent = createPluginSettingsComponent({
+        profileState: { activeProfileId: 'work' },
+        settings: {
+          ignorePatterns: 'Archive/*\n*.log',
+          profiles: [{ id: 'work', name: 'Work', patterns: '!Archive/keep.md' }],
+          shouldIgnoreExcludedFiles: true
+        }
+      });
+      vi.mocked(readIfExists).mockResolvedValueOnce('# local\n*.tmp');
+      const component = createComponent({ app, pluginSettingsComponent });
+      await component.loadWithPromises();
+
+      expect(component.explain({ isFolder: false, normalizedPath: 'Archive/keep.md' })).toStrictEqual({
+        excludedFilesEntry: null,
+        isIgnored: false,
+        patterns: {
+          decidingLine: { layer: PatternLayer.Profile, lineNumber: 1, profileName: 'Work', text: '!Archive/keep.md' },
+          excludedFolderPath: null,
+          isIgnored: false,
+          overriddenLines: [{ layer: PatternLayer.GlobalPatterns, lineNumber: 1, text: 'Archive/*' }]
+        }
+      });
+      expect(component.explain({ isFolder: false, normalizedPath: 'a.tmp' }).patterns.decidingLine)
+        .toStrictEqual({ layer: PatternLayer.LocalPatterns, lineNumber: 2, text: '*.tmp' });
+      expect(component.explain({ isFolder: true, normalizedPath: 'Templates' })).toMatchObject({
+        excludedFilesEntry: { layer: PatternLayer.ExcludedFiles, lineNumber: 1, text: 'Templates/' },
+        isIgnored: true
+      });
+      expect(component.explain({ isFolder: true, normalizedPath: '/' }).isIgnored).toBe(false);
+
+      for (const [normalizedPath, isFolder] of [['Archive/old.md', false], ['Archive/keep.md', false], ['x.log', false], ['a.tmp', false], ['Templates', true], ['note.md', false]] as const) {
+        expect(component.explain({ isFolder, normalizedPath }).isIgnored, normalizedPath).toBe(component.isIgnored({ isFolder, normalizedPath }));
+      }
+    });
+
+    it('should name a line of a file the active profile imports', async () => {
+      setupIndexedDatabase();
+      const readImportedFileImplementation = vi.mocked(readImportedFile).getMockImplementation();
+      vi.mocked(readImportedFile).mockImplementation(() => Promise.resolve('drafts/'));
+      onTestFinished(() => {
+        vi.mocked(readImportedFile).mockImplementation(readImportedFileImplementation ?? ((): Promise<null> => Promise.resolve(null)));
+      });
+      const pluginSettingsComponent = createPluginSettingsComponent({
+        profileState: { activeProfileId: 'work' },
+        settings: { profiles: [{ id: 'work', name: 'Work', patterns: '@import file:shared.txt' }] }
+      });
+      const component = createComponent({ pluginSettingsComponent });
+      await component.loadWithPromises();
+
+      expect(component.explain({ isFolder: true, normalizedPath: 'drafts' }).patterns.decidingLine).toStrictEqual({
+        filePath: 'shared.txt',
+        layer: PatternLayer.ImportedFile,
+        lineNumber: 1,
+        profileName: 'Work',
+        text: 'drafts/'
+      });
     });
   });
 
