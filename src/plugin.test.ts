@@ -272,11 +272,11 @@ describe('Plugin', () => {
      * The real `PluginBase` adds its universal child components to an internal
      * wrapper component, and that wrapper to itself through the base
      * `Component.addChild`, so none of them reaches the `addChild` override
-     * spied on here. Every call it sees is one of the plugin's own 18
+     * spied on here. Every call it sees is one of the plugin's own 19
      * `onloadImpl` children, which the override routes into the gated
      * feature-surface tier.
      */
-    const EXPECTED_ADD_CHILD_CALLS = 18;
+    const EXPECTED_ADD_CHILD_CALLS = 19;
     const appOriginal = app.asOriginalType__();
 
     // Spy on the real addChild (calls through) so the real children still load.
