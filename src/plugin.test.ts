@@ -123,7 +123,14 @@ vi.mock('./patches/metadata-cache-save-file-cache-patch-component.ts', () => ({
 vi.mock('./soft-exclude/soft-exclude-patch-component.ts', () => ({
   // eslint-disable-next-line prefer-arrow-callback, func-names -- mock must be constructable with `new` and return a real loadable Component.
   SoftExcludePatchComponent: vi.fn(function () {
-    return Object.assign(new Component(), { getFeatureScopedApp: vi.fn() });
+    return Object.assign(new Component(), { getFeatureScopedApp: vi.fn(), isSoftExcluded: vi.fn() });
+  })
+}));
+
+vi.mock('./soft-exclude/suggestion-removal-component.ts', () => ({
+  // eslint-disable-next-line prefer-arrow-callback, func-names -- mock must be constructable with `new` and return a real loadable Component.
+  SuggestionRemovalComponent: vi.fn(function () {
+    return new Component();
   })
 }));
 
@@ -265,7 +272,7 @@ describe('Plugin', () => {
      * The real `PluginBase` adds its universal child components to an internal
      * wrapper component, and that wrapper to itself through the base
      * `Component.addChild`, so none of them reaches the `addChild` override
-     * spied on here. Every call it sees is one of the plugin's own 17
+     * spied on here. Every call it sees is one of the plugin's own 18
      * `onloadImpl` children, which the override routes into the gated
      * feature-surface tier.
      */
