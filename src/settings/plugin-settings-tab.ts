@@ -10,6 +10,7 @@ import {
 } from '@mnaoumov/typescript-lib/async';
 import { Setting } from 'obsidian';
 
+import type { PathExplanation } from '../explain/path-explanation.ts';
 import type { IgnorePatternsComponent } from '../patterns/ignore-patterns-component.ts';
 import type { PluginSettingsComponent } from './plugin-settings-component.ts';
 import type {
@@ -21,6 +22,7 @@ import {
   GIT_IGNORE_FILE,
   OBSIDIAN_IGNORE_FILE
 } from '../constants.ts';
+import { renderPathExplanation } from '../explain/path-explanation.ts';
 import { attachPatternValidation } from '../patterns/pattern-findings-view.ts';
 import { ProfileEditModal } from '../profiles/profile-edit-modal.ts';
 import { getProfileChoices } from '../profiles/profile-suggest-modal.ts';
@@ -71,16 +73,21 @@ const SOFT_EXCLUDE_FEATURE_TOGGLES: readonly SoftExcludeFeatureToggle[] = [
 ];
 
 interface PluginSettingsTabConstructorParams extends PluginSettingsTabBaseConstructorParams<PluginSettings> {
+  readonly explainTypedPath: (this: void, typedPath: string) => Promise<null | PathExplanation>;
   readonly ignorePatternsComponent: IgnorePatternsComponent;
   readonly pluginSettingsComponent: PluginSettingsComponent;
 }
 
 export class PluginSettingsTab extends PluginSettingsTabBase<PluginSettings> {
+  // Kept across re-renders, so a refresh of the tab does not lose the path being explained.
+  private explainedPath = '';
+  private readonly explainTypedPath: (typedPath: string) => Promise<null | PathExplanation>;
   private readonly ignorePatternsComponent: IgnorePatternsComponent;
   private readonly profileSettingsComponent: PluginSettingsComponent;
 
   public constructor(params: PluginSettingsTabConstructorParams) {
     super(params);
+    this.explainTypedPath = params.explainTypedPath;
     this.ignorePatternsComponent = params.ignorePatternsComponent;
     this.profileSettingsComponent = params.pluginSettingsComponent;
   }
@@ -362,6 +369,54 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginSettings> {
                 });
               });
               this.addApplyButton(setting);
+            }
+          })
+        ]
+      }),
+      this.settingGroupEx({
+        heading: 'Explain',
+        items: [
+          this.settingEx({
+            desc: createFragment((f) => {
+              f.appendText('Type a vault path to see whether it is excluded, which line of which layer decides it, and which lines that line overrides. It explains the patterns as applied, so press ');
+              appendCodeBlock(f, 'Apply');
+              f.appendText(' first after an edit.');
+              f.createEl('br');
+              f.appendText('For an item the Files pane still shows, its menu has ');
+              appendCodeBlock(f, 'Why is this excluded?');
+              f.appendText(' too.');
+            }),
+            name: 'Explain a path',
+            render: (setting) => {
+              const resultEl = setting.settingEl.createDiv({ cls: 'advanced-exclude-explanation' });
+              const explain = async (): Promise<void> => {
+                const explanation = this.explainedPath.trim() === '' ? null : await this.explainTypedPath(this.explainedPath);
+                if (explanation) {
+                  renderPathExplanation(resultEl, explanation);
+                } else {
+                  resultEl.empty();
+                }
+              };
+              setting
+                .addText((text) => {
+                  text
+                    .setPlaceholder('folder/note.md')
+                    .setValue(this.explainedPath)
+                    .onChange((value) => {
+                      this.explainedPath = value;
+                    });
+                  text.inputEl.addEventListener('keydown', (keyboardEvent) => {
+                    if (keyboardEvent.key === 'Enter') {
+                      invokeAsyncSafely(explain);
+                    }
+                  });
+                })
+                .addButton((button) => {
+                  button.setButtonText('Explain').onClick(convertAsyncToSync(explain));
+                });
+              if (this.explainedPath.trim() !== '') {
+                invokeAsyncSafely(explain);
+              }
             }
           })
         ]

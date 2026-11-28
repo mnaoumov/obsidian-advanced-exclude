@@ -6,36 +6,37 @@ import {
 
 import {
   doesMatchPropertyRules,
+  findMatchingPropertyRule,
   parsePropertyRules
 } from './property-rules.ts';
 
 describe('parsePropertyRules', () => {
   it('parses key: value and key-only lines, lower-casing both', () => {
     expect(parsePropertyRules('Visibility: GM-only\r\ndraft')).toEqual([
-      { key: 'visibility', value: 'gm-only' },
-      { key: 'draft', value: null }
+      { key: 'visibility', lineNumber: 1, text: 'Visibility: GM-only', value: 'gm-only' },
+      { key: 'draft', lineNumber: 2, text: 'draft', value: null }
     ]);
   });
 
   it('skips empty lines, comments and lines with no key', () => {
-    expect(parsePropertyRules('\n  \n# a comment\n: orphan\nstatus: done')).toEqual([{ key: 'status', value: 'done' }]);
+    expect(parsePropertyRules('\n  \n# a comment\n: orphan\nstatus: done')).toEqual([{ key: 'status', lineNumber: 5, text: 'status: done', value: 'done' }]);
   });
 
   it('treats an empty value as any value', () => {
-    expect(parsePropertyRules('status:   ')).toEqual([{ key: 'status', value: null }]);
+    expect(parsePropertyRules('status:   ')).toEqual([{ key: 'status', lineNumber: 1, text: 'status:   ', value: null }]);
   });
 
   it('drops matching quotes around a value, and keeps a lone or unmatched quote', () => {
     expect(parsePropertyRules('a: "x y"\nb: \'z\'\nc: "\nd: "w\'')).toEqual([
-      { key: 'a', value: 'x y' },
-      { key: 'b', value: 'z' },
-      { key: 'c', value: '"' },
-      { key: 'd', value: '"w\'' }
+      { key: 'a', lineNumber: 1, text: 'a: "x y"', value: 'x y' },
+      { key: 'b', lineNumber: 2, text: 'b: \'z\'', value: 'z' },
+      { key: 'c', lineNumber: 3, text: 'c: "', value: '"' },
+      { key: 'd', lineNumber: 4, text: 'd: "w\'', value: '"w\'' }
     ]);
   });
 
   it('keeps everything after the first colon as the value', () => {
-    expect(parsePropertyRules('url: https://example.com')).toEqual([{ key: 'url', value: 'https://example.com' }]);
+    expect(parsePropertyRules('url: https://example.com')).toEqual([{ key: 'url', lineNumber: 1, text: 'url: https://example.com', value: 'https://example.com' }]);
   });
 
   it('returns no rules for empty text', () => {
@@ -68,6 +69,11 @@ describe('doesMatchPropertyRules', () => {
     expect(doesMatchPropertyRules({ secret: null }, rules)).toBe(false);
     expect(doesMatchPropertyRules({ secret: [] }, rules)).toBe(false);
     expect(doesMatchPropertyRules({ secret: { nested: 'x' } }, rules)).toBe(false);
+  });
+
+  it('names the first rule a note matches', () => {
+    expect(findMatchingPropertyRule({ draft: 'TRUE', secret: 'x' }, rules)?.lineNumber).toBe(2);
+    expect(findMatchingPropertyRule({ other: 'x' }, rules)).toBeNull();
   });
 
   it('does not match a note without the property, without frontmatter, or with no rules', () => {

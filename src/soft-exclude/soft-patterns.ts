@@ -1,7 +1,11 @@
-import ignore from 'ignore';
-
+import type { PatternVerdictExplanation } from '../explain/marked-pattern-tester.ts';
 import type { PluginSettings } from '../settings/plugin-settings.ts';
 
+import {
+  MarkedPatternTester,
+  PatternLayer,
+  toPatternLineOrigins
+} from '../explain/marked-pattern-tester.ts';
 import { ExcludeMode } from '../settings/plugin-settings.ts';
 
 /**
@@ -18,12 +22,19 @@ export interface SoftExcludeActivitySettings {
 export class SoftPatternsTester {
   public readonly hasPatterns: boolean;
   public readonly text: string;
-  private readonly tester: ignore.Ignore;
+  private readonly tester: MarkedPatternTester;
 
   public constructor(text: string) {
     this.text = text;
     this.hasPatterns = hasSoftPatterns(text);
-    this.tester = ignore({ ignoreCase: true }).add(text.split('\n'));
+    this.tester = new MarkedPatternTester(toPatternLineOrigins(text, { layer: PatternLayer.SoftPatterns }));
+  }
+
+  /**
+   * @returns Why the patterns give the path the verdict {@link isIgnored} gives it.
+   */
+  public explain(normalizedPath: string, isFolder: boolean): PatternVerdictExplanation {
+    return this.tester.explain(normalizedPath, isFolder);
   }
 
   /**
@@ -33,10 +44,7 @@ export class SoftPatternsTester {
    * @returns Whether the patterns soft-exclude the path.
    */
   public isIgnored(normalizedPath: string, isFolder: boolean): boolean {
-    if (!this.hasPatterns || normalizedPath === '' || normalizedPath === '/') {
-      return false;
-    }
-    return this.tester.ignores(isFolder ? `${normalizedPath}/` : normalizedPath);
+    return !(!this.hasPatterns || normalizedPath === '' || normalizedPath === '/') && this.tester.ignores(normalizedPath, isFolder);
   }
 }
 

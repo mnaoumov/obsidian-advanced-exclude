@@ -6,7 +6,11 @@ import { PluginDataHandler } from '@mnaoumov/obsidian-lib/data-handler';
 import { PluginBase } from '@mnaoumov/obsidian-lib/plugin/plugin';
 import { PluginEventSourceImpl } from '@mnaoumov/obsidian-lib/plugin/plugin-event-source';
 
+import type { PathExplanation } from './explain/path-explanation.ts';
+
+import { PathExplainer } from './explain/path-explainer.ts';
 import { ExcludeMenuComponent } from './files-pane/exclude-menu-component.ts';
+import { ExplainMenuComponent } from './files-pane/explain-menu-component.ts';
 import { FileTreeComponent } from './files-pane/file-tree-component.ts';
 import { IndexProjectionComponent } from './index-projection/index-projection-component.ts';
 import { ManualIndexHider } from './index-projection/manual-index-hider.ts';
@@ -98,6 +102,8 @@ export class Plugin extends PluginBase {
     this.addChild(fileTreeComponent);
 
     const pluginSettingsTab = new PluginSettingsTab({
+      // Closes over `pathExplainer`, created further down: it is only called when the user explains a path in the tab.
+      explainTypedPath: (typedPath: string): Promise<null | PathExplanation> => pathExplainer.explainTypedPath(typedPath),
       ignorePatternsComponent,
       plugin: this,
       pluginSettingsComponent
@@ -173,6 +179,20 @@ export class Plugin extends PluginBase {
         ignorePatternsComponent,
         pluginNoticeComponent: this.pluginNoticeComponent,
         pluginSettingsComponent
+      })
+    );
+
+    const pathExplainer = new PathExplainer({
+      app: this.app,
+      ignorePatternsComponent,
+      pluginSettingsComponent,
+      softExcludePatchComponent
+    });
+    this.addChild(
+      new ExplainMenuComponent({
+        app: this.app,
+        pathExplainer,
+        pluginNoticeComponent: this.pluginNoticeComponent
       })
     );
 

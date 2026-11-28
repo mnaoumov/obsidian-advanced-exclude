@@ -25,6 +25,7 @@ import {
   vi
 } from 'vitest';
 
+import type { PathExplanation } from '../explain/path-explanation.ts';
 import type { IgnorePatternsComponent } from '../patterns/ignore-patterns-component.ts';
 import type { ProfileEditModal } from '../profiles/profile-edit-modal.ts';
 import type { EffectiveSettings } from '../profiles/profiles.ts';
@@ -117,6 +118,7 @@ function renderRows(tab: PluginSettingsTab): void {
 
 describe('PluginSettingsTab', () => {
   let app: App;
+  let explainTypedPath: ReturnType<typeof vi.fn<(typedPath: string) => Promise<null | PathExplanation>>>;
   let ignorePatternsComponent: IgnorePatternsComponent;
   let activeProfileId: null | string;
   let editAndSave: ReturnType<typeof vi.fn<PluginSettingsComponent['editAndSave']>>;
@@ -192,10 +194,74 @@ describe('PluginSettingsTab', () => {
       app: app.asOriginalType__()
     });
 
+    explainTypedPath = vi.fn(() => Promise.resolve(null));
     tab = new PluginSettingsTab({
+      explainTypedPath,
       ignorePatternsComponent,
       plugin,
       pluginSettingsComponent
+    });
+  });
+
+  describe('explain a path', () => {
+    function findPathInput(): HTMLInputElement {
+      const inputEl = tab.containerEl.querySelector<HTMLInputElement>('input[placeholder="folder/note.md"]');
+      if (!inputEl) {
+        throw new Error('No path input');
+      }
+      return inputEl;
+    }
+
+    function typePath(inputEl: HTMLInputElement, value: string): void {
+      inputEl.value = value;
+      inputEl.dispatchEvent(new Event('input'));
+    }
+
+    it('should explain a typed path on Explain and on Enter, and keep it across a re-render', async () => {
+      explainTypedPath.mockResolvedValue({
+        excludeMode: ExcludeMode.Full,
+        isFolder: false,
+        main: { excludedFilesEntry: null, isIgnored: false, patterns: { decidingLine: null, excludedFolderPath: null, isIgnored: false, overriddenLines: [] } },
+        path: 'a.md',
+        soft: { excludedFeatures: [], isSoftMode: false, propertyRule: null, softPatterns: null }
+      });
+      const handlers = captureButtonHandlers(tab);
+      typePath(findPathInput(), 'a.md');
+
+      handlers.get('Explain')?.[0]?.(new MouseEvent('click'));
+      await waitForAllAsyncOperations();
+
+      expect(explainTypedPath).toHaveBeenCalledWith('a.md');
+      expect(tab.containerEl.querySelector('.advanced-exclude-explanation')?.textContent).toBe('The file a.md is not excluded.Patterns: no line matches it.');
+
+      findPathInput().dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+      findPathInput().dispatchEvent(new KeyboardEvent('keydown', { key: 'a' }));
+      await waitForAllAsyncOperations();
+      expect(explainTypedPath).toHaveBeenCalledTimes(2);
+
+      tab.containerEl.empty();
+      renderRows(tab);
+      await waitForAllAsyncOperations();
+      expect(findPathInput().value).toBe('a.md');
+      expect(explainTypedPath).toHaveBeenCalledTimes(3);
+    });
+
+    it('should clear the result for an empty path or the vault root', async () => {
+      const handlers = captureButtonHandlers(tab);
+      const resultEl = tab.containerEl.querySelector('.advanced-exclude-explanation');
+      resultEl?.createDiv({ text: 'Stale' });
+
+      handlers.get('Explain')?.[0]?.(new MouseEvent('click'));
+      await waitForAllAsyncOperations();
+      expect(explainTypedPath).not.toHaveBeenCalled();
+      expect(resultEl?.textContent).toBe('');
+
+      typePath(findPathInput(), '/');
+      resultEl?.createDiv({ text: 'Stale' });
+      handlers.get('Explain')?.[0]?.(new MouseEvent('click'));
+      await waitForAllAsyncOperations();
+      expect(explainTypedPath).toHaveBeenCalledWith('/');
+      expect(resultEl?.textContent).toBe('');
     });
   });
 
@@ -215,6 +281,7 @@ describe('PluginSettingsTab', () => {
         'Every device: plugin settings, carried by Obsidian Sync',
         'This device: .obsidianignore, not carried by Obsidian Sync',
         'Options',
+        'Explain',
         'Profiles'
       ]);
       expect(names).toContain('Global patterns');
@@ -233,7 +300,7 @@ describe('PluginSettingsTab', () => {
         refreshLocalPatterns,
         scheduleLocalPatternsSave
       });
-      tab = new PluginSettingsTab({ ignorePatternsComponent, plugin: strictProxy<Plugin>({ app: app.asOriginalType__() }), pluginSettingsComponent });
+      tab = new PluginSettingsTab({ explainTypedPath, ignorePatternsComponent, plugin: strictProxy<Plugin>({ app: app.asOriginalType__() }), pluginSettingsComponent });
 
       renderRows(tab);
 
